@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>即時天氣 + 預報（全球 MVP：Open-Meteo + 台灣 CWA）</title>
+
+  <style>
+    *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+    :root{
+      --bg1:#4da8ff;
+      --bg2:#c5e5ff;
+      --panel:rgba(0,0,0,.22);
+      --panel-border:rgba(255,255,255,.10);
+      --text-main:rgba(255,255,255,.96);
+      --text-sub:rgba(255,255,255,.75);
+      --glow:rgba(255,255,255,.16);
+      --temp-tint:rgba(255,255,255,0);
+      --section-bg:rgba(0,0,0,.10);
+      --section-border:rgba(255,255,255,.08);
+      --item-bg:rgba(255,255,255,.10);
+      --item-border:rgba(255,255,255,.10);
+      --btn-pill-bg:rgba(255,255,255,.10);
+    }
+    body{
+      margin:0;min-height:100vh;
+      background:
+        linear-gradient(var(--temp-tint), var(--temp-tint)),
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,.14), transparent 34%),
+        linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+      display:flex;align-items:center;justify-content:center;color:var(--text-main);
+      transition:background .8s ease,color .5s ease;
+      overflow-x:hidden;
+      position:relative;
+    }
+    .app{padding:24px;width:100%;max-width:430px;position:relative;z-index:2}
+    .card{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:28px;
+  padding:20px 22px 18px;
+  backdrop-filter:blur(18px);
+  box-shadow:0 14px 30px rgba(0,0,0,.16);
+  transition:background .6s ease,border-color .6s ease,box-shadow .6s ease;
+}
+    .card-top{display:flex;justify-content:space-between;align-items:center}
+    .card-location{font-size:18px;font-weight:500}
+    .card-coord{font-size:11px;opacity:.9;margin-top:2px}
+    #refreshBtn{
+      border:none;border-radius:999px;padding:6px 12px;
+      font-size:12px;font-weight:600;
+      background:rgba(255,255,255,.95);color:#0561cb;cursor:pointer
+    }
+
+    .mode-selector{margin-top:14px;display:flex;gap:8px;font-size:12px;flex-wrap:wrap}
+    .mode-selector label{
+      padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.15);
+      cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:.15s
+    }
+    .mode-selector input[type="radio"]{display:none}
+    .mode-selector label.active-mode{background:#0561cb;color:#fff}
+
+    .mode-input{margin-top:10px}
+    #mode-town input,#mode-coord input{
+      width:100%;padding:8px 10px;border:none;border-radius:999px;outline:none;margin-bottom:6px
+    }
+    .coord-row{display:flex;gap:6px}
+
+    .temp-row{margin-top:12px;display:flex;align-items:flex-end;justify-content:center;gap:12px}
+    .card-temp{font-size:72px;font-weight:600; font-variant-numeric: tabular-nums;}
+    .card-feels{
+      font-size:14px;padding:4px 10px;border-radius:999px;
+      background:rgba(0,0,0,.22);align-self:center;opacity:.95;white-space:nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .condition-row{margin-top:-2px;display:flex;align-items:center;justify-content:center;gap:10px}
+    .card-icon{font-size:32px;line-height:1}
+    .card-condition{font-size:18px;letter-spacing:2px;opacity:.95}
+
+    .realtime-metrics-wrap{margin-top:10px}
+    .realtime-metrics-top{
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:8px
+    }
+    .realtime-metrics-title{
+      font-size:12px;
+      opacity:1;
+      letter-spacing:.5px;
+      font-weight:700;
+      color:rgba(255,255,255,.96);
+    }
+    .realtime-metrics{
+      margin-top:8px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .metric-pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:600;
+      opacity:1;
+      font-variant-numeric:tabular-nums;
+      white-space:nowrap;
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .metric-pill b{font-weight:800}
+
+    .metric-wind{background:#1F4F95;color:#FFFFFF;}
+    .metric-hum{background:#147A63;color:#FFFFFF;}
+    .metric-pres{background:#46515C;color:#FFFFFF;}
+    .metric-sun{background:#C89200;color:#FFFFFF;}
+    .metric-vis{background:#BFC9D4;color:#1E2A36;}
+
+    .card-subtitle{margin-top:8px;font-size:12px;opacity:.9;line-height:1.6}
+    .card-time{margin-top:4px;font-size:11px;opacity:.8;text-align:left}
+
+    .card-divider{margin:12px 0 10px;border:none;border-top:1px solid rgba(255,255,255,.25)}
+
+    .hourly-block{
+      margin-top:12px;
+      padding:12px 10px 10px;
+      border-radius:18px;
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      transition:background .6s ease,border-color .6s ease;
+    }
+
+    .forecast-header{margin-top:2px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .forecast-title{font-size:13px;font-weight:700;letter-spacing:.5px;opacity:.96}
+    .forecast-mode-toggle{
+      display:flex;
+      gap:4px;
+      align-items:center;
+      padding:3px;
+      border-radius:999px;
+      background:var(--btn-pill-bg);
+      border:1px solid var(--section-border);
+      transition:background .6s ease,border-color .6s ease;
+    }
+
+    .forecast-mode-btn,.mini-toggle-btn{
+      border:none;border-radius:999px;padding:5px 10px;
+      font-size:11px;font-weight:700;
+      background:transparent;color:rgba(255,255,255,.72);cursor:pointer;white-space:nowrap
+    }
+    .forecast-mode-btn.on,.mini-toggle-btn.on{
+      background:#0561cb;color:#fff;box-shadow:0 4px 10px rgba(5,97,203,.25)
+    }
+    .mini-toggle-btn{
+      padding:4px 9px;font-size:10px;opacity:1;
+      background:rgba(255,255,255,.12);color:#fff;
+    }
+
+    .hourly-forecast{
+      margin-top:10px;
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding:2px 2px 8px;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .hourly-forecast::-webkit-scrollbar{display:none}
+    .forecast-item{
+      flex:0 0 auto;
+      width:72px;
+      min-height:122px;
+      border-radius:20px;
+      background:var(--item-bg);
+      border:1px solid var(--item-border);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px rgba(0,0,0,.10);
+      text-align:center;
+      padding:8px 6px 10px;
+      backdrop-filter:blur(8px);
+      transition:background .6s ease,border-color .6s ease;
+    }
+    .forecast-item.is-now{
+      background:linear-gradient(180deg, rgba(20,119,255,.40) 0%, rgba(20,119,255,.22) 100%);
+      border:1px solid rgba(255,255,255,.20);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 10px 20px rgba(5,97,203,.20);
+    }
+    .forecast-item .fi-time{font-size:11px;margin-bottom:6px;opacity:.78;font-weight:600;font-variant-numeric: tabular-nums;}
+    .forecast-item .fi-icon{font-size:23px;line-height:1;margin-bottom:8px}
+    .forecast-item .fi-temp{font-size:16px;font-weight:800;line-height:1.05;font-variant-numeric: tabular-nums;}
+    .forecast-item .fi-sub{font-size:10px;opacity:.72;margin-top:3px;line-height:1.2;font-variant-numeric: tabular-nums;}
+    .fi-pop{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      margin-top:5px;
+      padding:2px 7px;
+      border-radius:999px;
+      background:rgba(255,255,255,.12);
+      font-size:10px;
+      font-weight:700;
+      opacity:.92;
+    }
+
+    .forecast-empty{font-size:11px;opacity:.8}
+
+    .source-wrap{margin-top:12px}
+    .source-toggle-btn{
+      width:100%;
+      border:none;
+      border-radius:14px;
+      padding:10px 12px;
+      font-size:12px;
+      font-weight:600;
+      color:#fff;
+      background:rgba(255,255,255,.12);
+      cursor:pointer;
+      text-align:left;
+    }
+    .source-toggle-btn.on{background:rgba(255,255,255,.18);}
+    .source-panel{
+      margin-top:8px;
+      padding:10px 12px;
+      border-radius:14px;
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      transition:background .6s ease,border-color .6s ease;
+    }
+    .source-panel #hintBar{margin-top:8px;font-size:11px;opacity:.85;line-height:1.45}
+    .source-panel .card-footer{margin-top:10px;text-align:left}
+
+
+    .daily-forecast{margin-top:6px;display:flex;flex-direction:column;gap:4px}
+    .daily-row{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:6px 10px;border-radius:14px;background:var(--section-bg);font-size:12px;
+      border:1px solid var(--section-border);
+      overflow:hidden;transition:background .6s ease,border-color .6s ease;
+    }
+    .dr-left{min-width:54px;opacity:.95}
+    .dr-mid{display:flex;align-items:center;gap:6px;min-width:130px;flex:1}
+    .dr-icon{font-size:18px}
+    .dr-wx{opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+
+    .dr-right{
+      display:flex;align-items:center;gap:8px;justify-content:flex-end;
+      min-width:138px; font-variant-numeric: tabular-nums;
+    }
+    .dr-temp{
+      display:flex;align-items:baseline;gap:6px;
+      min-width:90px;justify-content:flex-end;
+    }
+    .dr-min{opacity:.78; min-width:34px; text-align:right;}
+    .dr-max{font-weight:600; min-width:34px; text-align:right;}
+
+    .dr-pop{display:flex;justify-content:flex-end;min-width:0}
+    .dr-pop-pill{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:2px 8px;border-radius:999px;
+      background:rgba(255,255,255,.14);
+      font-size:11px;opacity:.92;
+      min-width:44px;
+    }
+
+    #hintBar{margin-top:8px;font-size:11px;opacity:.85;line-height:1.45}
+    #hintBar b{font-weight:650}
+
+    #debugBox{
+      display:none;margin-top:10px;white-space:pre-wrap;
+      font-size:11px;opacity:.85;line-height:1.35;
+      background:rgba(0,0,0,.18);border-radius:12px;padding:8px 10px
+    }
+
+    .card-footer{margin-top:12px;font-size:11px;opacity:.75;text-align:right}
+    small{opacity:.8}
+    
+    .rain-block{
+  margin-top:14px;
+  padding:12px;
+  border-radius:18px;
+  background:var(--section-bg);
+  border:1px solid var(--section-border);
+  transition:background .6s ease,border-color .6s ease;
+}
+
+.rain-header{
+  margin-bottom:10px;
+}
+
+.rain-title{
+  font-size:13px;
+  font-weight:700;
+  color:rgba(255,255,255,.96);
+  letter-spacing:.3px;
+}
+
+.rain-subtitle{
+  margin-top:3px;
+  font-size:11px;
+  color:rgba(255,255,255,.68);
+}
+
+.rain-controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+#rainMinutes{
+  flex:1;
+  min-width:0;
+  padding:10px 14px;
+  border:none;
+  border-radius:999px;
+  outline:none;
+  background:rgba(255,255,255,.92);
+  color:#1f2f45;
+  font-size:14px;
+  font-weight:600;
+}
+
+#rainBtn{
+  flex:0 0 auto;
+  padding:10px 14px;
+  border:none;
+  border-radius:999px;
+  background:rgba(255,255,255,.16);
+  color:#fff;
+  font-weight:700;
+  cursor:pointer;
+  border:1px solid rgba(255,255,255,.10);
+}
+
+#rainBtn:hover{
+  background:rgba(255,255,255,.22);
+}
+
+#rainResult{
+  margin-top:10px;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.06);
+  font-size:13px;
+  font-weight:700;
+  color:rgba(255,255,255,.96);
+  text-align:center;
+}
+
+
+    .sky-layer,.rain-layer,.fog-layer,.stars-layer,.cloud-layer,.precip-layer{position:fixed;inset:0;pointer-events:none;z-index:0}
+    .sky-layer{opacity:0;transition:opacity .8s ease}
+    .rain-layer{opacity:0;transition:opacity .5s ease;background-image:linear-gradient(120deg,transparent 0%,transparent 46%,rgba(255,255,255,.08) 47%,rgba(255,255,255,.08) 48%,transparent 49%,transparent 100%);background-size:18px 18px;animation:rainMove .8s linear infinite}
+    .fog-layer{opacity:0;transition:opacity .8s ease;background:radial-gradient(circle at 30% 35%, rgba(255,255,255,.14), transparent 28%),radial-gradient(circle at 70% 60%, rgba(255,255,255,.10), transparent 30%),linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));filter:blur(18px)}
+    .stars-layer,.cloud-layer,.precip-layer{overflow:hidden}
+    .stars-layer{opacity:0;transition:opacity .7s ease}
+    .stars-layer .star{position:absolute;border-radius:50%;background:rgba(255,255,255,.95);box-shadow:0 0 6px rgba(255,255,255,.35);animation:twinkle var(--twinkle-dur,3s) ease-in-out infinite;animation-delay:var(--twinkle-delay,0s);transform:scale(var(--star-scale,1))}
+    .cloud-layer{opacity:0;transition:opacity .7s ease}
+    .cloud-layer .cloud{position:absolute;border-radius:999px;background:radial-gradient(ellipse at center, rgba(255,255,255,.26) 0%, rgba(255,255,255,.18) 40%, rgba(255,255,255,.08) 62%, rgba(255,255,255,0) 78%);filter:blur(4px);animation:cloudDrift var(--cloud-dur,70s) linear infinite;animation-delay:var(--cloud-delay,0s)}
+    .cloud-layer .cloud::before,.cloud-layer .cloud::after{content:"";position:absolute;border-radius:999px;background:inherit}
+    .cloud-layer .cloud::before{width:58%;height:78%;left:8%;top:-28%}
+    .cloud-layer .cloud::after{width:46%;height:66%;right:10%;top:-18%}
+    .precip-layer{opacity:0;transition:opacity .45s ease}
+    .precip-layer .drop{position:absolute;top:-18%;width:1.5px;height:52px;border-radius:999px;background:linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.22) 18%, rgba(255,255,255,.85) 100%);box-shadow:0 0 6px rgba(170,210,255,.22);transform:rotate(11deg);animation:fallRain var(--drop-dur,1s) linear infinite;animation-delay:var(--drop-delay,0s);opacity:var(--drop-opacity,.7)}
+    .precip-layer .snowflake{position:absolute;top:-12%;color:rgba(255,255,255,.95);text-shadow:0 0 8px rgba(255,255,255,.3);animation:fallSnow var(--snow-dur,8s) linear infinite;animation-delay:var(--snow-delay,0s);font-size:var(--snow-size,10px);opacity:var(--snow-opacity,.85)}
+    @keyframes rainMove{from{transform:translateY(-10px)}to{transform:translateY(10px)}}
+    @keyframes twinkle{0%,100%{opacity:.18;transform:scale(var(--star-scale,1))}50%{opacity:1;transform:scale(calc(var(--star-scale,1) * 1.7))}}
+    @keyframes cloudDrift{0%{transform:translateX(-22vw)}100%{transform:translateX(118vw)}}
+    @keyframes fallRain{0%{transform:translate3d(0,-8vh,0) rotate(11deg)}100%{transform:translate3d(-10vw,120vh,0) rotate(11deg)}}
+    @keyframes fallSnow{0%{transform:translate3d(0,-8vh,0) rotate(0deg)}50%{transform:translate3d(14px,58vh,0) rotate(140deg)}100%{transform:translate3d(-10px,118vh,0) rotate(300deg)}}
+
+    body[data-scene="clear-day"]{--bg1:#5aaeff;--bg2:#bfe3ff;--panel:rgba(60,110,170,.30);--panel-border:rgba(255,255,255,.16);--section-bg:rgba(29,73,120,.16);--section-border:rgba(255,255,255,.10);--item-bg:rgba(255,255,255,.11);--item-border:rgba(255,255,255,.10)}
+body[data-scene="partly-day"]{
+  --bg1:#7dbcf0;
+  --bg2:#d7ebf8;
+  --panel:rgba(95,130,168,.26);
+  --panel-border:rgba(255,255,255,.18);
+  --section-bg:rgba(72,102,136,.14);
+  --section-border:rgba(255,255,255,.11);
+  --item-bg:rgba(255,255,255,.13);
+  --item-border:rgba(255,255,255,.11);
+}
+body[data-scene="overcast-day"]{
+  --bg1:#89a8c3;
+  --bg2:#d5e2ec;
+  --panel:rgba(122,145,166,.20);
+  --panel-border:rgba(255,255,255,.22);
+  --section-bg:rgba(96,116,136,.10);
+  --section-border:rgba(255,255,255,.13);
+  --item-bg:rgba(255,255,255,.15);
+  --item-border:rgba(255,255,255,.12);
+}
+body[data-scene="rain-day"]{
+  --bg1:#6f98bc;
+  --bg2:#c3d8e8;
+  --panel:rgba(72,94,118,.30);
+  --panel-border:rgba(255,255,255,.15);
+  --section-bg:rgba(54,72,92,.17);
+  --section-border:rgba(255,255,255,.10);
+  --item-bg:rgba(255,255,255,.11);
+  --item-border:rgba(255,255,255,.10);
+}
+body[data-scene="storm-day"]{
+  --bg1:#5f7e9c;
+  --bg2:#a9bfd1;
+  --panel:rgba(58,74,95,.34);
+  --panel-border:rgba(255,255,255,.13);
+  --section-bg:rgba(39,53,70,.20);
+  --section-border:rgba(255,255,255,.09);
+  --item-bg:rgba(255,255,255,.10);
+  --item-border:rgba(255,255,255,.09);
+}
+    body[data-scene="clear-night"]{--bg1:#0d2149;--bg2:#203764;--panel:rgba(18,31,58,.44);--panel-border:rgba(255,255,255,.10);--section-bg:rgba(17,28,47,.25);--section-border:rgba(255,255,255,.08);--item-bg:rgba(255,255,255,.09);--item-border:rgba(255,255,255,.08)}
+    body[data-scene="cloudy-night"]{--bg1:#1b2a44;--bg2:#3d5270;--panel:rgba(22,33,51,.46);--panel-border:rgba(255,255,255,.10);--section-bg:rgba(16,24,38,.28);--section-border:rgba(255,255,255,.08);--item-bg:rgba(255,255,255,.08);--item-border:rgba(255,255,255,.08)}
+    body[data-scene="rain-night"]{--bg1:#172336;--bg2:#334960;--panel:rgba(18,26,40,.52);--panel-border:rgba(255,255,255,.09);--section-bg:rgba(12,18,29,.30);--section-border:rgba(255,255,255,.08);--item-bg:rgba(255,255,255,.08);--item-border:rgba(255,255,255,.08)}
+    body[data-scene="fog-day"]{--bg1:#8da0ad;--bg2:#d2dbe2;--panel:rgba(86,99,109,.34);--panel-border:rgba(255,255,255,.14);--section-bg:rgba(49,60,69,.18);--section-border:rgba(255,255,255,.10);--item-bg:rgba(255,255,255,.10);--item-border:rgba(255,255,255,.09)}
+    body[data-scene="fog-night"]{--bg1:#283544;--bg2:#4f6377;--panel:rgba(31,42,53,.46);--panel-border:rgba(255,255,255,.11);--section-bg:rgba(20,28,36,.28);--section-border:rgba(255,255,255,.08);--item-bg:rgba(255,255,255,.08);--item-border:rgba(255,255,255,.08)}
+    body[data-scene="sunrise"],body[data-scene="sunset"]{--bg1:#6e7fd6;--bg2:#f3b37f;--panel:rgba(72,82,120,.30);--panel-border:rgba(255,255,255,.16);--section-bg:rgba(45,51,82,.18);--section-border:rgba(255,255,255,.10);--item-bg:rgba(255,255,255,.11);--item-border:rgba(255,255,255,.10)}
+
+body[data-scene="clear-day"] .sky-layer,
+body[data-scene="partly-day"] .sky-layer,
+body[data-scene="overcast-day"] .sky-layer,
+body[data-scene="rain-day"] .sky-layer{
+  opacity:1;
+  background:
+    radial-gradient(circle at 72% 10%, rgba(255,245,190,.20), transparent 18%),
+    radial-gradient(circle at 50% 18%, rgba(255,255,255,.15), transparent 34%),
+    radial-gradient(circle at 50% 60%, rgba(255,255,255,.05), transparent 46%);
+}
+    body[data-scene="clear-night"] .sky-layer,body[data-scene="cloudy-night"] .sky-layer,body[data-scene="rain-night"] .sky-layer{opacity:.34;background:radial-gradient(circle at 50% 14%, rgba(180,205,255,.12), transparent 26%),linear-gradient(180deg, rgba(255,255,255,.03), transparent 42%)}
+    body[data-scene="rain-day"] .rain-layer,body[data-scene="rain-night"] .rain-layer,body[data-scene="storm-day"] .rain-layer{opacity:1}
+    body[data-scene="fog-day"] .fog-layer,body[data-scene="fog-night"] .fog-layer{opacity:1}
+
+  </style>
+</head>
+
+<body data-scene="clear-day">
+  <div class="sky-layer"></div>
+  <div class="stars-layer" id="starsLayer"></div>
+  <div class="cloud-layer" id="cloudLayer"></div>
+  <div class="precip-layer" id="precipLayer"></div>
+  <div class="rain-layer"></div>
+  <div class="fog-layer"></div>
+
+  <div class="app">
+    <div class="card">
+
+      <div class="card-top">
+        <div>
+          <div class="card-location">
+            <span id="locationName">目前位置</span>
+            <span class="dot"> · </span>
+            <span id="altitudeLabel">-- m</span>
+          </div>
+          <div class="card-coord" id="coordLabel">座標：--, --</div>
+        </div>
+        <button id="refreshBtn" type="button">更新</button>
+      </div>
+
+      <div class="mode-selector">
+        <label data-mode="gps" class="active-mode">
+          <input type="radio" name="mode" value="gps" checked />
+          使用目前位置 (GPS)
+        </label>
+        <label data-mode="town">
+          <input type="radio" name="mode" value="town" />
+          輸入地點(城市或景點/地點)
+        </label>
+        <label data-mode="coord">
+          <input type="radio" name="mode" value="coord" />
+          輸入座標
+        </label>
+      </div>
+
+      <div class="mode-input" id="mode-town" style="display:none;">
+        <input id="townName" type="text" placeholder="例如：北京、天安門廣場、秀林鄉" />
+        <small>台灣鄉鎮市區：以公所座標；其他：以城市/景點座標。</small>
+      </div>
+
+      <div class="mode-input" id="mode-coord" style="display:none;">
+        <div class="coord-row">
+          <input id="manualLat" type="text" placeholder="緯度 (24.1234)" />
+          <input id="manualLon" type="text" placeholder="經度 (121.5678)" />
+        </div>
+        <input id="manualAlt" type="text" placeholder="高度 (m，可留白自動估算)" />
+      </div>
+
+      <div class="temp-row">
+        <div class="card-temp" id="cardTemp">--.-°</div>
+        <div class="card-feels" id="feelsLabel">體感 --.-°</div>
+      </div>
+
+      <div class="condition-row">
+        <div class="card-icon" id="weatherIcon">？</div>
+        <div class="card-condition" id="cardCondition">--</div>
+      </div>
+
+      <div class="realtime-metrics-wrap">
+        <div class="realtime-metrics-top">
+          <div class="realtime-metrics-title">更多天氣資料</div>
+        </div>
+        <div class="realtime-metrics" id="realtimeMetrics">
+          <span class="metric-pill metric-wind" id="mWind">風 <b>--</b></span>
+          <span class="metric-pill metric-hum" id="mHum">濕度 <b>--</b></span>
+          <span class="metric-pill metric-pres" id="mPres">氣壓 <b>--</b></span>
+          <span class="metric-pill metric-sun" id="mSun">日照 <b>--</b></span>
+          <span class="metric-pill metric-vis" id="mVis">能見度 <b>--</b></span>
+        </div>
+      </div>
+
+      <hr class="card-divider" />
+      
+      <!-- 降雨預測 -->
+<div class="rain-block">
+  <div class="rain-header">
+    <div class="rain-title">即時降雨預測</div>
+    <div class="rain-subtitle">查詢未來指定分鐘內降雨量</div>
+  </div>
+
+  <div class="rain-controls">
+    <input id="rainMinutes" type="number" placeholder="輸入1–60分鐘的整數" />
+    <button id="rainBtn">查詢降雨</button>
+  </div>
+
+  <div id="rainResult">--</div>
+</div>
+
+      <div class="hourly-block">
+        <div class="forecast-header">
+          <div class="forecast-title" id="fcTitle">未來 24 小時預報</div>
+          <div class="forecast-mode-toggle">
+            <button class="forecast-mode-btn on" data-forecast-mode="10m">10 分鐘</button>
+            <button class="forecast-mode-btn" data-forecast-mode="1h">1 小時</button>
+          </div>
+        </div>
+        <div class="hourly-forecast" id="hourlyForecast">
+          <div class="forecast-empty">尚無預報資料</div>
+        </div>
+      </div>
+
+      <div class="forecast-header" style="margin-top:10px;">
+        <div class="forecast-title">未來 7 天天氣預報</div>
+        <button id="toggle7dTempMode" class="mini-toggle-btn">顯示體感</button>
+      </div>
+      <div class="daily-forecast" id="dailyForecast">
+        <div class="forecast-empty">尚無預報資料</div>
+      </div>
+
+      <div class="source-wrap">
+        <button id="toggleSourceBtn" class="source-toggle-btn" type="button">資料來源</button>
+
+        <div id="sourcePanel" class="source-panel" style="display:none;">
+          <div class="card-subtitle" id="stationLabel">選擇模式後按「更新」。</div>
+          <div class="card-time" id="timeLabel"></div>
+          <div id="hintBar"></div>
+
+          <div class="card-footer" id="footerLabel">
+            即時：台灣優先 CWA（30km 內有測站）；否則 Open-Meteo current
+            <br/>
+            預報：台灣優先 CWA（30km 內有預報點）；否則 Open-Meteo forecast
+          </div>
+        </div>
+      </div>
+
+      <pre id="debugBox"></pre>
+    </div>
+  </div>
+
+<script>
+/* ===========================
+   設定
+   =========================== */
+const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
+
+const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
+const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
+
+const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ return ""; }})();
+const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0003-001") : "";
+const CWA_OBS_1H_PROXY  = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0001-001") : "";
+
+const ELEVATION_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/elev") : "/elev";
+const elevationCache = new Map();
+
+const OM_FORECAST = "https://api.open-meteo.com/v1/forecast";
+const OM_ELEVATION = "https://api.open-meteo.com/v1/elevation";
+
+// Open-Meteo 標準遞減率（°C/m）
+const LR_STD = 0.0065;
+
+// 台灣縣市 D0047
+const COUNTY_FORECAST_CODE = {
+  "宜蘭縣":"F-D0047-001","桃園市":"F-D0047-005","新竹縣":"F-D0047-009","苗栗縣":"F-D0047-013",
+  "彰化縣":"F-D0047-017","南投縣":"F-D0047-021","雲林縣":"F-D0047-025","嘉義縣":"F-D0047-029",
+  "屏東縣":"F-D0047-033","臺東縣":"F-D0047-037","花蓮縣":"F-D0047-041","澎湖縣":"F-D0047-045",
+  "基隆市":"F-D0047-049","新竹市":"F-D0047-053","嘉義市":"F-D0047-057","臺北市":"F-D0047-061",
+  "高雄市":"F-D0047-065","新北市":"F-D0047-069","臺中市":"F-D0047-073","臺南市":"F-D0047-077",
+  "連江縣":"F-D0047-081","金門縣":"F-D0047-085"
+};
+
+// B0053 short
+const B0053_SHORT = [
+  "F-B0053-005","F-B0053-011","F-B0053-017","F-B0053-023","F-B0053-029","F-B0053-035",
+  "F-B0053-041","F-B0053-047","F-B0053-053","F-B0053-059","F-B0053-065","F-B0053-071",
+  "F-B0053-078","F-B0053-084"
+];
+
+function weeklyIdFromThreeDay(threeDayId){
+  const n = parseInt(threeDayId.slice(-3),10);
+  if (threeDayId.startsWith("F-B0053-")) {
+    return "F-B0053-" + String(n - 2).padStart(3, "0");
+  }
+  return "F-D0047-" + String(n + 2).padStart(3, "0");
+}
+
+/* ===========================
+   UI helpers / debug
+   =========================== */
+const $ = (id)=>document.getElementById(id);
+const debugOn = (()=>{ try{ return new URL(location.href).searchParams.get("debug")==="1"; }catch{ return false; }})();
+if(debugOn) $("debugBox").style.display = "block";
+function dbg(s){ if(debugOn) $("debugBox").textContent += s + "\n"; }
+
+let forecastMode = "10m"; // 10m | 1h
+let weeklyMode = "temp";  // temp | feel
+let lastTarget = null;
+let currentSunriseHour = 5.6;
+let currentSunsetHour = 18.2333;
+
+const K_FIXED = 3;
+const DIST_POW = 1.7;
+
+/* ===========================
+   資料來源折疊
+   =========================== */
+let sourceOpen = false;
+function setSourceOpen(open){
+  sourceOpen = !!open;
+  $("sourcePanel").style.display = sourceOpen ? "block" : "none";
+  $("toggleSourceBtn").classList.toggle("on", sourceOpen);
+}
+$("toggleSourceBtn").onclick = ()=>setSourceOpen(!sourceOpen);
+
+/* ===========================
+   台澎金馬概略範圍
+   =========================== */
+function isInsideTaiwan(lat, lon) {
+  return (lat >= 3.9739 && lat <= 26.3895 && lon >= 108.3326 && lon <= 124.5611);
+}
+
+/* ===========================
+   台灣 label 組合
+   =========================== */
+function buildTaiwanLabel(county, district, fallback="目前位置"){
+  const c = (county||"").trim();
+  const d = (district||"").trim();
+  if(c && d) return c + d;
+  if(c) return c;
+  if(d) return d;
+  return fallback;
+}
+function normalizeCountyName(name){
+  return (name||"").replace("台","臺");
+}
+
+/* ===========================
+   Reverse geocode / geocode
+   =========================== */
+async function reverseGeocodePlace(lat, lon) {
+  const url =
+    "https://nominatim.openstreetmap.org/reverse?format=jsonv2" +
+    "&lat=" + lat + "&lon=" + lon + "&accept-language=zh-TW";
+  try {
+    const r = await fetch(url, { cache:"no-store" });
+    const data = await r.json();
+    const a = data.address || {};
+
+    const countyRaw = a.state || a.county || a.city || a.state_district || "";
+    // 這裡 district 只做「一般用途」，台灣鄉鎮市區輸入會用 adminOverride 覆蓋
+    const districtRaw = a.city_district || a.town || a.suburb || a.city || a.county || "";
+
+    const county = normalizeCountyName(countyRaw);
+    const district = (districtRaw || "").toString().trim();
+
+    const inTW = isInsideTaiwan(Number(lat), Number(lon));
+    if(inTW){
+      const label = buildTaiwanLabel(county, district, "目前位置");
+      return { label, county, district };
+    }
+
+    const name =
+      a.city_district || a.town || a.suburb || a.city || a.village || a.county || a.state || a.country || "";
+    const label = (name || data.display_name || "目前位置").toString().split(",")[0].trim();
+    return { label: label || "目前位置" };
+  } catch {
+    return { label:"目前位置" };
+  }
+}
+
+async function geocodeTownOfficeTaiwan(townName) {
+  const q = "台灣 " + townName + " 公所";
+  const url =
+    "https://nominatim.openstreetmap.org/search?format=jsonv2" +
+    "&q=" + encodeURIComponent(q) +
+    "&limit=1&accept-language=zh-TW";
+  const res = await fetch(url, { cache:"no-store" });
+  if (!res.ok) throw new Error("geocode error");
+  const arr = await res.json();
+  if (!arr || !arr.length) throw new Error("no result");
+  const item = arr[0];
+  const lat = parseFloat(item.lat);
+  const lon = parseFloat(item.lon);
+  if (!isFinite(lat) || !isFinite(lon)) throw new Error("invalid coord");
+  return { lat, lon, label: townName };
+}
+
+async function geocodePlaceGlobal(query) {
+  const url =
+    "https://nominatim.openstreetmap.org/search?format=jsonv2" +
+    "&q=" + encodeURIComponent(query) +
+    "&limit=1&accept-language=zh-TW";
+  const res = await fetch(url, { cache:"no-store" });
+  if (!res.ok) throw new Error("geocode error");
+  const arr = await res.json();
+  if (!arr || !arr.length) throw new Error("no result");
+  const item = arr[0];
+  const lat = parseFloat(item.lat);
+  const lon = parseFloat(item.lon);
+  if (!isFinite(lat) || !isFinite(lon)) throw new Error("invalid coord");
+  const label = (item.display_name || query || "地點").split(",")[0].trim() || query;
+  return { lat, lon, label };
+}
+
+/* ===========================
+   fetch JSON（加 timeout，避免卡死）
+   =========================== */
+async function fetchJson(url, timeoutMs = 6500){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try{
+    const r = await fetch(url, { cache:"no-store", signal: ctrl.signal });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const txt = await r.text();
+    try { return JSON.parse(txt); }
+    catch { throw new Error("Not JSON"); }
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// 觀測：先 proxy 再 S3，兩者都有 timeout
+async function fetchObsResilient(s3Url, proxyUrl){
+  if(proxyUrl){
+    try { return await fetchJson(proxyUrl, 6500); }
+    catch(e){ dbg("[obs proxy fail] " + proxyUrl + " " + e); }
+  }
+  return await fetchJson(s3Url, 6500);
+}
+
+/* ===========================
+   高度：/elev 優先；若 -32768 -> Open-Meteo Elevation
+   =========================== */
+async function getOpenMeteoElevation(lat, lon){
+  const url = `${OM_ELEVATION}?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}`;
+  const d = await fetchJson(url, 6500);
+  const h = d?.elevation?.[0];
+  return (typeof h === "number" && isFinite(h)) ? h : 0;
+}
+
+async function getElevation(lat, lon, altFromGps) {
+  if (typeof altFromGps === "number" && isFinite(altFromGps)) return altFromGps;
+
+  const key = `${lat.toFixed(5)},${lon.toFixed(5)}`;
+  if (elevationCache.has(key)) return elevationCache.get(key);
+
+  // 1) /elev
+  try {
+    const url = `${ELEVATION_PROXY}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+    const d = await fetchJson(url, 6500);
+    const h = (d && typeof d.elevation === "number" && isFinite(d.elevation)) ? d.elevation : NaN;
+    if (isFinite(h) && h !== -32768) {
+      elevationCache.set(key, h);
+      return h;
+    }
+  } catch(e) {
+    dbg("[elev proxy fail] " + e);
+  }
+
+  // 2) Open-Meteo elevation
+  try {
+    const h2 = await getOpenMeteoElevation(lat, lon);
+    elevationCache.set(key, h2);
+    return h2;
+  } catch(e) {
+    dbg("[elev om fail] " + e);
+    elevationCache.set(key, 0);
+    return 0;
+  }
+}
+
+/* ===========================
+   距離 / clamp / 溫度合法
+   =========================== */
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+function isValidTemp(t) { return typeof t === "number" && t > -50 && t < 55; }
+
+/* ===========================
+   觀測時間權重（0–40分鐘）
+   =========================== */
+function getObsAgeMinutes(station, nowTs) {
+  if (!station || !station.obsTime) return Infinity;
+  const ts = new Date(station.obsTime).getTime();
+  if (!isFinite(ts)) return Infinity;
+  return (nowTs - ts) / 60000;
+}
+function computeTimeWeight(station, nowTs) {
+  const age = getObsAgeMinutes(station, nowTs);
+  if (!isFinite(age) || age < 0) return 0;
+  if (age >= 40) return 0;
+
+  let w = 0;
+  if (age <= 10) { w = 1.0 - 0.2 * (age / 10); }
+  else if (age <= 20) { w = 0.8 - 0.2 * ((age - 10) / 10); }
+  else if (age <= 30) { w = 0.6 - 0.25 * ((age - 20) / 10); }
+  else { w = 0.35 - 0.35 * ((age - 30) / 10); }
+
+  return clamp(w, 0, 1);
+}
+function isFreshObservation(station, nowTs) { return computeTimeWeight(station, nowTs) > 0; }
+
+/* ===========================
+   即時測站選點（5km 起跳 +5km 擴張）
+   =========================== */
+const OBS_RADIUS_START_KM = 5;
+const OBS_RADIUS_STEP_KM  = 5;
+const OBS_RADIUS_MAX_KM   = 99999;
+
+function pickStationsByRadiusStep(withDist, nowTs){
+  if(!withDist || !withDist.length) return { used: [], radiusKm: 0 };
+  let r = OBS_RADIUS_START_KM;
+
+  while (true) {
+    const used = withDist.filter(s => s.dist <= r && isFreshObservation(s, nowTs));
+    if (used.length >= 3) return { used, radiusKm: r };
+    r += OBS_RADIUS_STEP_KM;
+    if (r > OBS_RADIUS_MAX_KM) break;
+  }
+
+  const fallback = withDist.filter(s => isFreshObservation(s, nowTs));
+  return { used: fallback, radiusKm: r };
+}
+
+/* ===========================
+   lapse rate（你的原邏輯保留）
+   =========================== */
+function computeLapseRate(month, rh, rain1h) {
+  let lr;
+  if ([5,6,7,8,9].includes(month)) {
+    lr = 0.006;
+    if (rh >= 90 && rain1h > 0) lr = 0.0055;
+    else if (rh <= 50) lr = 0.0075;
+    lr = clamp(lr, 0.004, 0.008);
+  } else if ([12,1,2].includes(month)) {
+    lr = 0.0036;
+    if (rh >= 90 && rain1h > 0) lr = 0.003;
+    else if (rh <= 60) lr = 0.004;
+    lr = clamp(lr, 0.002, 0.0045);
+  } else {
+    lr = 0.005;
+    if (rh >= 90 && rain1h > 0) lr = 0.0045;
+    else if (rh <= 50) lr = 0.0065;
+    lr = clamp(lr, 0.0035, 0.007);
+  }
+  return lr;
+}
+function computeFinalLapseRate(target, env, stations) {
+  const { month, rh, rain1h, nowTs } = env;
+  const climateLR = computeLapseRate(month, rh, rain1h);
+
+  let candidates = stations
+    .map((s) => ({...s, _dist: haversine(target.lat, target.lon, s.lat, s.lon)}))
+    .filter((s) => isValidTemp(s.temp) && isFreshObservation(s, nowTs));
+
+  if (candidates.length < 3) return climateLR;
+
+  let selected = [];
+  let r = 1;
+  while (r <= 20) {
+    selected = candidates.filter((s) => s._dist <= r);
+    if (selected.length >= 3) {
+      const hs = selected.map((s) => s.alt || 0);
+      const maxH = Math.max(...hs);
+      const minH = Math.min(...hs);
+      if (maxH - minH >= 150 && maxH > 250) break;
+    }
+    r++;
+  }
+  if (selected.length < 3 || r > 20) return climateLR;
+
+  let avgT = selected.reduce((sum, s) => sum + s.temp, 0) / selected.length;
+  selected = selected.filter((s) => Math.abs(s.temp - avgT) <= 4);
+  if (selected.length < 3) return climateLR;
+
+  function regress(points) {
+    let Sw=0,Swh=0,Swt=0,Swhh=0,Swht=0;
+    for (const s of points) {
+      const dkm = Math.max(s._dist, 0.1);
+      const wDist = 1/(dkm*dkm);
+      const wTime = computeTimeWeight(s, nowTs);
+      const w = wDist * wTime;
+      if (w <= 0) continue;
+      const h = s.alt || 0;
+      const t = s.temp;
+      Sw += w; Swh += w*h; Swt += w*t; Swhh += w*h*h; Swht += w*h*t;
+    }
+    const denom = Sw*Swhh - Swh*Swh;
+    if (denom === 0 || Sw === 0) return null;
+    const b = (Sw*Swht - Swh*Swt)/denom; // ℃/m
+    const a = (Swt - b*Swh)/Sw;
+
+    let ssTot=0, ssRes=0;
+    const tMean = Swt/Sw;
+    for (const s of points) {
+      const dkm = Math.max(s._dist, 0.1);
+      const wDist = 1/(dkm*dkm);
+      const wTime = computeTimeWeight(s, nowTs);
+      const w = wDist * wTime;
+      if (w <= 0) continue;
+      const h = s.alt || 0;
+      const t = s.temp;
+      const tFit = a + b*h;
+      ssTot += w*(t - tMean)*(t - tMean);
+      ssRes += w*(t - tFit)*(t - tFit);
+    }
+    const r2 = ssTot > 0 ? 1 - ssRes/ssTot : 0;
+    return {a,b,r2};
+  }
+
+  let reg = regress(selected);
+  if(!reg) return climateLR;
+
+  let cleaned = [];
+  for (const s of selected) {
+    const h = s.alt || 0;
+    const tFit = reg.a + reg.b*h;
+    if (Math.abs(s.temp - tFit) <= 2.5) cleaned.push(s);
+  }
+  if (cleaned.length >= 3) {
+    const reg2 = regress(cleaned);
+    if (reg2) reg = reg2;
+  }
+
+  let obsLR = Math.abs(reg.b);
+  obsLR = clamp(obsLR, 0.002, 0.009);
+  const weight = clamp(clamp(reg.r2,0,1), 0.2, 0.8);
+  return weight*obsLR + (1-weight)*climateLR;
+}
+
+/* ===========================
+   解析 CWA 自動測站（O-A0003 / O-A0001）
+   =========================== */
+function parseCwaStations(raw) {
+  const out = [];
+  (raw || []).forEach((st) => {
+    const geo = st.GeoInfo || {};
+    const coords = geo.Coordinates || [];
+    const wgs = coords.find((c) => c.CoordinateName === "WGS84");
+    if (!wgs) return;
+
+    const lat = parseFloat(wgs.StationLatitude);
+    const lon = parseFloat(wgs.StationLongitude);
+    if (!isFinite(lat) || !isFinite(lon)) return;
+
+    const alt = parseFloat(geo.StationAltitude || "0") || 0;
+
+    const we = st.WeatherElement || {};
+    const now = we.Now || {};
+
+    const tempRaw = parseFloat(we.AirTemperature || "NaN");
+    if (!isValidTemp(tempRaw)) return;
+
+    let rhRaw = parseFloat(we.RelativeHumidity || "NaN");
+    if (!isFinite(rhRaw) || rhRaw <= 0 || rhRaw > 100) rhRaw = NaN;
+
+    let windRaw = parseFloat(we.WindSpeed || "NaN");
+    if (!isFinite(windRaw) || windRaw < 0) windRaw = NaN;
+
+    let windDir = parseFloat(we.WindDirection || "NaN");
+    if (!isFinite(windDir)) windDir = NaN;
+
+    let presRaw = parseFloat(we.AirPressure || "NaN");
+    if (!isFinite(presRaw) || presRaw < 10 || presRaw > 2000) presRaw = NaN;
+
+    const sunRaw = parseFloat(we.SunshineDuration || "NaN");
+    const sunHours = (isFinite(sunRaw) && sunRaw >= 0) ? sunRaw : NaN;
+
+    let visDesc = (we.VisibilityDescription ?? "").toString().trim();
+    if(visDesc === "-99") visDesc = "";
+
+    const precip = parseFloat(now.Precipitation || "0") || 0;
+
+    let weatherRaw = (we.Weather || "").trim();
+    if (weatherRaw === "-99" || weatherRaw === "-999") weatherRaw = "";
+
+    const obsTime = st.ObsTime && st.ObsTime.DateTime ? st.ObsTime.DateTime : null;
+
+    out.push({
+      id: st.StationId, name: st.StationName,
+      lat, lon, alt, temp: tempRaw, rh: rhRaw, wind: windRaw, windDir,
+      pres: presRaw, sunHours, visDesc,
+      precip, weather: weatherRaw, obsTime
+    });
+  });
+  return out;
+}
+
+function pickConditionByDistance(pickedStations) {
+  if (!pickedStations || !pickedStations.length) return "目前天氣不明";
+  for (const s of pickedStations) {
+    if (s.weather && s.weather.trim() !== "") return s.weather;
+  }
+  return "目前天氣不明";
+}
+function mapWeatherToIcon(cond, isNight=false) {
+  if (!cond || cond === "--" || cond === "目前天氣不明") return "？";
+  const s = cond.toString();
+  if (s.includes("雷")) return "⛈";
+  if (s.includes("雪")) return "❄";
+  if (s.includes("雨")) return isNight ? "🌧" : ((s.includes("陣")||s.includes("短暫")||s.includes("驟")) ? "🌦" : "🌧");
+  if (s.includes("雹")) return "🌨";
+  if (s.includes("霧") || s.includes("煙")) return "🌫";
+  if (s.includes("陰")) return "☁";
+  if (s.includes("多雲")) return isNight ? "☁" : "⛅";
+  if (s.includes("雲")) return "☁";
+  if (s.includes("晴") || s.includes("大致晴朗")) return isNight ? "🌙" : "☀";
+  return isNight ? "🌙" : "⛅";
+}
+function formatObsTimeHHMM(t) {
+  if (typeof t === "string" && t.length >= 16) return t.slice(11, 16);
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return "";
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+/* ===========================
+   風向：角度 -> 16 方位
+   =========================== */
+const DIR16 = [
+  {name:"北風", deg:0},{name:"北北東風",deg:22.5},{name:"東北風",deg:45},{name:"東北東風",deg:67.5},
+  {name:"東風",deg:90},{name:"東南東風",deg:112.5},{name:"東南風",deg:135},{name:"南南東風",deg:157.5},
+  {name:"南風",deg:180},{name:"南南西風",deg:202.5},{name:"西南風",deg:225},{name:"西南西風",deg:247.5},
+  {name:"西風",deg:270},{name:"西北西風",deg:292.5},{name:"西北風",deg:315},{name:"北北西風",deg:337.5}
+];
+function degToDir16(deg){
+  if(!isFinite(deg)) return "--";
+  let d = ((deg % 360) + 360) % 360;
+  const idx = Math.round(d / 22.5) % 16;
+  return DIR16[idx].name;
+}
+
+/* ===========================
+   即時細項：加權工具（距離 + 時間）
+   =========================== */
+function weightedScalar(stationsWithDist, nowTs, maxKm, getVal){
+  const p = 1.7;
+  let wSum=0, vSum=0;
+  for(const s of stationsWithDist){
+    if(!isFreshObservation(s, nowTs)) continue;
+    if(!(s.dist <= maxKm)) continue;
+    const v = getVal(s);
+    if(!isFinite(v)) continue;
+
+    const d = Math.max(s.dist, 0.1);
+    const wDist = 1/Math.pow(d, p);
+    const wTime = computeTimeWeight(s, nowTs);
+    const w = wDist*wTime;
+    if(w<=0) continue;
+
+    wSum += w;
+    vSum += v*w;
+  }
+  return (wSum>0) ? (vSum/wSum) : NaN;
+}
+function weightedVectorWind(stationsWithDist, nowTs, maxKm){
+  const p = 1.7;
+  let wSum=0, spSum=0, x=0, y=0;
+
+  for(const s of stationsWithDist){
+    if(!isFreshObservation(s, nowTs)) continue;
+    if(!(s.dist <= maxKm)) continue;
+
+    const sp = s.wind;
+    const dir = s.windDir;
+    if(!isFinite(sp) || !isFinite(dir)) continue;
+
+    const d = Math.max(s.dist, 0.1);
+    const wDist = 1/Math.pow(d, p);
+    const wTime = computeTimeWeight(s, nowTs);
+    const w = wDist*wTime;
+    if(w<=0) continue;
+
+    wSum += w;
+    spSum += sp*w;
+
+    const rad = (dir * Math.PI) / 180;
+    x += Math.cos(rad) * w;
+    y += Math.sin(rad) * w;
+  }
+
+  const speed = (wSum>0) ? (spSum/wSum) : NaN;
+  if(wSum<=0 || (x===0 && y===0)) return {speed: NaN, dirDeg: NaN};
+
+  let dirRad = Math.atan2(y, x);
+  let dirDeg = dirRad * 180 / Math.PI;
+  dirDeg = ((dirDeg % 360) + 360) % 360;
+
+  return {speed, dirDeg};
+}
+function pickNearestVisibilityDesc(stationsWithDist, nowTs, maxKm){
+  for(const s of stationsWithDist){
+    if(!(s.dist <= maxKm)) break;
+    if(!isFreshObservation(s, nowTs)) continue;
+    const v = (s.visDesc ?? "").toString().trim();
+    if(v) return v;
+  }
+  return "";
+}
+
+/* ===========================
+   氣壓：海平面加權 -> 回推目標高度
+   =========================== */
+function seaLevelPressureFromStation(p_hPa, h_m){
+  const x = 1 - 2.25577e-5 * h_m;
+  if(x <= 0) return NaN;
+  return p_hPa * Math.pow(x, -5.25588);
+}
+function pressureAtHeightFromSeaLevel(p0_hPa, h_m){
+  const x = 1 - 2.25577e-5 * h_m;
+  if(x <= 0) return NaN;
+  return p0_hPa * Math.pow(x, 5.25588);
+}
+function weightedPressureAtTarget(stationsWithDist, nowTs, maxKm, targetAlt){
+  const p = 1.7;
+  let wSum=0, p0Sum=0;
+
+  for(const s of stationsWithDist){
+    if(!isFreshObservation(s, nowTs)) continue;
+    if(!(s.dist <= maxKm)) continue;
+    if(!isFinite(s.pres)) continue;
+
+    const p0 = seaLevelPressureFromStation(s.pres, s.alt||0);
+    if(!isFinite(p0)) continue;
+
+    const d = Math.max(s.dist, 0.1);
+    const wDist = 1/Math.pow(d, p);
+    const wTime = computeTimeWeight(s, nowTs);
+    const w = wDist*wTime;
+    if(w<=0) continue;
+
+    wSum += w;
+    p0Sum += p0*w;
+  }
+
+  if(wSum<=0) return {pAtTarget: NaN, p0: NaN};
+
+  const p0Avg = p0Sum/wSum;
+  const pAt = pressureAtHeightFromSeaLevel(p0Avg, targetAlt||0);
+  return {pAtTarget: pAt, p0: p0Avg};
+}
+
+/* ===========================
+   即時溫度：多站 + 最終 lapse rate 的高度修正插值
+   =========================== */
+function interpolateTemperatureWithHeight(target, env, stations, usedStations) {
+  const { nowTs } = env;
+  const finalLR = computeFinalLapseRate(target, env, stations);
+
+  let used = Array.isArray(usedStations) ? usedStations.slice() : null;
+
+  if(!used || !used.length){
+    let valid = stations
+      .map((s)=>({...s, dist:haversine(target.lat,target.lon,s.lat,s.lon)}))
+      .filter((s)=>isValidTemp(s.temp) && isFreshObservation(s, nowTs))
+      .sort((a,b)=>a.dist-b.dist);
+
+    if (!valid.length) return { temp: NaN, lapseRate: finalLR, used: [] };
+
+    const picked = pickStationsByRadiusStep(valid, nowTs);
+    used = picked.used;
+  }
+
+  if (!used || !used.length) return { temp: NaN, lapseRate: finalLR, used: [] };
+
+  let wSum=0, tSum=0;
+  const p = 1.7;
+
+  for (const s of used) {
+    const dkm = Math.max(s.dist || haversine(target.lat,target.lon,s.lat,s.lon), 0.1);
+    const wDist = 1 / Math.pow(dkm, p);
+    const wTime = computeTimeWeight(s, nowTs);
+    const w = wDist * wTime;
+    if (w <= 0) continue;
+
+    const hStation = s.alt || 0;
+    const hTarget  = target.elev || 0;
+    const deltaH = hTarget - hStation;
+
+    const T_adj = s.temp - finalLR * deltaH;
+    wSum += w;
+    tSum += T_adj * w;
+  }
+
+  return { temp: (wSum===0 ? NaN : (tSum/wSum)), lapseRate: finalLR, used };
+}
+
+/* ===========================
+   Open-Meteo：weather_code -> 文字/圖示
+   =========================== */
+function omCodeToTextIcon(code, isNight=false){
+  const c = Number(code);
+  if(!isFinite(c)) return { text:"天氣不明", icon:"？" };
+
+  if (c === 0) return { text:"晴", icon:isNight ? "🌙" : "☀" };
+  if (c === 1) return { text:"大致晴朗", icon:isNight ? "🌙" : "🌤" };
+  if (c === 2) return { text:"局部多雲", icon:isNight ? "☁" : "⛅" };
+  if (c === 3) return { text:"陰", icon:"☁" };
+
+  if (c === 45 || c === 48) return { text:"霧", icon:"🌫" };
+
+  if (c === 51 || c === 53 || c === 55) return { text:"毛毛雨", icon:isNight ? "🌧" : "🌦" };
+  if (c === 56 || c === 57) return { text:"凍毛毛雨", icon:"🌧" };
+
+  if (c === 61 || c === 63 || c === 65) return { text:"雨", icon:"🌧" };
+  if (c === 66 || c === 67) return { text:"凍雨", icon:"🌧" };
+
+  if (c === 71 || c === 73 || c === 75) return { text:"雪", icon:"❄" };
+  if (c === 77) return { text:"霰", icon:"🌨" };
+
+  if (c === 80 || c === 81 || c === 82) return { text:"陣雨", icon:isNight ? "🌧" : "🌦" };
+  if (c === 85 || c === 86) return { text:"陣雪", icon:"🌨" };
+
+  if (c === 95) return { text:"雷雨", icon:"⛈" };
+  if (c === 96 || c === 99) return { text:"雷雨/冰雹", icon:"⛈" };
+
+  return { text:"天氣變化", icon:isNight ? "🌙" : "⛅" };
+}
+
+function getScene({
+  weatherText = "",
+  hour = new Date().getHours(),
+  rain = 0,
+  cloud = 0,
+  visibility = 20,
+  isThunder = false,
+  sunriseHour = 5.6,
+  sunsetHour = 18.2333
+}) {
+  const t = String(weatherText || "").toLowerCase();
+  const isNight = hour < sunriseHour || hour >= sunsetHour;
+  const isSunrise = hour >= sunriseHour - 0.4 && hour < sunriseHour + 0.7;
+  const isSunset = hour >= sunsetHour - 0.7 && hour < sunsetHour + 0.4;
+
+  if (isThunder || t.includes("雷")) return isNight ? "rain-night" : "storm-day";
+  if (visibility <= 2 || t.includes("霧")) return isNight ? "fog-night" : "fog-day";
+  if (rain >= 8 || t.includes("大雨") || t.includes("豪雨")) return isNight ? "rain-night" : "rain-day";
+  if (rain > 0.2 || t.includes("雨") || t.includes("陣雨")) return isNight ? "rain-night" : "rain-day";
+
+  if (isSunrise) return "sunrise";
+  if (isSunset) return "sunset";
+
+  if (cloud >= 92 || t.includes("陰")) return isNight ? "cloudy-night" : "overcast-day";
+  if (cloud >= 60 || t.includes("多雲")) return isNight ? "cloudy-night" : "partly-day";
+
+  return isNight ? "clear-night" : "clear-day";
+}
+function applyScene(scene){
+  document.body.dataset.scene = scene || "clear-day";
+}
+function applyTemperatureTint(tempC){
+  let tint = "rgba(255,255,255,0)";
+  if (tempC >= 32) tint = "rgba(255,190,120,.10)";
+  else if (tempC >= 26) tint = "rgba(255,220,150,.06)";
+  else if (tempC <= 12) tint = "rgba(120,180,255,.10)";
+  else if (tempC <= 18) tint = "rgba(170,210,255,.06)";
+  document.documentElement.style.setProperty("--temp-tint", tint);
+}
+function isNightHour(hour, sunriseHour, sunsetHour){
+  return hour < sunriseHour || hour >= sunsetHour;
+}
+function buildStars(count){
+  const box = $("starsLayer");
+  if (!box) return;
+  box.innerHTML = Array.from({length: count}, () => {
+    const left = (Math.random()*100).toFixed(2);
+    const top = (Math.random()*62).toFixed(2);
+    const size = (Math.random()*1.8 + 0.6).toFixed(2);
+    const scale = (Math.random()*0.8 + 0.7).toFixed(2);
+    const dur = (Math.random()*3 + 2.4).toFixed(2);
+    const delay = (Math.random()*4).toFixed(2);
+    return `<span class="star" style="left:${left}%;top:${top}%;width:${size}px;height:${size}px;--star-scale:${scale};--twinkle-dur:${dur}s;--twinkle-delay:${delay}s"></span>`;
+  }).join("");
+}
+function buildClouds(count, density){
+  const box = $("cloudLayer");
+  if (!box) return;
+  box.innerHTML = Array.from({length: count}, (_, i) => {
+    const w = 120 + Math.random()*150 + density*0.8;
+    const h = w * (0.34 + Math.random()*0.08);
+    const top = Math.random()*42;
+    const dur = 45 + Math.random()*55;
+    const delay = -Math.random()*dur;
+    const opacity = 0.16 + Math.min(density/100, 1)*0.18 + Math.random()*0.08;
+    return `<span class="cloud" style="top:${top}%;width:${w}px;height:${h}px;opacity:${opacity.toFixed(2)};--cloud-dur:${dur.toFixed(1)}s;--cloud-delay:${delay.toFixed(1)}s"></span>`;
+  }).join("");
+}
+function buildPrecip(type, count){
+  const box = $("precipLayer");
+  if (!box) return;
+  if (!type || count <= 0) { box.innerHTML = ""; box.style.opacity = 0; return; }
+  if (type === "snow") {
+    box.innerHTML = Array.from({length: count}, () => {
+      const left = Math.random()*100;
+      const size = 8 + Math.random()*10;
+      const dur = 6 + Math.random()*6;
+      const delay = -Math.random()*dur;
+      const opacity = 0.55 + Math.random()*0.4;
+      return `<span class="snowflake" style="left:${left.toFixed(2)}%;--snow-size:${size.toFixed(1)}px;--snow-dur:${dur.toFixed(2)}s;--snow-delay:${delay.toFixed(2)}s;--snow-opacity:${opacity.toFixed(2)}">✦</span>`;
+    }).join("");
+    box.style.opacity = 1;
+    return;
+  }
+  box.innerHTML = Array.from({length: count}, () => {
+    const left = Math.random()*110;
+    const dur = 0.58 + Math.random()*0.55;
+    const delay = -Math.random()*dur;
+    const opacity = 0.35 + Math.random()*0.45;
+    const h = 28 + Math.random()*34;
+    return `<span class="drop" style="left:${left.toFixed(2)}%;height:${h.toFixed(1)}px;--drop-dur:${dur.toFixed(2)}s;--drop-delay:${delay.toFixed(2)}s;--drop-opacity:${opacity.toFixed(2)}"></span>`;
+  }).join("");
+  box.style.opacity = 1;
+}
+function renderAtmosphereEffects({scene, cloud=0, weatherText="", rain=0, isNight=false}){
+  const stars = $("starsLayer");
+  const clouds = $("cloudLayer");
+  const precip = $("precipLayer");
+  if (!stars || !clouds || !precip) return;
+
+  const t = String(weatherText || "");
+  const hasSnow = t.includes("雪") || t.includes("霰");
+  const hasRain = !hasSnow && (rain > 0.05 || t.includes("雨") || t.includes("雷"));
+  const cloudAmt = isFinite(cloud) ? Math.max(0, Math.min(100, cloud)) : (t.includes("陰") ? 90 : t.includes("多雲") ? 60 : 18);
+  const cloudCount = cloudAmt >= 90 ? 8 : cloudAmt >= 70 ? 6 : cloudAmt >= 45 ? 4 : cloudAmt >= 20 ? 2 : 0;
+  const starCount = isNight ? (cloudAmt < 25 ? 42 : cloudAmt < 55 ? 18 : 6) : 0;
+
+  buildStars(starCount);
+  stars.style.opacity = isNight ? (cloudAmt < 25 ? 1 : cloudAmt < 55 ? .6 : .22) : 0;
+
+  buildClouds(cloudCount, cloudAmt);
+  clouds.style.opacity = cloudCount ? (isNight ? .72 : .95) : 0;
+
+  if (hasSnow) buildPrecip("snow", isNight ? 54 : 42);
+  else if (hasRain) buildPrecip("rain", t.includes("雷") || rain >= 8 ? 95 : rain >= 2 ? 72 : 44);
+  else buildPrecip("", 0);
+}
+
+function getHourFloatForScene(useCwaRealtime, om){
+  if (useCwaRealtime) {
+    const nowLocal = new Date();
+    return nowLocal.getHours() + nowLocal.getMinutes() / 60;
+  }
+
+  const currentTimeStr = om?.current?.time;
+  if (currentTimeStr) {
+    const m = String(currentTimeStr).match(/T(\d{2}):(\d{2})/);
+    if (m) return Number(m[1]) + Number(m[2]) / 60;
+  }
+
+  const tz = om?.timezone;
+  if (tz) {
+    try {
+      const fmt = new Intl.DateTimeFormat("en-GB", {
+        timeZone: tz,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+      const parts = fmt.formatToParts(new Date());
+      const hh = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+      const mm = Number(parts.find(p => p.type === "minute")?.value ?? "0");
+      return hh + mm / 60;
+    } catch(e) {}
+  }
+
+  const nowLocal = new Date();
+  return nowLocal.getHours() + nowLocal.getMinutes() / 60;
+}
+
+async function fetchSunriseSunsetUTC(lat, lon){
+  const url = `https://api.sunrise-sunset.org/json?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lon)}&formatted=0`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("sunrise-sunset HTTP " + res.status);
+  const data = await res.json();
+  if (data?.status !== "OK") throw new Error("sunrise-sunset bad response");
+  return {
+    sunriseUTC: data?.results?.sunrise || "",
+    sunsetUTC: data?.results?.sunset || "",
+    tzid: data?.tzid || "UTC"
+  };
+}
+
+function utcIsoToHourFloatInTimeZone(isoString, timeZone){
+  if (!isoString || !timeZone) return NaN;
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return NaN;
+
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
+    const parts = fmt.formatToParts(date);
+    const hh = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+    const mm = Number(parts.find(p => p.type === "minute")?.value ?? "0");
+    const ss = Number(parts.find(p => p.type === "second")?.value ?? "0");
+    return hh + mm / 60 + ss / 3600;
+  } catch(e) {
+    return NaN;
+  }
+}
+
+async function getSunriseSunsetHourForScene(lat, lon, useCwaRealtime, om, inTW){
+  let tz = om?.timezone || "";
+  if (!tz && useCwaRealtime && inTW) tz = "Asia/Taipei";
+  if (!tz) {
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }
+    catch { tz = "UTC"; }
+  }
+
+  try {
+    const ss = await fetchSunriseSunsetUTC(lat, lon);
+    const sunriseHour = utcIsoToHourFloatInTimeZone(ss.sunriseUTC, tz);
+    const sunsetHour  = utcIsoToHourFloatInTimeZone(ss.sunsetUTC, tz);
+    return {
+      sunriseHour: isFinite(sunriseHour) ? sunriseHour : 5.6,
+      sunsetHour: isFinite(sunsetHour) ? sunsetHour : 18.2333
+    };
+  } catch(e) {
+    return {
+      sunriseHour: 5.6,
+      sunsetHour: 18.2333
+    };
+  }
+}
+
+/* ===========================
+   CWA 預報索引解析（你原本的函式）
+   =========================== */
+function getLocations(json){
+  const a = json?.cwaopendata?.Dataset?.Locations?.Location;
+  if(Array.isArray(a)) return a;
+  const b = json?.records?.Locations?.[0]?.Location;
+  if(Array.isArray(b)) return b;
+  const c = json?.records?.locations?.[0]?.location;
+  if(Array.isArray(c)) return c;
+  return [];
+}
+function getCountyNameFromForecast(json){
+  const n1 = json?.cwaopendata?.Dataset?.Locations?.LocationsName;
+  if(n1) return n1;
+  const n2 = json?.records?.LocationsName;
+  if(n2) return n2;
+  const n3 = json?.records?.locations?.[0]?.locationsName;
+  if(n3) return n3;
+  return "";
+}
+function getLocationName(loc){
+  return loc?.LocationName || loc?.locationName || loc?.name || "";
+}
+function getLatLon(loc){
+  const lat = parseFloat(loc?.Latitude || loc?.latitude || loc?.lat || 0) || 0;
+  const lon = parseFloat(loc?.Longitude || loc?.longitude || loc?.lon || 0) || 0;
+  return {lat,lon};
+}
+function getWeatherElements(loc){
+  return loc?.WeatherElement || loc?.weatherElement || loc?.WeatherElements || loc?.weatherElements || [];
+}
+function normalizeStr(x){ return (x==null) ? "" : String(x).trim(); }
+function findElement(we, aliases){
+  const a = (aliases||[]).map(normalizeStr).filter(Boolean);
+  return (we||[]).find(e=>{
+    const n = normalizeStr(e?.ElementName || e?.elementName);
+    return a.includes(n);
+  }) || null;
+}
+function timeToRange(t){
+  const dt = t?.DataTime || t?.dataTime;
+  if(dt){
+    const ts = Date.parse(dt);
+    return {start:ts, end:ts, mid:ts};
+  }
+  const s = Date.parse(t?.StartTime || t?.startTime || "");
+  const e = Date.parse(t?.EndTime || t?.endTime || "");
+  if(isFinite(s) && isFinite(e)) return {start:s, end:e, mid:(s+e)/2};
+  if(isFinite(s)) return {start:s, end:s, mid:s};
+  return {start:NaN,end:NaN,mid:NaN};
+}
+function getElementValueObj(t){
+  const v = t?.ElementValue || t?.elementValue;
+  if(!v) return null;
+  if(Array.isArray(v)) return v[0] || null;
+  if(typeof v === "object") return v;
+  return null;
+}
+function pickFirstNumeric(obj, preferKeys){
+  if(!obj) return NaN;
+  if(preferKeys && preferKeys.length){
+    for(const k of preferKeys){
+      if(obj[k] != null && isFinite(parseFloat(obj[k]))) return parseFloat(obj[k]);
+    }
+  }
+  for(const k of Object.keys(obj)){
+    const v = parseFloat(obj[k]);
+    if(isFinite(v)) return v;
+  }
+  return NaN;
+}
+function pickFirstString(obj, preferKeys){
+  if(!obj) return "";
+  if(preferKeys && preferKeys.length){
+    for(const k of preferKeys){
+      if(obj[k] != null && String(obj[k]).trim()) return String(obj[k]).trim();
+    }
+  }
+  for(const k of Object.keys(obj)){
+    const v = obj[k];
+    if(v != null && String(v).trim() && !isFinite(parseFloat(v))) return String(v).trim();
+  }
+  return "";
+}
+function buildNumericSeriesCWA(we, elementAliases, preferValueKeys){
+  const elem = findElement(we, elementAliases);
+  if(!elem) return [];
+  const times = elem?.Time || elem?.time || [];
+  const out=[];
+  for(const t of times){
+    const r = timeToRange(t);
+    if(!isFinite(r.mid)) continue;
+    const obj = getElementValueObj(t);
+    const val = pickFirstNumeric(obj, preferValueKeys);
+    if(!isFinite(val)) continue;
+    out.push({...r, value: val});
+  }
+  out.sort((a,b)=>a.mid-b.mid);
+  return out;
+}
+function buildStringSeriesCWA(we, elementAliases, preferValueKeys){
+  const elem = findElement(we, elementAliases);
+  if(!elem) return [];
+  const times = elem?.Time || elem?.time || [];
+  const out=[];
+  for(const t of times){
+    const r = timeToRange(t);
+    if(!isFinite(r.mid)) continue;
+    const obj = getElementValueObj(t);
+    const txt = pickFirstString(obj, preferValueKeys);
+    if(!txt) continue;
+    out.push({...r, text: txt});
+  }
+  out.sort((a,b)=>a.mid-b.mid);
+  return out;
+}
+function seriesValueAtNearest(series, ts){
+  if(!series || !series.length) return null;
+  let best=null, bestDt=Infinity;
+  for(const p of series){
+    const dt = Math.abs(p.mid - ts);
+    if(dt < bestDt){ bestDt=dt; best=p; }
+  }
+  return best;
+}
+function seriesValueAtInterval(series, ts){
+  if(!series || !series.length) return null;
+  for(const p of series){
+    if(isFinite(p.start) && isFinite(p.end) && ts >= p.start && ts < p.end) return p;
+  }
+  return seriesValueAtNearest(series, ts);
+}
+function wxIconText(wx, isNight=false){
+  const s = normalizeStr(wx);
+  if(!s) return isNight ? "🌙" : "⛅";
+  if(s.includes("雷")) return "⛈";
+  if(s.includes("雪") || s.includes("霰")) return "🌨";
+  if(s.includes("雨")) return "🌧";
+  if(s.includes("霧")) return "🌫";
+  if(s.includes("陰")) return "☁";
+  if(s.includes("多雲")) return isNight ? "☁" : "⛅";
+  if(s.includes("晴")) return isNight ? "🌙" : "☀";
+  return isNight ? "🌙" : "⛅";
+}
+function hourFloatFromTs(ts){
+  const d = new Date(ts);
+  return d.getHours() + d.getMinutes() / 60;
+}
+function fmtHHMM(ts){
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mm = String(d.getMinutes()).padStart(2,"0");
+  return `${hh}:${mm}`;
+}
+function nextFullHourTs(nowTs){
+  const d = new Date(nowTs);
+  d.setMinutes(0,0,0);
+  let t = d.getTime();
+  if(t < nowTs) t += 3600000;
+  return t;
+}
+function ceilTo10MinTs(nowTs){
+  const d = new Date(nowTs);
+  const m = d.getMinutes();
+  const add = (m % 10 === 0 && d.getSeconds()===0 && d.getMilliseconds()===0) ? 0 : (10 - (m % 10));
+  d.setSeconds(0,0);
+  d.setMinutes(m + add);
+  return d.getTime();
+}
+const WEEK = ["週日","週一","週二","週三","週四","週五","週六"];
+
+/* ===========================
+   CWA 全台預報索引
+   =========================== */
+const fcCache = new Map();
+let globalIndex = null;
+
+async function mapLimit(items, limit, fn){
+  const ret = [];
+  let idx = 0;
+  const workers = Array.from({length:Math.max(1,limit)}, async ()=>{
+    while(idx < items.length){
+      const my = idx++;
+      try { ret[my] = await fn(items[my], my); }
+      catch(e){ ret[my] = null; }
+    }
+  });
+  await Promise.all(workers);
+  return ret;
+}
+async function fetchForecastDataset(datasetId){
+  const cached = fcCache.get(datasetId);
+  if(cached && cached.json) return cached.json;
+  const json = await fetchJson(`${PROXY_BASE}/${datasetId}`, 6500);
+  fcCache.set(datasetId, {json, ts: Date.now()});
+  return json;
+}
+async function ensureGlobalIndex(){
+  if(globalIndex) return globalIndex;
+
+  const idsD0047 = Object.entries(COUNTY_FORECAST_CODE).map(([county, id])=>({county, id}));
+  const idsB0053 = B0053_SHORT.map(id=>({county:"(B0053)", id}));
+  const ids = [...idsD0047, ...idsB0053];
+
+  $("hintBar").innerHTML = `預報：<b>建立台灣 CWA 預報點索引中…</b>（D0047：${idsD0047.length}，B0053：${idsB0053.length}）`;
+  if(debugOn) $("debugBox").textContent = "";
+
+  const results = await mapLimit(ids, 6, async ({county, id})=>{
+    const json = await fetchForecastDataset(id);
+    const cwaCounty = getCountyNameFromForecast(json) || county;
+    const locs = getLocations(json) || [];
+    const arr = [];
+    for(const loc of locs){
+      const {lat,lon} = getLatLon(loc);
+      if(!isFinite(lat) || !isFinite(lon) || lat===0 || lon===0) continue;
+      arr.push({ datasetId:id, county:cwaCounty, loc, lat, lon });
+    }
+    dbg(`[index] ${id} ${cwaCounty} locs=${arr.length}`);
+    return arr;
+  });
+
+  globalIndex = results.filter(Boolean).flat();
+  dbg(`[index] total=${globalIndex.length}`);
+  return globalIndex;
+}
+
+/* ===========================
+   7天：weekly location -> 7日摘要
+   =========================== */
+function buildDailyFromWeeklyLoc(loc7){
+  const we7 = getWeatherElements(loc7);
+
+const sMinT  = buildNumericSeriesCWA(we7, ["MinT","最低溫度"], ["value","Value"]);
+const sMaxT  = buildNumericSeriesCWA(we7, ["MaxT","最高溫度"], ["value","Value"]);
+const sMinAT = buildNumericSeriesCWA(we7, ["MinAT","最低體感溫度"], ["value","Value"]);
+const sMaxAT = buildNumericSeriesCWA(we7, ["MaxAT","最高體感溫度"], ["value","Value"]);
+const sPoP12 = buildNumericSeriesCWA(we7, ["PoP12h","12小時降雨機率"], ["value","Value"]);
+const sWx7   = buildStringSeriesCWA(we7, ["Wx","天氣現象"], ["value","Value","Weather"]);
+
+  const byDate = new Map();
+  const dateKey = (ts)=>{
+    const d = new Date(ts);
+    const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), da=String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${da}`;
+  };
+  const push = (key, obj)=>{
+    if(!byDate.has(key)) byDate.set(key, []);
+    byDate.get(key).push(obj);
+  };
+
+  for(const p of sMinT)  push(dateKey(p.mid), {t:"MinT", v:p.value, ts:p.mid});
+  for(const p of sMaxT)  push(dateKey(p.mid), {t:"MaxT", v:p.value, ts:p.mid});
+  for(const p of sMinAT) push(dateKey(p.mid), {t:"MinAT", v:p.value, ts:p.mid});
+  for(const p of sMaxAT) push(dateKey(p.mid), {t:"MaxAT", v:p.value, ts:p.mid});
+  for(const p of sPoP12) push(dateKey(p.mid), {t:"PoP", v:p.value, ts:p.mid});
+
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  for(let i=0;i<7;i++){
+    const d = new Date(today.getTime()+i*86400000);
+    const mid = d.getTime() + 12*3600000;
+    const wx = seriesValueAtInterval(sWx7, mid)?.text || "";
+    push(dateKey(d.getTime()), {t:"Wx", v:wx, ts:mid});
+  }
+
+  const keys = Array.from(byDate.keys()).sort().slice(0,7);
+  return keys.map(k=>{
+    const d = new Date(k+"T00:00:00");
+    const items = byDate.get(k) || [];
+    const last = (type)=>{
+      const arr = items.filter(x=>x.t===type).sort((a,b)=>a.ts-b.ts);
+      return arr.length ? arr[arr.length-1].v : NaN;
+    };
+    const popMax = ()=>{
+      const arr = items.filter(x=>x.t==="PoP").map(x=>x.v).filter(v=>isFinite(v));
+      return arr.length ? Math.max(...arr) : NaN;
+    };
+    const wx = (items.find(x=>x.t==="Wx")?.v) || "";
+    return {
+      dateKey:k,
+      dow:WEEK[d.getDay()],
+      wx,
+      minT:last("MinT"), maxT:last("MaxT"),
+      minAT:last("MinAT"), maxAT:last("MaxAT"),
+      pop:popMax()
+    };
+  });
+}
+
+/* ===========================
+   預報資料（渲染用）
+   =========================== */
+let hourly1h = [];
+let hourly10m = [];
+let daily7 = [];
+
+/* ===========================
+   loading skeleton
+   =========================== */
+function setForecastLoading(){
+  $("hourlyForecast").innerHTML = `
+    ${Array.from({length:6},(_,i)=>`
+      <div class="forecast-item ${i===0 ? 'is-now' : ''}">
+        <div class="fi-time">${i===0 ? '現在' : '--:--'}</div>
+        <div class="fi-icon">—</div>
+        <div class="fi-temp">--</div>
+        <div class="fi-sub">體感 --</div>
+        <div class="fi-pop">--</div>
+      </div>
+    `).join("")}
+  `;
+  $("dailyForecast").innerHTML = `
+    ${Array.from({length:4},()=>`
+      <div class="daily-row">
+        <div class="dr-left">--</div>
+        <div class="dr-mid"><span class="dr-icon">—</span><span class="dr-wx">--</span></div>
+        <div class="dr-right">
+          <div class="dr-temp"><span class="dr-min">--</span><span class="dr-max">--</span></div>
+          <div class="dr-pop"><span class="dr-pop-pill">--</span></div>
+        </div>
+      </div>
+    `).join("")}
+  `;
+  $("hintBar").innerHTML = "";
+  $("fcTitle").textContent = "未來 24 小時預報";
+}
+
+/* ===========================
+   Open-Meteo URL / 解析
+   =========================== */
+function buildOpenMeteoUrl(lat, lon){
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_mean,sunrise,sunset",
+    hourly: "temperature_2m,apparent_temperature,precipitation_probability,weather_code,cloud_cover",
+    current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m",
+    minutely_15: "visibility",
+    timezone: "auto"
+  });
+  return `${OM_FORECAST}?${params.toString()}`;
+}
+function normalizeVisibilityKmFromOpenMeteo(d){
+  const visArr = d?.minutely_15?.visibility;
+  if(!Array.isArray(visArr) || !visArr.length) return NaN;
+  const v = Number(visArr[0]);
+  if(!isFinite(v)) return NaN;
+  if (v > 200) return v / 1000; // meters -> km
+  return v;
+}
+async function fetchOpenMeteoAll(lat, lon){
+  const url = buildOpenMeteoUrl(lat, lon);
+  return await fetchJson(url, 6500);
+}
+
+/* ===========================
+   核心：一次更新「即時 + 預報」
+   adminOverride：使用者輸入的 鄉/鎮/市/區（若有）
+   =========================== */
+async function runAllForTarget(lat, lon, alt, labelHint, adminOverride=null) {
+  $("cardTemp").textContent = "--.-°";
+  $("feelsLabel").textContent = "體感 --.-°";
+  $("cardCondition").textContent = "--";
+  $("weatherIcon").textContent = "？";
+  $("stationLabel").textContent = "讀取中…";
+  $("timeLabel").textContent = "";
+  $("coordLabel").textContent = `座標：${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  $("locationName").textContent = labelHint || "目前位置";
+  $("altitudeLabel").textContent = "-- m";
+
+  $("mWind").innerHTML = `風 <b>--</b>`;
+  $("mHum").innerHTML  = `濕度 <b>--</b>`;
+  $("mPres").innerHTML = `氣壓 <b>--</b>`;
+  $("mSun").innerHTML  = `日照 <b>--</b>`;
+  $("mVis").innerHTML  = `能見度 <b>--</b>`;
+
+  setForecastLoading();
+
+// ===== label（台灣：若 adminOverride 存在，用「縣市 + 使用者輸入」避免顯示里）=====
+const inTW = isInsideTaiwan(lat, lon);
+
+if (!labelHint || !labelHint.trim()) {
+  // 沒有使用者輸入 → 純 reverse geocode
+  try {
+    const rg = await reverseGeocodePlace(lat, lon);
+    $("locationName").textContent = rg.label || "目前位置";
+  } catch {
+    $("locationName").textContent = "目前位置";
+  }
+
+} else if (inTW) {
+  // 有輸入，而且在台灣
+  try {
+    const rg = await reverseGeocodePlace(lat, lon);
+
+    if (adminOverride) {
+      const input = adminOverride.trim();
+
+      // ✅ 使用者已經輸入完整縣市（例：新北市中和區）
+      if (rg.county && input.startsWith(rg.county)) {
+        $("locationName").textContent = input;
+      } else {
+        // ✅ 用「縣市 + 使用者輸入的鄉鎮市區」
+        $("locationName").textContent =
+          buildTaiwanLabel(rg.county, input, input);
+      }
+
+    } else {
+      // 沒有 adminOverride，照原本邏輯
+      $("locationName").textContent =
+        buildTaiwanLabel(rg.county, rg.district, labelHint.trim());
+    }
+
+  } catch {
+    $("locationName").textContent = labelHint.trim();
+  }
+
+} else {
+  // 非台灣
+  $("locationName").textContent = labelHint.trim();
+}
+
+  // ===== target altitude =====
+  let targetAlt = alt;
+  if (targetAlt == null || !isFinite(targetAlt)) targetAlt = await getElevation(lat, lon, null);
+  $("altitudeLabel").textContent = `${Math.round(targetAlt)} m`;
+
+  const nowTs = Date.now();
+
+  // ===== 先準備 Open-Meteo（全球必備）=====
+  let om = null;
+  try {
+    $("stationLabel").textContent = "讀取 Open-Meteo…";
+    om = await fetchOpenMeteoAll(lat, lon);
+  } catch (e) {
+    dbg("[open-meteo] fail " + e);
+    om = null;
+  }
+
+  const gridElev = (om && typeof om.elevation === "number" && isFinite(om.elevation)) ? om.elevation : 0;
+  const dH = (isFinite(targetAlt) ? targetAlt : 0) - gridElev;
+
+  // ===== 台灣：嘗試 CWA 觀測（30km 規則）=====
+  let useCwaRealtime = false;
+  let cwaStations = [];
+  let cwaWithDist = [];
+  let cwaPick = { used: [], radiusKm: 0 };
+  let finalLRRealtime = computeLapseRate(new Date().getMonth()+1, 80, 0);
+
+  if (inTW) {
+    $("stationLabel").textContent = "讀取 CWA 觀測…";
+
+    let data10=null, data1h=null;
+    const [d10, d1h] = await Promise.allSettled([
+      fetchObsResilient(CWA_OBS_10M_S3, CWA_OBS_10M_PROXY || ""),
+      fetchObsResilient(CWA_OBS_1H_S3,  CWA_OBS_1H_PROXY  || "")
+    ]);
+
+    data10 = (d10.status === "fulfilled") ? d10.value : null;
+    data1h = (d1h.status === "fulfilled") ? d1h.value : null;
+
+    const stations10 = (data10?.cwaopendata?.dataset?.Station)
+      ? parseCwaStations(data10.cwaopendata.dataset.Station) : [];
+    const stations1h = (data1h?.cwaopendata?.dataset?.Station)
+      ? parseCwaStations(data1h.cwaopendata.dataset.Station) : [];
+
+    const stationMap = new Map();
+    stations10.forEach(s=>stationMap.set(s.id, s));
+    stations1h.forEach(s=>{ if(!stationMap.has(s.id)) stationMap.set(s.id, s); });
+    cwaStations = Array.from(stationMap.values());
+
+    if (cwaStations.length) {
+      cwaWithDist = cwaStations
+        .map(s=>({...s, dist:haversine(lat,lon,s.lat,s.lon)}))
+        .sort((a,b)=>a.dist-b.dist);
+
+      const nearestFresh = cwaWithDist.find(s=>isFreshObservation(s, nowTs));
+      const nearestFreshDist = nearestFresh ? nearestFresh.dist : Infinity;
+
+      useCwaRealtime = (nearestFreshDist <= 30);
+
+      if (useCwaRealtime) {
+        cwaPick = pickStationsByRadiusStep(cwaWithDist, nowTs);
+
+        const main = cwaPick.used[0] || nearestFresh;
+        const env = {
+          month: new Date().getMonth() + 1,
+          rh: isFinite(main?.rh) ? main.rh : 80,
+          rain1h: (main?.precip > 0) ? 1 : 0,
+          nowTs
+        };
+        finalLRRealtime = computeFinalLapseRate({lat,lon,elev:targetAlt}, env, cwaStations);
+      }
+    }
+  }
+
+  // ===== 即時渲染：CWA 或 Open-Meteo =====
+  let realtimeT = NaN;
+  let realtimeAT = NaN;
+  let realtimeCondText = "";
+  let realtimeRain = 0;
+  let realtimeCloud = NaN;
+  let realtimeVisKm = NaN;
+  let realtimeThunder = false;
+
+  if (useCwaRealtime) {
+    const used = cwaPick.used || [];
+    if (!used.length) {
+      useCwaRealtime = false;
+    } else {
+      const main = used[0];
+      const env = {
+        month: new Date().getMonth() + 1,
+        rh: isFinite(main.rh) ? main.rh : 80,
+        rain1h: (main.precip > 0) ? 1 : 0,
+        nowTs
+      };
+      const itp = interpolateTemperatureWithHeight({lat,lon,elev:targetAlt}, env, cwaStations, used);
+      const T = isFinite(itp.temp) ? itp.temp : main.temp;
+      realtimeT = T;
+
+      const farthest = used[used.length-1].dist;
+      const maxVarRadius = farthest + 15;
+
+      let rhEff = weightedScalar(cwaWithDist, nowTs, maxVarRadius, (s)=>s.rh);
+      if(!isFinite(rhEff)) rhEff = 60;
+      let windEff = weightedScalar(cwaWithDist, nowTs, maxVarRadius, (s)=>s.wind);
+      if(!isFinite(windEff)) windEff = 1.5;
+
+      const e = (rhEff/100) * 6.105 * Math.exp((17.27*T)/(237.7 + T));
+      const Tapp = 1.04*T + 0.2*e - 0.65*windEff - 2.7;
+      realtimeAT = Tapp;
+
+      $("cardTemp").textContent = `${T.toFixed(1)}°`;
+      $("feelsLabel").textContent = isFinite(Tapp) ? `體感 ${Tapp.toFixed(1)}°` : "體感 --.-°";
+
+      const cond = pickConditionByDistance(used);
+      realtimeCondText = cond;
+      realtimeRain = isFinite(main?.precip) ? main.precip : 0;
+      realtimeThunder = cond.includes("雷");
+      if (cond.includes("陰")) realtimeCloud = 82;
+      else if (cond.includes("多雲")) realtimeCloud = 52;
+      else if (cond.includes("晴")) realtimeCloud = 12;
+
+      $("cardCondition").textContent = cond;
+      $("weatherIcon").textContent = mapWeatherToIcon(cond, false);
+
+      $("stationLabel").textContent =
+        `即時：綜合測站（半徑≤${cwaPick.radiusKm}km）：` +
+        used.map(s => `${s.name} ${s.dist.toFixed(1)}km ${s.temp.toFixed(1)}℃`).join("，");
+
+      const timeGroups = new Map();
+      for (const s of used) {
+        const hhmm = s.obsTime ? formatObsTimeHHMM(s.obsTime) : "";
+        if (!hhmm) continue;
+        if (!timeGroups.has(hhmm)) timeGroups.set(hhmm, []);
+        timeGroups.get(hhmm).push(s.name);
+      }
+      if (timeGroups.size) {
+        const parts = Array.from(timeGroups.entries())
+          .sort((a,b) => a[0].localeCompare(b[0]))
+          .map(([hhmm, names]) => `${Array.from(new Set(names)).join("、")}觀測時間:${hhmm}`);
+        $("timeLabel").textContent = parts.join("　");
+      } else {
+        $("timeLabel").textContent = "觀測時間：--:--";
+      }
+
+      const WIND_MAX_KM = 5;
+      const HUM_MAX_KM  = 8;
+      const PRES_MAX_KM = 30;
+      const SUN_MAX_KM  = 8;
+      const VIS_MAX_KM  = 10;
+
+      const wv = weightedVectorWind(cwaWithDist, nowTs, WIND_MAX_KM);
+      const windTxt = (isFinite(wv.speed) && isFinite(wv.dirDeg))
+        ? `${wv.speed.toFixed(1)} m/s ${degToDir16(wv.dirDeg)}`
+        : "--";
+      $("mWind").innerHTML = `風 <b>${windTxt}</b>`;
+
+      const hum = weightedScalar(cwaWithDist, nowTs, HUM_MAX_KM, (s)=>s.rh);
+      $("mHum").innerHTML = `濕度 <b>${isFinite(hum) ? Math.round(hum)+"%" : "--"}</b>`;
+
+      const pres = weightedPressureAtTarget(cwaWithDist, nowTs, PRES_MAX_KM, targetAlt);
+      $("mPres").innerHTML = `氣壓 <b>${isFinite(pres.pAtTarget) ? pres.pAtTarget.toFixed(1)+" hPa" : "--"}</b>`;
+
+      const sunH = weightedScalar(cwaWithDist, nowTs, SUN_MAX_KM, (s)=>s.sunHours);
+      $("mSun").innerHTML = `日照 <b>${isFinite(sunH) ? sunH.toFixed(1)+"h" : "--"}</b>`;
+
+      const visRaw = pickNearestVisibilityDesc(cwaWithDist, nowTs, VIS_MAX_KM);
+      const visNum = parseFloat(String(visRaw || "").replace(/[^\d.]/g, ""));
+      realtimeVisKm = isFinite(visNum) ? visNum : NaN;
+      $("mVis").innerHTML = `能見度（km） <b>${visRaw ? visRaw : "--"}</b>`;
+    }
+  }
+
+  if (!useCwaRealtime) {
+    if (!om?.current) {
+      $("stationLabel").textContent = "即時：Open-Meteo 暫時無法取得。";
+    } else {
+      const cur = om.current;
+      const T0 = Number(cur.temperature_2m);
+      const AT0 = Number(cur.apparent_temperature);
+      const rh = Number(cur.relative_humidity_2m);
+      const pres = Number(cur.surface_pressure);
+      const wind = Number(cur.wind_speed_10m);
+      const windDir = Number(cur.wind_direction_10m);
+      const provisionalNight = useCwaRealtime ? false : (()=>{
+        const h = getHourFloatForScene(false, om);
+        return h < 5.6 || h >= 18.2333;
+      })();
+      const wx = omCodeToTextIcon(cur.weather_code, provisionalNight);
+      realtimeCondText = wx.text;
+      realtimeThunder = wx.text.includes("雷");
+      realtimeVisKm = normalizeVisibilityKmFromOpenMeteo(om);
+      const cc = Number(om?.hourly?.cloud_cover?.[0]);
+      realtimeCloud = isFinite(cc) ? cc : NaN;
+
+      const T = isFinite(T0) ? (T0 - LR_STD * dH) : NaN;
+      const AT = isFinite(AT0) ? (AT0 - LR_STD * dH) : NaN;
+
+      realtimeT = T;
+      realtimeAT = AT;
+
+      $("cardTemp").textContent = isFinite(T) ? `${T.toFixed(1)}°` : "--.-°";
+      $("feelsLabel").textContent = isFinite(AT) ? `體感 ${AT.toFixed(1)}°` : "體感 --.-°";
+      $("cardCondition").textContent = wx.text;
+      $("weatherIcon").textContent = wx.icon;
+
+      $("stationLabel").textContent = inTW
+        ? "即時：Open-Meteo（≤30km 無 CWA 測站或 CWA 失敗）"
+        : "即時：Open-Meteo（全球）";
+
+      $("timeLabel").textContent = cur.time ? ("更新時間：" + cur.time.replace("T"," ")) : "";
+
+      const windTxt = (isFinite(wind) && isFinite(windDir)) ? `${wind.toFixed(1)} m/s ${degToDir16(windDir)}` : "--";
+      $("mWind").innerHTML = `風 <b>${windTxt}</b>`;
+      $("mHum").innerHTML  = `濕度 <b>${isFinite(rh) ? Math.round(rh)+"%" : "--"}</b>`;
+      $("mPres").innerHTML = `氣壓 <b>${isFinite(pres) ? pres.toFixed(1)+" hPa" : "--"}</b>`;
+      $("mSun").innerHTML  = `日照 <b>--</b>`;
+      const visKm = normalizeVisibilityKmFromOpenMeteo(om);
+      $("mVis").innerHTML  = `能見度（km） <b>${isFinite(visKm) ? visKm.toFixed(1) : "--"}</b>`;
+    }
+  }
+
+const hourFloat = getHourFloatForScene(useCwaRealtime, om);
+const ss = await getSunriseSunsetHourForScene(lat, lon, useCwaRealtime, om, inTW);
+currentSunriseHour = ss.sunriseHour;
+currentSunsetHour = ss.sunsetHour;
+const iconNight = isNightHour(hourFloat, ss.sunriseHour, ss.sunsetHour);
+const scene = getScene({
+  weatherText: realtimeCondText,
+  hour: hourFloat,
+  rain: realtimeRain,
+  cloud: realtimeCloud,
+  visibility: realtimeVisKm,
+  isThunder: realtimeThunder,
+  sunriseHour: ss.sunriseHour,
+  sunsetHour: ss.sunsetHour
+});
+applyScene(scene);
+renderAtmosphereEffects({
+  scene,
+  cloud: realtimeCloud,
+  weatherText: realtimeCondText,
+  rain: realtimeRain,
+  isNight: iconNight
+});
+if (realtimeCondText) $("weatherIcon").textContent = mapWeatherToIcon(realtimeCondText, iconNight);
+if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
+
+  // ===== 預報：台灣 30km 內有 CWA 預報點 -> 用 CWA，否則用 Open-Meteo =====
+  let useCwaForecast = false;
+
+  if (inTW) {
+    try {
+      const idx = await ensureGlobalIndex();
+      const nearest = idx
+        .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
+        .sort((a,b)=>a.d-b.d)[0];
+
+      if (nearest && isFinite(nearest.d)) {
+        useCwaForecast = (nearest.d <= 30);
+      }
+    } catch(e) {
+      dbg("[cwa-forecast-index] fail " + e);
+      useCwaForecast = false;
+    }
+  }
+
+  if (useCwaForecast) {
+    $("hintBar").innerHTML = `預報：<b>CWA</b>（使用加權預報點中…）`;
+
+    const idx = globalIndex;
+    const rankedAll = idx
+      .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
+      .sort((a,b)=>a.d-b.d);
+
+    const picked = [];
+    const seen = new Set();
+    for(const p of rankedAll){
+      const key = `${p.datasetId}::${getLocationName(p.loc)}`;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      picked.push(p);
+      if(picked.length >= K_FIXED) break;
+    }
+
+    const pickedAlt = await Promise.all(picked.map(async p=>{
+      const h = await getElevation(p.lat, p.lon, null);
+      return {...p, alt:h};
+    }));
+
+    // ✅ 這次預報用的 lapse rate（°C/m）
+    const month = new Date().getMonth() + 1;
+    let lr = finalLRRealtime;
+    if (!isFinite(lr) || lr <= 0) lr = computeLapseRate(month, 80, 0);
+
+    // ✅ 顯示：預報點 + 距離 + 垂直遞減率
+    const usedStr = pickedAlt.map(p=>{
+      const nm = getLocationName(p.loc) || "--";
+      const prefix = (p.county && p.county !== "(B0053)") ? p.county : "";
+      const dist = isFinite(p.d) ? p.d.toFixed(1) : "--";
+      return `${prefix}${nm}（${p.datasetId}・${dist}km）`;
+    }).join("、");
+
+    const lrKmAbs = lr * 1000; // °C/km
+    $("hintBar").innerHTML =
+      `預報：<b>CWA</b>｜使用：<b>${usedStr}</b>` +
+      `<br/>垂直遞減率：<b>−${lrKmAbs.toFixed(2)}°C/km</b>（每上升 1km 約降 ${lrKmAbs.toFixed(2)}°C）`;
+
+// ✅ D0047/B0053 常見 elementName：T / AT / Wx / PoP3h|PoP6h|PoP12h
+const pointSeries3 = pickedAlt.map(p=>{
+  const we = getWeatherElements(p.loc);
+
+  const sT  = buildNumericSeriesCWA(we,
+    ["T","溫度","Temperature"],
+    ["value","Value","Temperature"]
+  );
+
+  const sAT = buildNumericSeriesCWA(we,
+    ["AT","體感溫度","ApparentTemperature"],
+    ["value","Value","ApparentTemperature"]
+  );
+
+  const sWx = buildStringSeriesCWA(we,
+    ["Wx","天氣現象","Weather"],
+    ["value","Value","Weather"]
+  );
+
+  // ✅ 你原本寫死 3 小時很容易抓不到，改成多種 PoP 代碼都接受
+  const sPoP = buildNumericSeriesCWA(we,
+    ["PoP3h","PoP6h","PoP12h","PoP","3小時降雨機率","6小時降雨機率","12小時降雨機率"],
+    ["value","Value","ProbabilityOfPrecipitation"]
+  );
+
+  return {...p, sT, sAT, sWx, sPoP3: sPoP}; // 保持你後面用 sPoP3 的變數名不動
+});
+
+    const now = Date.now();
+    const t0 = nextFullHourTs(now);
+
+    const hourlyAll = [];
+    for(let i=0;i<=24;i++){
+      const ts = t0 + i*3600000;
+
+      let sumW=0, sumT=0, sumAT=0, sumATW=0;
+
+      for(const p of pointSeries3){
+        const dkm = Math.max(p.d, 0.1);
+        const w = 1/Math.pow(dkm, DIST_POW);
+
+        const vT = seriesValueAtNearest(p.sT, ts)?.value;
+        if(isFinite(vT)){
+          const T_adj = vT - lr * (targetAlt - (p.alt||0));
+          sumT += w * T_adj;
+          sumW += w;
+        }
+
+        const vAT = seriesValueAtNearest(p.sAT, ts)?.value;
+        if(isFinite(vAT)){
+          const AT_adj = vAT - lr * (targetAlt - (p.alt||0));
+          sumAT += w * AT_adj;
+          sumATW += w;
+        }
+      }
+
+      const nearest = pointSeries3[0];
+      const wx = seriesValueAtInterval(nearest.sWx, ts)?.text || "";
+      const pop = seriesValueAtInterval(nearest.sPoP3, ts)?.value;
+
+      hourlyAll.push({
+        ts,
+        temp: (sumW>0 ? sumT/sumW : NaN),
+        at:   (sumATW>0 ? sumAT/sumATW : NaN),
+        wx, pop
+      });
+    }
+
+    // --- 加入誤差平滑修正 (Bias Correction) ---
+    const DECAY_MINUTES = 360; // 6小時消除誤差
+    const start10 = ceilTo10MinTs(now);
+    const firstFc = hourlyAll[0] || null;
+    const fcT0  = (firstFc && isFinite(firstFc.temp)) ? firstFc.temp : NaN;
+    const fcAT0 = (firstFc && isFinite(firstFc.at))   ? firstFc.at   : NaN;
+
+    const errorT  = (isFinite(realtimeT) && isFinite(fcT0)) ? (realtimeT - fcT0) : 0;
+    const errorAT = (isFinite(realtimeAT) && isFinite(fcAT0)) ? (realtimeAT - fcAT0) : 0;
+
+    hourly1h = hourlyAll.slice(0, 24).map(p => {
+      const minDiff = (p.ts - now) / 60000;
+      const weight = minDiff < 0 ? 1 : clamp((DECAY_MINUTES - minDiff) / DECAY_MINUTES, 0, 1);
+      return {
+        ...p,
+        temp: isFinite(p.temp) ? (p.temp + errorT * weight) : NaN,
+        at: isFinite(p.at) ? (p.at + errorAT * weight) : NaN
+      };
+    });
+
+    hourly10m = [];
+    for(let i=0; i<144; i++){
+      const ts = start10 + i*600000;
+      const minDiff = (ts - now) / 60000;
+      const weight = minDiff < 0 ? 1 : clamp((DECAY_MINUTES - minDiff) / DECAY_MINUTES, 0, 1);
+
+      const x = (ts - t0) / 3600000;
+      const j = Math.floor(x);
+      const f = x - j;
+      const a = hourlyAll[clamp(j, 0, hourlyAll.length - 1)];
+      const b = hourlyAll[clamp(j+1, 0, hourlyAll.length - 1)] || a;
+
+      let baseT = (isFinite(a?.temp) && isFinite(b?.temp)) ? (a.temp + (b.temp - a.temp)*f) : NaN;
+      let baseAT = (isFinite(a?.at) && isFinite(b?.at)) ? (a.at + (b.at - a.at)*f) : NaN;
+
+      const temp = isFinite(baseT) ? (baseT + errorT * weight) : NaN;
+      const at = isFinite(baseAT) ? (baseAT + errorAT * weight) : NaN;
+
+      const nearest = pointSeries3[0];
+      const wx = seriesValueAtInterval(nearest.sWx, ts)?.text || (firstFc?.wx || "");
+      const pop = seriesValueAtInterval(nearest.sPoP3, ts)?.value;
+
+      hourly10m.push({ts, temp, at, wx, pop});
+    }
+
+    // 7d
+    daily7 = [];
+    const weeklyIdsNeeded = Array.from(new Set(pickedAlt.map(p=>weeklyIdFromThreeDay(p.datasetId))));
+    await mapLimit(weeklyIdsNeeded, 4, async (wid)=>{ try{ await fetchForecastDataset(wid); }catch(e){ dbg("[weekly] fail "+wid+" "+e); } });
+
+    const perPointDaily = [];
+    for(const p of pickedAlt){
+      const weeklyId = weeklyIdFromThreeDay(p.datasetId);
+      const wJson = fcCache.get(weeklyId)?.json || null;
+      if(!wJson) continue;
+
+      const locs7 = getLocations(wJson) || [];
+      if(!locs7.length) continue;
+
+      const name3 = getLocationName(p.loc);
+      let loc7 = locs7.find(x=>getLocationName(x)===name3) || null;
+
+      if(!loc7){
+        loc7 = locs7
+          .map(loc=>{
+            const {lat:la,lon:lo}=getLatLon(loc);
+            const dd=haversine(lat,lon,la,lo);
+            return {loc,dd};
+          })
+          .sort((a,b)=>a.dd-b.dd)[0]?.loc || null;
+      }
+      if(!loc7) continue;
+
+      perPointDaily.push({
+        ...p,
+        weeklyId,
+        daily: buildDailyFromWeeklyLoc(loc7)
+      });
+    }
+
+    if(perPointDaily.length){
+      const baseDaily = perPointDaily[0].daily;
+      for(let dayIdx=0; dayIdx<7; dayIdx++){
+        let sumMinT=0, wMinT=0;
+        let sumMaxT=0, wMaxT=0;
+        let sumMinAT=0,wMinAT=0;
+        let sumMaxAT=0,wMaxAT=0;
+
+        for(const p of perPointDaily){
+          const w = 1/Math.pow(Math.max(p.d,0.1), DIST_POW);
+          const d = p.daily[dayIdx];
+          if(!d) continue;
+          const dh = targetAlt - (p.alt||0);
+
+          if(isFinite(d.minT)){ sumMinT += w * (d.minT - lr*dh); wMinT += w; }
+          if(isFinite(d.maxT)){ sumMaxT += w * (d.maxT - lr*dh); wMaxT += w; }
+          if(isFinite(d.minAT)){ sumMinAT += w * (d.minAT - lr*dh); wMinAT += w; }
+          if(isFinite(d.maxAT)){ sumMaxAT += w * (d.maxAT - lr*dh); wMaxAT += w; }
+        }
+
+        const base = baseDaily[dayIdx] || {};
+        daily7.push({
+          dateKey: base.dateKey || "",
+          dow: base.dow || "--",
+          wx: base.wx || "",
+          pop: base.pop,
+          minT: (wMinT>0) ? (sumMinT/wMinT) : NaN,
+          maxT: (wMaxT>0) ? (sumMaxT/wMaxT) : NaN,
+          minAT:(wMinAT>0)? (sumMinAT/wMinAT) : NaN,
+          maxAT:(wMaxAT>0)? (sumMaxAT/wMaxAT) : NaN
+        });
+      }
+    }
+
+    renderHourlyForecast(false);
+    renderDailyForecast(false);
+
+  } else {
+    const lrStdStr = `−${(LR_STD*1000).toFixed(2)}°C/km`;
+    $("hintBar").innerHTML = inTW
+      ? `預報：<b>Open-Meteo（≤30km 無 CWA 預報點）</b><br/>垂直遞減率：<b>${lrStdStr}</b>（標準）`
+      : `預報：<b>Open-Meteo（全球）</b><br/>垂直遞減率：<b>${lrStdStr}</b>（標準）`;
+
+    hourly1h = [];
+    hourly10m = [];
+    daily7 = [];
+
+    const h = om?.hourly;
+    const d = om?.daily;
+
+    if (!h || !Array.isArray(h.time)) {
+      $("hourlyForecast").innerHTML = `<div class="forecast-empty">Open-Meteo 預報暫時無法取得</div>`;
+    } else {
+      const now = Date.now();
+      const t0 = nextFullHourTs(now);
+
+      const times = h.time.map(t=>Date.parse(t));
+      let startIdx = times.findIndex(ts=>isFinite(ts) && ts >= t0);
+      if (startIdx < 0) startIdx = 0;
+
+      const endIdx = Math.min(startIdx + 24, times.length - 1);
+
+      const all = [];
+      for(let i=startIdx; i<=endIdx; i++){
+        const ts = times[i];
+        const T00 = Number(h.temperature_2m?.[i]);
+        const AT00 = Number(h.apparent_temperature?.[i]);
+        const pop = Number(h.precipitation_probability?.[i]);
+        const code = Number(h.weather_code?.[i]);
+        const wx = omCodeToTextIcon(code);
+
+        const T = isFinite(T00) ? (T00 - LR_STD * dH) : NaN;
+        const AT = isFinite(AT00) ? (AT00 - LR_STD * dH) : NaN;
+
+        all.push({
+          ts,
+          temp: T,
+          at: AT,
+          wx: wx.text,
+          icon: wx.icon,
+          _code: code,
+          pop: isFinite(pop) ? pop : NaN
+        });
+      }
+
+      // --- 加入誤差平滑修正 (Bias Correction) 給 Open-Meteo ---
+      const DECAY_MINUTES = 360;
+      const start10 = ceilTo10MinTs(now);
+      let modelTNow = NaN, modelATNow = NaN;
+      {
+        let j = 0;
+        while (j < all.length-1 && all[j+1].ts < now) j++;
+        const a = all[clamp(j, 0, all.length - 1)];
+        const b = all[clamp(j + 1, 0, all.length - 1)] || a;
+        if (isFinite(a?.ts) && isFinite(b?.ts) && b.ts !== a.ts) {
+          const f = clamp((now - a.ts) / (b.ts - a.ts), 0, 1);
+          modelTNow = (isFinite(a.temp) && isFinite(b.temp)) ? (a.temp + (b.temp - a.temp) * f) : a.temp;
+          modelATNow = (isFinite(a.at) && isFinite(b.at)) ? (a.at + (b.at - a.at) * f) : a.at;
+        } else if (a) {
+          modelTNow = a.temp; modelATNow = a.at;
+        }
+      }
+
+      const errorT = (isFinite(realtimeT) && isFinite(modelTNow)) ? (realtimeT - modelTNow) : 0;
+      const errorAT = (isFinite(realtimeAT) && isFinite(modelATNow)) ? (realtimeAT - modelATNow) : 0;
+
+      hourly1h = all.slice(0, 24).map(p => {
+        const minDiff = (p.ts - now) / 60000;
+        const weight = minDiff < 0 ? 1 : clamp((DECAY_MINUTES - minDiff) / DECAY_MINUTES, 0, 1);
+        return {
+          ts: p.ts,
+          temp: isFinite(p.temp) ? (p.temp + errorT * weight) : NaN,
+          at: isFinite(p.at) ? (p.at + errorAT * weight) : NaN,
+          wx: p.wx, pop: p.pop, _icon: p.icon, _code: p._code
+        };
+      });
+
+      hourly10m = [];
+      for(let i=0; i<144; i++){
+        const ts = start10 + i*600000;
+        const minDiff = (ts - now) / 60000;
+        const weight = minDiff < 0 ? 1 : clamp((DECAY_MINUTES - minDiff) / DECAY_MINUTES, 0, 1);
+
+        let j = 0;
+        while (j < all.length - 1 && all[j + 1].ts < ts) j++;
+        const a = all[clamp(j, 0, all.length - 1)];
+        const b = all[clamp(j + 1, 0, all.length - 1)] || a;
+
+        let baseT = NaN, baseAT = NaN;
+        if (isFinite(a?.ts) && isFinite(b?.ts) && b.ts !== a.ts) {
+          const f = clamp((ts - a.ts) / (b.ts - a.ts), 0, 1);
+          baseT = (isFinite(a.temp) && isFinite(b.temp)) ? (a.temp + (b.temp - a.temp) * f) : NaN;
+          baseAT = (isFinite(a.at) && isFinite(b.at)) ? (a.at + (b.at - a.at) * f) : NaN;
+        } else if (a) {
+          baseT = a.temp; baseAT = a.at;
+        }
+
+        const temp = isFinite(baseT) ? (baseT + errorT * weight) : NaN;
+        const at = isFinite(baseAT) ? (baseAT + errorAT * weight) : NaN;
+
+        const near = (Math.abs(ts - a.ts) <= Math.abs(ts - b.ts)) ? a : b;
+        hourly10m.push({ ts, temp, at, wx: near.wx, pop: near.pop, _icon:near.icon, _code:near._code });
+      }
+    }
+
+    if (d && Array.isArray(d.time)) {
+      for(let i=0;i<Math.min(7, d.time.length); i++){
+        const dt = d.time[i];
+        const ts = Date.parse(dt + "T12:00:00");
+
+        const minT0 = Number(d.temperature_2m_min?.[i]);
+        const maxT0 = Number(d.temperature_2m_max?.[i]);
+        const minAT0 = Number(d.apparent_temperature_min?.[i]);
+        const maxAT0 = Number(d.apparent_temperature_max?.[i]);
+
+        const minT  = isFinite(minT0)  ? (minT0  - LR_STD * dH) : NaN;
+        const maxT  = isFinite(maxT0)  ? (maxT0  - LR_STD * dH) : NaN;
+        const minAT = isFinite(minAT0) ? (minAT0 - LR_STD * dH) : NaN;
+        const maxAT = isFinite(maxAT0) ? (maxAT0 - LR_STD * dH) : NaN;
+
+        const pop = Number(d.precipitation_probability_mean?.[i]);
+        const code = Number(d.weather_code?.[i]);
+        const wx = omCodeToTextIcon(code);
+        const dd = new Date(ts);
+        daily7.push({
+          dateKey: dt,
+          dow: WEEK[dd.getDay()],
+          wx: wx.text,
+          _icon: wx.icon,
+          pop: isFinite(pop) ? pop : NaN,
+          minT, maxT, minAT, maxAT
+        });
+      }
+    }
+
+    renderHourlyForecast(true);
+    renderDailyForecast(true);
+  }
+}
+
+/* ===========================
+   渲染：24h
+   =========================== */
+function formatHourlyValue(v, mode){
+  if(!isFinite(v)) return "--";
+  return mode === "10m" ? v.toFixed(1) : String(Math.round(v));
+}
+
+function renderHourlyForecast(isOpenMeteo=false){
+  const box = $("hourlyForecast");
+  box.innerHTML = "";
+
+  const data = (forecastMode==="10m") ? hourly10m : hourly1h;
+  if(!data || !data.length){
+    box.innerHTML = `<div class="forecast-empty">尚無預報資料</div>`;
+    return;
+  }
+
+  const limit = (forecastMode === "10m") ? 144 : 24;
+  const arr = data.slice(0, limit);
+
+  for(let i=0; i<arr.length; i++){
+    const p = arr[i];
+    const pop = isFinite(p.pop) ? Math.round(p.pop) : null;
+
+    const rowHour = hourFloatFromTs(p.ts);
+    const rowNight = isNightHour(rowHour, currentSunriseHour, currentSunsetHour);
+    const icon = (isOpenMeteo && p._icon) ? omCodeToTextIcon(p._code ?? null, rowNight).icon : wxIconText(p.wx || "", rowNight);
+    const tempStr = formatHourlyValue(p.temp, forecastMode);
+    const atStr = formatHourlyValue(p.at, forecastMode);
+
+    const item = document.createElement("div");
+    item.className = `forecast-item ${i===0 ? "is-now" : ""}`.trim();
+    item.innerHTML = `
+      <div class="fi-time">${i===0 ? "現在" : fmtHHMM(p.ts)}</div>
+      <div class="fi-icon">${icon}</div>
+      <div class="fi-temp">${tempStr}°</div>
+      <div class="fi-sub">體感 ${atStr}°</div>
+      ${pop!=null ? `<div class="fi-pop">${pop}%</div>` : ``}
+    `;
+    box.appendChild(item);
+  }
+}
+
+/* ===========================
+   渲染：7d
+   =========================== */
+function renderDailyForecast(isOpenMeteo=false){
+  const box = $("dailyForecast");
+  box.innerHTML = "";
+
+  if(!daily7 || !daily7.length){
+    box.innerHTML = `<div class="forecast-empty">尚無預報資料</div>`;
+    return;
+  }
+
+  for(const d of daily7){
+    const min = (weeklyMode==="feel") ? d.minAT : d.minT;
+    const max = (weeklyMode==="feel") ? d.maxAT : d.maxT;
+    const pop = isFinite(d.pop) ? Math.round(d.pop) : null;
+
+    const minStr = isFinite(min) ? (Math.round(min) + "°") : "--";
+    const maxStr = isFinite(max) ? (Math.round(max) + "°") : "--";
+
+    const icon = (isOpenMeteo && d._icon) ? d._icon : wxIconText(d.wx || "", false);
+
+    const row = document.createElement("div");
+    row.className = "daily-row";
+    row.innerHTML = `
+      <div class="dr-left">${d.dow}</div>
+      <div class="dr-mid">
+        <span class="dr-icon">${icon}</span>
+        <span class="dr-wx">${d.wx || "--"}</span>
+      </div>
+      <div class="dr-right">
+        <div class="dr-temp">
+          <span class="dr-min">${minStr}</span>
+          <span class="dr-max">${maxStr}</span>
+        </div>
+        <div class="dr-pop"><span class="dr-pop-pill">${pop!=null ? (pop+"%") : "--"}</span></div>
+      </div>
+    `;
+    box.appendChild(row);
+  }
+}
+
+/* ===========================
+   模式切換 UI
+   =========================== */
+function updateModeUI() {
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  $("mode-town").style.display = (mode === "town") ? "block" : "none";
+  $("mode-coord").style.display = (mode === "coord") ? "block" : "none";
+
+  document.querySelectorAll(".mode-selector label").forEach((label) => label.classList.remove("active-mode"));
+  const lbl = document.querySelector(`.mode-selector label[data-mode="${mode}"]`);
+  if (lbl) lbl.classList.add("active-mode");
+}
+document.querySelectorAll('input[name="mode"]').forEach((r) => r.addEventListener("change", updateModeUI));
+
+/* ===========================
+   三種輸入模式：gps / place / coord
+   =========================== */
+async function runGpsMode(){
+  $("stationLabel").textContent = "取得 GPS 位置中…";
+  if(!navigator.geolocation){
+    $("stationLabel").textContent = "此裝置不支援定位。";
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos)=>{
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+
+      let alt = (typeof pos.coords.altitude === "number" && isFinite(pos.coords.altitude)) ? pos.coords.altitude : null;
+      if(alt == null) alt = await getElevation(lat, lon, null);
+
+      lastTarget = { lat, lon, alt, label:"", adminOverride:null };
+      await runAllForTarget(lat, lon, alt, "", null);
+    },
+    (err)=>{
+      $("stationLabel").textContent = "GPS 失敗：" + err.message;
+    },
+    { enableHighAccuracy:true, timeout:12000, maximumAge:30000 }
+  );
+}
+
+async function runTownMode(){
+  const name = ($("townName").value || "").trim();
+  if(!name){
+    $("stationLabel").textContent = "請輸入地點，例如：台北、巴黎、秀林鄉。";
+    return;
+  }
+
+  $("stationLabel").textContent = `正在查詢「${name}」位置…`;
+
+  const last = name[name.length - 1];
+  const isTwTown = ["鄉","鎮","市","區"].includes(last);
+
+  try{
+    let lat, lon, label;
+
+    if (isTwTown) {
+      const p = await geocodeTownOfficeTaiwan(name);
+      lat = p.lat; lon = p.lon; label = p.label || name;
+    } else {
+      const p = await geocodePlaceGlobal(name);
+      lat = p.lat; lon = p.lon; label = p.label || name;
+    }
+
+    const alt = await getElevation(lat, lon, null);
+
+    // ✅ 關鍵：若使用者輸入為鄉鎮市區，直接用這個作為 adminOverride，避免顯示里
+    const adminOverride = isTwTown ? name : null;
+
+    lastTarget = { lat, lon, alt, label, adminOverride };
+    await runAllForTarget(lat, lon, alt, label, adminOverride);
+  }catch(e){
+    $("stationLabel").textContent = `找不到「${name}」的位置，請換個更具體的名稱（例如：自由廣場）。`;
+  }
+}
+
+async function runCoordMode(){
+  const latStr = $("manualLat").value.trim();
+  const lonStr = $("manualLon").value.trim();
+  const altStr = $("manualAlt").value.trim();
+
+  const lat = parseFloat(latStr);
+  const lon = parseFloat(lonStr);
+  let alt = parseFloat(altStr);
+
+  if(!isFinite(lat) || !isFinite(lon)){
+    $("stationLabel").textContent = "請輸入正確的緯度 / 經度。";
+    return;
+  }
+  if(!isFinite(alt)) alt = null;
+  if(alt == null) alt = await getElevation(lat, lon, null);
+
+  lastTarget = { lat, lon, alt, label:"自訂座標", adminOverride:null };
+  await runAllForTarget(lat, lon, alt, "自訂座標", null);
+}
+
+/* ===========================
+   綁定按鈕 / 切換
+   =========================== */
+$("refreshBtn").onclick = async ()=>{
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  if(mode==="gps") await runGpsMode();
+  else if(mode==="town") await runTownMode();
+  else await runCoordMode();
+};
+
+document.querySelectorAll(".forecast-mode-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".forecast-mode-btn").forEach(b=>b.classList.remove("on"));
+    btn.classList.add("on");
+    forecastMode = btn.dataset.forecastMode;
+    renderHourlyForecast(false);
+  });
+});
+
+$("toggle7dTempMode").onclick = ()=>{
+  weeklyMode = (weeklyMode==="temp") ? "feel" : "temp";
+  $("toggle7dTempMode").textContent = (weeklyMode==="feel") ? "顯示氣溫" : "顯示體感";
+  $("toggle7dTempMode").classList.toggle("on", weeklyMode==="feel");
+  renderDailyForecast(false);
+};
+
+/* ===========================
+   init
+   =========================== */
+updateModeUI();
+runGpsMode();
+  
+  // ===== 降雨預測 =====
+const RAIN_API = "https://api.leochangrainapi.com/api/rain";
+
+$("rainBtn").onclick = async () => {
+  const minutes = parseInt($("rainMinutes").value);
+
+  // 驗證
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) {
+    $("rainResult").textContent = "請輸入1-60間的整數";
+    return;
+  }
+
+  if (!lastTarget) {
+    $("rainResult").textContent = "尚未取得位置";
+    return;
+  }
+
+  const { lat, lon } = lastTarget;
+
+  $("rainResult").textContent = "計算中...";
+
+  try {
+    const url = `${RAIN_API}?lat=${lat}&lon=${lon}&minutes=${minutes}&mode=mean`;
+    const res = await fetch(url)
+    const data = await res.json();
+
+    const series = data.series || [];
+
+    if (!series.length) {
+      $("rainResult").textContent = "無資料";
+      return;
+    }
+
+    // ===== 累積雨量 =====
+    const total = series.reduce((a, b) => a + (b || 0), 0);
+
+    // ===== 最大雨強（用來上色）=====
+    const maxRainHr = Math.max(...series) * 60;
+
+    // ===== 顏色判斷 =====
+    let color = "";
+    if (maxRainHr < 5) color = "";
+    else if (maxRainHr < 15) color = "green";
+    else if (maxRainHr < 30) color = "yellow";
+    else if (maxRainHr < 50) color = "orange";
+    else if (maxRainHr < 75) color = "red";
+    else color = "purple";
+
+    // ===== 套顏色 =====
+    const box = $("rainResult");
+    box.style.background = getRainBg(color);
+
+    // ===== 顯示 =====
+    box.textContent = `未來${minutes}分鐘降雨量為 ${total.toFixed(1)} 毫米`;
+
+  } catch (e) {
+    $("rainResult").textContent = "取得失敗";
+  }
+};
+
+// 顏色對應
+function getRainBg(color) {
+  switch (color) {
+    case "green": return "rgba(0,200,0,0.6)";
+    case "yellow": return "rgba(255,200,0,0.7)";
+    case "orange": return "rgba(255,140,0,0.7)";
+    case "red": return "rgba(255,0,0,0.7)";
+    case "purple": return "rgba(180,0,255,0.7)";
+    default: return "rgba(0,0,0,.18)";
+  }
+}
+</script>
+</body>
+</html>
