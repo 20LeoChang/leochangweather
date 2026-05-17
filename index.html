@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.1.2</title>
+  <title>天氣網站v5.2</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -526,7 +526,7 @@ body[data-scene="rain-day"] .sky-layer{
   </div>
 
   <div class="rain-controls">
-    <input id="rainMinutes" type="number" placeholder="輸入1–60分鐘的整數" />
+    <input id="rainMinutes" type="number" min="1" max="60" step="1" placeholder="輸入1–60分鐘的整數" />
     <button id="rainBtn">查詢降雨</button>
   </div>
 
@@ -2753,70 +2753,92 @@ runGpsMode();
 const RAIN_API = "https://api.leochangrainapi.com/api/rain";
 
 $("rainBtn").onclick = async () => {
-  const minutes = parseInt($("rainMinutes").value);
+  const box = $("rainResult");
+  const btn = $("rainBtn");
+  const rawMinutes = $("rainMinutes").value.trim();
+  const minutes = Number(rawMinutes);
 
   // 驗證
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) {
-    $("rainResult").textContent = "請輸入1-60間的整數";
+    box.textContent = "請輸入1-60間的整數";
     return;
   }
 
   if (!lastTarget) {
-    $("rainResult").textContent = "尚未取得位置";
+    box.textContent = "尚未取得位置";
     return;
   }
 
   const { lat, lon } = lastTarget;
 
-  $("rainResult").textContent = "計算中...";
+  btn.disabled = true;
+  btn.textContent = "計算中";
+  btn.style.opacity = "0.6";
+  btn.style.cursor = "not-allowed";
+  box.textContent = "計算中...";
 
   try {
-    const url = `${RAIN_API}?lat=${lat}&lon=${lon}&minutes=${minutes}&mode=mean`;
-    const res = await fetch(url)
+    const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean`;
+    const res = await fetch(url, { cache: "no-store" });
     const data = await res.json();
 
-    const series = data.series || [];
+    const series = Array.isArray(data.series)
+      ? data.series.map(Number).filter(Number.isFinite)
+      : [];
 
-    if (!series.length) {
-      $("rainResult").textContent = "無資料";
+    if (!series.length && !Number.isFinite(Number(data.accum_mm))) {
+      box.textContent = "無資料";
       return;
     }
 
     // ===== 累積雨量 =====
-    const total = series.reduce((a, b) => a + (b || 0), 0);
+    const total = Number.isFinite(Number(data.accum_mm))
+      ? Number(data.accum_mm)
+      : series.reduce((a, b) => a + (Number(b) || 0), 0);
 
     // ===== 最大雨強（用來上色）=====
-    const maxRainHr = Math.max(...series) * 60;
+    const maxRainHr = series.length ? Math.max(...series) * 60 : 0;
 
     // ===== 顏色判斷 =====
+    // 分級：<1 無色｜1–5 藍色｜5–15 綠色｜15–35 黃色｜35–55 橘色｜55–70 紅色｜>70 紫色
     let color = "";
-    if (maxRainHr < 5) color = "";
+    if (maxRainHr < 1) color = "";
+    else if (maxRainHr < 5) color = "blue";
     else if (maxRainHr < 15) color = "green";
-    else if (maxRainHr < 30) color = "yellow";
-    else if (maxRainHr < 50) color = "orange";
-    else if (maxRainHr < 75) color = "red";
+    else if (maxRainHr < 35) color = "yellow";
+    else if (maxRainHr < 55) color = "orange";
+    else if (maxRainHr <= 70) color = "red";
     else color = "purple";
 
     // ===== 套顏色 =====
-    const box = $("rainResult");
     box.style.background = getRainBg(color);
 
     // ===== 顯示 =====
     box.textContent = `未來${minutes}分鐘降雨量為 ${total.toFixed(1)} 毫米`;
 
   } catch (e) {
-    $("rainResult").textContent = "取得失敗";
+    box.textContent = "取得失敗";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "查詢降雨";
+    btn.style.opacity = "";
+    btn.style.cursor = "";
   }
 };
+
+$("rainMinutes").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !$("rainBtn").disabled) $("rainBtn").click();
+});
 
 // 顏色對應
 function getRainBg(color) {
   switch (color) {
-    case "green": return "rgba(0,200,0,0.6)";
-    case "yellow": return "rgba(255,200,0,0.7)";
-    case "orange": return "rgba(255,140,0,0.7)";
-    case "red": return "rgba(255,0,0,0.7)";
-    case "purple": return "rgba(180,0,255,0.7)";
+    case "blue": return "rgba(60,150,255,0.62)";
+    case "green": return "rgba(0,200,0,0.62)";
+    case "yellow": return "rgba(255,200,0,0.72)";
+    case "orange": return "rgba(255,140,0,0.72)";
+    case "red": return "rgba(255,0,0,0.72)";
+    case "purple": return "rgba(180,0,255,0.72)";
     default: return "rgba(0,0,0,.18)";
   }
 }
