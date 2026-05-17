@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.2</title>
+  <title>天氣網站v5.3</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -638,6 +638,41 @@ let currentSunsetHour = 18.2333;
 const K_FIXED = 3;
 const DIST_POW = 1.7;
 
+// 更新請求防重複：避免使用者連按造成多個 CWA/預報請求同時跑
+let weatherRefreshBusy = false;
+let weatherRunSeq = 0;
+let lastWeatherRefreshAt = 0;
+
+function setRefreshBusy(busy, label = "更新") {
+  weatherRefreshBusy = !!busy;
+  const btn = $("refreshBtn");
+  if (!btn) return;
+  btn.disabled = weatherRefreshBusy;
+  btn.textContent = weatherRefreshBusy ? "更新中…" : label;
+  btn.style.opacity = weatherRefreshBusy ? "0.65" : "";
+  btn.style.cursor = weatherRefreshBusy ? "not-allowed" : "";
+}
+
+// 降雨查詢版本序號：換地點/更新時遞增，避免上一個地點的雷達結果回寫到新地點
+let rainRunSeq = 0;
+
+function resetRainResult(){
+  rainRunSeq++;
+  const box = $("rainResult");
+  const btn = $("rainBtn");
+  if (box) {
+    box.textContent = "--";
+    box.style.background = "rgba(255,255,255,.08)";
+    box.style.color = "rgba(255,255,255,.96)";
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "查詢降雨";
+    btn.style.opacity = "";
+    btn.style.cursor = "";
+  }
+}
+
 /* ===========================
    資料來源折疊
    =========================== */
@@ -1123,8 +1158,9 @@ function weightedVectorWind(stationsWithDist, nowTs, maxKm){
     spSum += sp*w;
 
     const rad = (dir * Math.PI) / 180;
-    x += Math.cos(rad) * w;
-    y += Math.sin(rad) * w;
+    // 風向是「風從哪裡來」，顯示用方向以風速加權平均，避免弱風測站把方向拉歪
+    x += Math.cos(rad) * sp * w;
+    y += Math.sin(rad) * sp * w;
   }
 
   const speed = (wSum>0) ? (spSum/wSum) : NaN;
@@ -1652,6 +1688,10 @@ const WEEK = ["週日","週一","週二","週三","週四","週五","週六"];
    =========================== */
 const fcCache = new Map();
 let globalIndex = null;
+let globalIndexPromise = null;
+const forecastIndexCache = new Map();
+const forecastIndexPromiseCache = new Map();
+const FC_TTL_MS = 10 * 60 * 1000;
 
 async function mapLimit(items, limit, fn){
   const ret = [];
@@ -1668,38 +1708,64 @@ async function mapLimit(items, limit, fn){
 }
 async function fetchForecastDataset(datasetId){
   const cached = fcCache.get(datasetId);
-  if(cached && cached.json) return cached.json;
+  if(cached && cached.json && Date.now() - cached.ts < FC_TTL_MS) return cached.json;
   const json = await fetchJson(`${PROXY_BASE}/${datasetId}`, 6500);
   fcCache.set(datasetId, {json, ts: Date.now()});
   return json;
 }
+async function buildForecastIndexFromIds(ids, cacheKey, labelText="建立 CWA 預報點索引中…"){
+  const cached = forecastIndexCache.get(cacheKey);
+  if(cached && cached.index && Date.now() - cached.ts < FC_TTL_MS) return cached.index;
+
+  const pending = forecastIndexPromiseCache.get(cacheKey);
+  if(pending) return await pending;
+
+  const promise = (async ()=>{
+    $("hintBar").innerHTML = `預報：<b>${labelText}</b>`;
+    const results = await mapLimit(ids, 3, async ({county, id})=>{
+      const json = await fetchForecastDataset(id);
+      const cwaCounty = getCountyNameFromForecast(json) || county;
+      const locs = getLocations(json) || [];
+      const arr = [];
+      for(const loc of locs){
+        const {lat,lon} = getLatLon(loc);
+        if(!isFinite(lat) || !isFinite(lon) || lat===0 || lon===0) continue;
+        arr.push({ datasetId:id, county:cwaCounty, loc, lat, lon });
+      }
+      dbg(`[index] ${id} ${cwaCounty} locs=${arr.length}`);
+      return arr;
+    });
+    const index = results.filter(Boolean).flat();
+    forecastIndexCache.set(cacheKey, {index, ts: Date.now()});
+    return index;
+  })();
+
+  forecastIndexPromiseCache.set(cacheKey, promise);
+  try { return await promise; }
+  finally { forecastIndexPromiseCache.delete(cacheKey); }
+}
+async function ensureCountyIndex(countyName){
+  const c = normalizeCountyName(countyName || "");
+  const id = COUNTY_FORECAST_CODE[c];
+  if(!id) return [];
+  return await buildForecastIndexFromIds([{county:c, id}], `county:${c}`, `讀取 ${c} CWA 預報點…`);
+}
 async function ensureGlobalIndex(){
   if(globalIndex) return globalIndex;
+  if(globalIndexPromise) return await globalIndexPromise;
 
-  const idsD0047 = Object.entries(COUNTY_FORECAST_CODE).map(([county, id])=>({county, id}));
-  const idsB0053 = B0053_SHORT.map(id=>({county:"(B0053)", id}));
-  const ids = [...idsD0047, ...idsB0053];
+  globalIndexPromise = (async ()=>{
+    const idsD0047 = Object.entries(COUNTY_FORECAST_CODE).map(([county, id])=>({county, id}));
+    const idsB0053 = B0053_SHORT.map(id=>({county:"(B0053)", id}));
+    const ids = [...idsD0047, ...idsB0053];
+    if(debugOn) $("debugBox").textContent = "";
+    globalIndex = await buildForecastIndexFromIds(ids, "global", `建立台灣 CWA 全台預報點索引中…（${ids.length} 份資料）`);
+    dbg(`[index] total=${globalIndex.length}`);
+    return globalIndex;
+  })();
 
-  $("hintBar").innerHTML = `預報：<b>建立台灣 CWA 預報點索引中…</b>（D0047：${idsD0047.length}，B0053：${idsB0053.length}）`;
-  if(debugOn) $("debugBox").textContent = "";
-
-  const results = await mapLimit(ids, 6, async ({county, id})=>{
-    const json = await fetchForecastDataset(id);
-    const cwaCounty = getCountyNameFromForecast(json) || county;
-    const locs = getLocations(json) || [];
-    const arr = [];
-    for(const loc of locs){
-      const {lat,lon} = getLatLon(loc);
-      if(!isFinite(lat) || !isFinite(lon) || lat===0 || lon===0) continue;
-      arr.push({ datasetId:id, county:cwaCounty, loc, lat, lon });
-    }
-    dbg(`[index] ${id} ${cwaCounty} locs=${arr.length}`);
-    return arr;
-  });
-
-  globalIndex = results.filter(Boolean).flat();
-  dbg(`[index] total=${globalIndex.length}`);
-  return globalIndex;
+  try { return await globalIndexPromise; }
+  finally { globalIndexPromise = null; }
 }
 
 /* ===========================
@@ -1853,14 +1919,20 @@ async function runAllForTarget(lat, lon, alt, labelHint, adminOverride=null) {
   $("mVis").innerHTML  = `能見度 <b>--</b>`;
 
   setForecastLoading();
+  // 每次更新先清空，避免舊請求或切換模式時殘留/重複預報列
+  hourly1h = [];
+  hourly10m = [];
+  daily7 = [];
 
 // ===== label（台灣：若 adminOverride 存在，用「縣市 + 使用者輸入」避免顯示里）=====
 const inTW = isInsideTaiwan(lat, lon);
+let forecastCountyName = "";
 
 if (!labelHint || !labelHint.trim()) {
   // 沒有使用者輸入 → 純 reverse geocode
   try {
     const rg = await reverseGeocodePlace(lat, lon);
+    forecastCountyName = rg.county || "";
     $("locationName").textContent = rg.label || "目前位置";
   } catch {
     $("locationName").textContent = "目前位置";
@@ -1870,6 +1942,7 @@ if (!labelHint || !labelHint.trim()) {
   // 有輸入，而且在台灣
   try {
     const rg = await reverseGeocodePlace(lat, lon);
+    forecastCountyName = rg.county || "";
 
     if (adminOverride) {
       const input = adminOverride.trim();
@@ -2148,13 +2221,24 @@ if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
 
   // ===== 預報：台灣 30km 內有 CWA 預報點 -> 用 CWA，否則用 Open-Meteo =====
   let useCwaForecast = false;
+  let selectedForecastIndex = [];
 
   if (inTW) {
     try {
-      const idx = await ensureGlobalIndex();
-      const nearest = idx
+      // 先只讀目前縣市的 D0047，避免第一次就抓全台索引造成 10+ 秒延遲
+      selectedForecastIndex = forecastCountyName ? await ensureCountyIndex(forecastCountyName) : [];
+
+      // 如果縣市判斷失敗或距離太遠，再 fallback 全台索引
+      let nearest = selectedForecastIndex
         .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
         .sort((a,b)=>a.d-b.d)[0];
+
+      if (!nearest || !isFinite(nearest.d) || nearest.d > 30) {
+        selectedForecastIndex = await ensureGlobalIndex();
+        nearest = selectedForecastIndex
+          .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
+          .sort((a,b)=>a.d-b.d)[0];
+      }
 
       if (nearest && isFinite(nearest.d)) {
         useCwaForecast = (nearest.d <= 30);
@@ -2162,13 +2246,14 @@ if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
     } catch(e) {
       dbg("[cwa-forecast-index] fail " + e);
       useCwaForecast = false;
+      selectedForecastIndex = [];
     }
   }
 
   if (useCwaForecast) {
     $("hintBar").innerHTML = `預報：<b>CWA</b>（使用加權預報點中…）`;
 
-    const idx = globalIndex;
+    const idx = selectedForecastIndex;
     const rankedAll = idx
       .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
       .sort((a,b)=>a.d-b.d);
@@ -2644,22 +2729,30 @@ async function runGpsMode(){
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos)=>{
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
+  // geolocation 是 callback API，必須包成 Promise，否則 GPS 模式會太早解除「更新中…」狀態
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      async (pos)=>{
+        try {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
 
-      let alt = (typeof pos.coords.altitude === "number" && isFinite(pos.coords.altitude)) ? pos.coords.altitude : null;
-      if(alt == null) alt = await getElevation(lat, lon, null);
+          let alt = (typeof pos.coords.altitude === "number" && isFinite(pos.coords.altitude)) ? pos.coords.altitude : null;
+          if(alt == null) alt = await getElevation(lat, lon, null);
 
-      lastTarget = { lat, lon, alt, label:"", adminOverride:null };
-      await runAllForTarget(lat, lon, alt, "", null);
-    },
-    (err)=>{
-      $("stationLabel").textContent = "GPS 失敗：" + err.message;
-    },
-    { enableHighAccuracy:true, timeout:12000, maximumAge:30000 }
-  );
+          lastTarget = { lat, lon, alt, label:"", adminOverride:null };
+          await runAllForTarget(lat, lon, alt, "", null);
+        } finally {
+          resolve();
+        }
+      },
+      (err)=>{
+        $("stationLabel").textContent = "GPS 失敗：" + err.message;
+        resolve();
+      },
+      { enableHighAccuracy:true, timeout:12000, maximumAge:30000 }
+    );
+  });
 }
 
 async function runTownMode(){
@@ -2720,12 +2813,36 @@ async function runCoordMode(){
 /* ===========================
    綁定按鈕 / 切換
    =========================== */
-$("refreshBtn").onclick = async ()=>{
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-  if(mode==="gps") await runGpsMode();
-  else if(mode==="town") await runTownMode();
-  else await runCoordMode();
-};
+async function runCurrentMode(){
+  if (weatherRefreshBusy) return;
+  const mySeq = ++weatherRunSeq;
+  setRefreshBusy(true);
+  resetRainResult();
+  $("stationLabel").textContent = "更新中…";
+  try {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    if(mode==="gps") await runGpsMode();
+    else if(mode==="town") await runTownMode();
+    else await runCoordMode();
+  } catch(e) {
+    dbg("[refresh] fail " + e);
+    $("stationLabel").textContent = "更新失敗，請稍後再試。";
+  } finally {
+    if (mySeq === weatherRunSeq) {
+      lastWeatherRefreshAt = Date.now();
+      setRefreshBusy(false);
+    }
+  }
+}
+
+$("refreshBtn").onclick = runCurrentMode;
+
+// 超過 2 分鐘沒有手動更新時，自動用同一個位置刷新一次；若正在更新中就跳過。
+setInterval(async ()=>{
+  if (weatherRefreshBusy || !lastTarget) return;
+  if (Date.now() - lastWeatherRefreshAt < 120000) return;
+  await runCurrentMode();
+}, 30000);
 
 document.querySelectorAll(".forecast-mode-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -2747,12 +2864,13 @@ $("toggle7dTempMode").onclick = ()=>{
    init
    =========================== */
 updateModeUI();
-runGpsMode();
+runCurrentMode();
   
   // ===== 降雨預測 =====
 const RAIN_API = "https://api.leochangrainapi.com/api/rain";
 
 $("rainBtn").onclick = async () => {
+  const myRainSeq = ++rainRunSeq;
   const box = $("rainResult");
   const btn = $("rainBtn");
   const rawMinutes = $("rainMinutes").value.trim();
@@ -2780,14 +2898,18 @@ $("rainBtn").onclick = async () => {
   try {
     const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean`;
     const res = await fetch(url, { cache: "no-store" });
+    if (myRainSeq !== rainRunSeq) return;
+    if (!res.ok) throw new Error("RAIN_API_HTTP_" + res.status);
     const data = await res.json();
+    if (myRainSeq !== rainRunSeq) return;
+    if (data.ok === false) throw new Error(data.error || "RAIN_API_OK_FALSE");
 
     const series = Array.isArray(data.series)
       ? data.series.map(Number).filter(Number.isFinite)
       : [];
 
     if (!series.length && !Number.isFinite(Number(data.accum_mm))) {
-      box.textContent = "無資料";
+      if (myRainSeq === rainRunSeq) box.textContent = "無資料";
       return;
     }
 
@@ -2810,6 +2932,8 @@ $("rainBtn").onclick = async () => {
     else if (maxRainHr <= 70) color = "red";
     else color = "purple";
 
+    if (myRainSeq !== rainRunSeq) return;
+
     // ===== 套顏色 =====
     box.style.background = getRainBg(color);
 
@@ -2817,12 +2941,14 @@ $("rainBtn").onclick = async () => {
     box.textContent = `未來${minutes}分鐘降雨量為 ${total.toFixed(1)} 毫米`;
 
   } catch (e) {
-    box.textContent = "取得失敗";
+    if (myRainSeq === rainRunSeq) box.textContent = "取得失敗";
   } finally {
-    btn.disabled = false;
-    btn.textContent = "查詢降雨";
-    btn.style.opacity = "";
-    btn.style.cursor = "";
+    if (myRainSeq === rainRunSeq) {
+      btn.disabled = false;
+      btn.textContent = "查詢降雨";
+      btn.style.opacity = "";
+      btn.style.cursor = "";
+    }
   }
 };
 
