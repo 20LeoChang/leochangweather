@@ -439,6 +439,236 @@ body[data-scene="rain-day"] .sky-layer{
     body[data-scene="rain-day"] .rain-layer,body[data-scene="rain-night"] .rain-layer,body[data-scene="storm-day"] .rain-layer{opacity:1}
     body[data-scene="fog-day"] .fog-layer,body[data-scene="fog-night"] .fog-layer{opacity:1}
 
+    /* ===========================
+   v5.3.1 iPhone / 小螢幕適配修正
+   修正：7 天預報降雨機率膠囊被吃掉
+   =========================== */
+
+html{
+  width:100%;
+  min-width:0;
+  overflow-x:hidden;
+}
+
+body{
+  width:100%;
+  min-width:0;
+  min-height:100vh;
+  min-height:100dvh;
+  overflow-x:hidden;
+  -webkit-text-size-adjust:100%;
+}
+
+/* 外層不要讓 Safari 算錯寬度 */
+.app{
+  width:100%;
+  max-width:430px;
+  min-width:0;
+  padding:clamp(14px, 4vw, 24px);
+}
+
+.card{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  padding:20px clamp(14px, 4vw, 22px) 18px;
+}
+
+/* 避免所有子層爆寬 */
+.card,
+.hourly-block,
+.rain-block,
+.daily-forecast,
+.daily-row,
+.forecast-header,
+.realtime-metrics{
+  min-width:0;
+  max-width:100%;
+}
+
+/* 7 天預報：改成固定右側欄位 + 中間文字自動省略 */
+.daily-forecast{
+  margin-top:6px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  width:100%;
+  min-width:0;
+}
+
+.daily-row{
+  display:grid;
+  grid-template-columns:
+    42px          /* 星期 */
+    22px          /* icon */
+    minmax(0,1fr) /* 天氣文字，可縮 */
+    32px          /* 低溫 */
+    32px          /* 高溫 */
+    46px;         /* 降雨機率 */
+  align-items:center;
+  column-gap:6px;
+
+  width:100%;
+  min-width:0;
+  max-width:100%;
+
+  padding:6px 8px;
+  border-radius:14px;
+  background:var(--section-bg);
+  font-size:12px;
+  border:1px solid var(--section-border);
+  overflow:hidden;
+  transition:background .6s ease,border-color .6s ease;
+}
+
+.dr-left{
+  min-width:0;
+  opacity:.95;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:clip;
+}
+
+/* 讓原本 HTML 結構不要干擾 grid */
+.dr-mid,
+.dr-right,
+.dr-temp{
+  display:contents;
+}
+
+.dr-icon{
+  font-size:18px;
+  line-height:1;
+  text-align:center;
+  min-width:0;
+}
+
+.dr-wx{
+  min-width:0;
+  max-width:100%;
+  opacity:.95;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.dr-min,
+.dr-max{
+  min-width:0;
+  text-align:right;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+.dr-min{
+  opacity:.78;
+}
+
+.dr-max{
+  font-weight:600;
+}
+
+.dr-pop{
+  min-width:0;
+  display:flex;
+  justify-content:flex-end;
+}
+
+.dr-pop-pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:44px;
+  min-width:44px;
+  max-width:44px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:rgba(255,255,255,.14);
+  font-size:11px;
+  opacity:.92;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+
+/* 更窄的 iPhone / 小螢幕再壓縮一點 */
+@media (max-width:390px){
+  .daily-row{
+    grid-template-columns:
+      38px
+      20px
+      minmax(0,1fr)
+      30px
+      30px
+      42px;
+    column-gap:5px;
+    padding:6px 7px;
+    font-size:11.5px;
+  }
+
+  .dr-icon{
+    font-size:17px;
+  }
+
+  .dr-pop-pill{
+    width:40px;
+    min-width:40px;
+    max-width:40px;
+    padding:2px 4px;
+    font-size:10.5px;
+  }
+}
+
+/* 超窄螢幕：保住右邊，不讓降雨機率消失 */
+@media (max-width:360px){
+  .daily-row{
+    grid-template-columns:
+      36px
+      19px
+      minmax(0,1fr)
+      28px
+      28px
+      40px;
+    column-gap:4px;
+    padding:6px 6px;
+    font-size:11px;
+  }
+
+  .dr-pop-pill{
+    width:38px;
+    min-width:38px;
+    max-width:38px;
+    font-size:10px;
+  }
+}
+
+/* 降雨查詢區也順手修，避免按鈕或輸入框在小螢幕爆寬 */
+.rain-controls{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  min-width:0;
+}
+
+#rainMinutes{
+  flex:1 1 auto;
+  min-width:0;
+}
+
+#rainBtn{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+/* 即時資料膠囊避免撐爆 */
+.metric-pill{
+  max-width:100%;
+}
+
+/* 24 小時預報橫向滾動保護 */
+.hourly-forecast{
+  max-width:100%;
+  min-width:0;
+}
   </style>
 </head>
 
