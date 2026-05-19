@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.3.1</title>
+  <title>天氣網站v5.4</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -1112,25 +1112,94 @@ function computeTimeWeight(station, nowTs) {
 function isFreshObservation(station, nowTs) { return computeTimeWeight(station, nowTs) > 0; }
 
 /* ===========================
-   即時測站選點（5km 起跳 +5km 擴張）
+   即時測站選點
+   規則：
+   10km 內 >=5：高度修正克里金
+   10km 內 3–4：高度修正 IDW
+   10km 內 <3：每 5km 擴張，找到 >=3 後只用 IDW
    =========================== */
-const OBS_RADIUS_START_KM = 5;
+const OBS_RADIUS_START_KM = 10;
 const OBS_RADIUS_STEP_KM  = 5;
 const OBS_RADIUS_MAX_KM   = 99999;
 
-function pickStationsByRadiusStep(withDist, nowTs){
-  if(!withDist || !withDist.length) return { used: [], radiusKm: 0 };
-  let r = OBS_RADIUS_START_KM;
+const IDW_MIN_STATIONS = 3;
+const KRIGING_MIN_STATIONS = 5;
+const KRIGING_FIRST_RADIUS_KM = 10;
+const KRIGING_MAX_STATIONS = 10;
 
-  while (true) {
-    const used = withDist.filter(s => s.dist <= r && isFreshObservation(s, nowTs));
-    if (used.length >= 3) return { used, radiusKm: r };
-    r += OBS_RADIUS_STEP_KM;
-    if (r > OBS_RADIUS_MAX_KM) break;
+function pickStationsByRadiusStep(withDist, nowTs){
+  if (!withDist || !withDist.length) {
+    return {
+      used: [],
+      radiusKm: 0,
+      preferMethod: "idw",
+      reason: "no_station"
+    };
   }
 
-  const fallback = withDist.filter(s => isFreshObservation(s, nowTs));
-  return { used: fallback, radiusKm: r };
+  const fresh = withDist
+    .filter(s => isFreshObservation(s, nowTs))
+    .sort((a, b) => a.dist - b.dist);
+
+  if (!fresh.length) {
+    return {
+      used: [],
+      radiusKm: 0,
+      preferMethod: "idw",
+      reason: "no_fresh_station"
+    };
+  }
+
+  // 1) 先看 10km 內
+  const firstRadiusUsed = fresh.filter(s => s.dist <= KRIGING_FIRST_RADIUS_KM);
+
+  // 10km 內 >=5：用克里金
+  if (firstRadiusUsed.length >= KRIGING_MIN_STATIONS) {
+    return {
+      used: firstRadiusUsed.slice(0, KRIGING_MAX_STATIONS),
+      radiusKm: KRIGING_FIRST_RADIUS_KM,
+      preferMethod: "kriging",
+      reason: "10km_ge_5"
+    };
+  }
+
+  // 10km 內 3–4：用 IDW
+  if (firstRadiusUsed.length >= IDW_MIN_STATIONS) {
+    return {
+      used: firstRadiusUsed,
+      radiusKm: KRIGING_FIRST_RADIUS_KM,
+      preferMethod: "idw",
+      reason: "10km_3_to_4"
+    };
+  }
+
+  // 2) 10km 內 <3：每 5km 往外擴，直到 >=3；找到後只用 IDW
+  for (
+    let r = KRIGING_FIRST_RADIUS_KM + OBS_RADIUS_STEP_KM;
+    r <= OBS_RADIUS_MAX_KM;
+    r += OBS_RADIUS_STEP_KM
+  ) {
+    const used = fresh.filter(s => s.dist <= r);
+
+    if (used.length >= IDW_MIN_STATIONS) {
+      return {
+        used: used.slice(0, KRIGING_MAX_STATIONS),
+        radiusKm: r,
+        preferMethod: "idw",
+        reason: "expanded_for_idw_only"
+      };
+    }
+  }
+
+  // 真的很偏遠：連 3 站都找不到，就拿最近新資料保底
+  const fallback = fresh.slice(0, IDW_MIN_STATIONS);
+
+  return {
+    used: fallback,
+    radiusKm: fallback.length ? Math.max(...fallback.map(s => s.dist || 0)) : 0,
+    preferMethod: "idw",
+    reason: "fallback_less_than_3"
+  };
 }
 
 /* ===========================
@@ -1455,33 +1524,53 @@ function weightedPressureAtTarget(stationsWithDist, nowTs, maxKm, targetAlt){
 }
 
 /* ===========================
-   即時溫度：多站 + 最終 lapse rate 的高度修正插值
+   即時溫度：高度修正 IDW fallback
+   保留：
+   - 實測/氣候混合遞減率 finalLR
+   - 觀測時間權重 computeTimeWeight
+   - 有效溫度/新鮮資料過濾
    =========================== */
-function interpolateTemperatureWithHeight(target, env, stations, usedStations) {
+function interpolateTemperatureIDWFallback(target, env, stations, usedStations, finalLR) {
   const { nowTs } = env;
-  const finalLR = computeFinalLapseRate(target, env, stations);
 
   let used = Array.isArray(usedStations) ? usedStations.slice() : null;
 
-  if(!used || !used.length){
+  if (!used || !used.length) {
     let valid = stations
-      .map((s)=>({...s, dist:haversine(target.lat,target.lon,s.lat,s.lon)}))
-      .filter((s)=>isValidTemp(s.temp) && isFreshObservation(s, nowTs))
-      .sort((a,b)=>a.dist-b.dist);
+      .map((s) => ({ ...s, dist: haversine(target.lat, target.lon, s.lat, s.lon) }))
+      .filter((s) => isValidTemp(s.temp) && isFreshObservation(s, nowTs))
+      .sort((a, b) => a.dist - b.dist);
 
-    if (!valid.length) return { temp: NaN, lapseRate: finalLR, used: [] };
+    if (!valid.length) {
+      return {
+        temp: NaN,
+        method: "idw",
+        lapseRate: finalLR,
+        used: []
+      };
+    }
 
     const picked = pickStationsByRadiusStep(valid, nowTs);
     used = picked.used;
   }
 
-  if (!used || !used.length) return { temp: NaN, lapseRate: finalLR, used: [] };
+  if (!used || !used.length) {
+    return {
+      temp: NaN,
+      method: "idw",
+      lapseRate: finalLR,
+      used: []
+    };
+  }
 
-  let wSum=0, tSum=0;
+  let wSum = 0;
+  let tSum = 0;
   const p = 1.7;
 
   for (const s of used) {
-    const dkm = Math.max(s.dist || haversine(target.lat,target.lon,s.lat,s.lon), 0.1);
+    if (!isValidTemp(s.temp) || !isFreshObservation(s, nowTs)) continue;
+
+    const dkm = Math.max(s.dist || haversine(target.lat, target.lon, s.lat, s.lon), 0.1);
     const wDist = 1 / Math.pow(dkm, p);
     const wTime = computeTimeWeight(s, nowTs);
     const w = wDist * wTime;
@@ -1491,12 +1580,190 @@ function interpolateTemperatureWithHeight(target, env, stations, usedStations) {
     const hTarget  = target.elev || 0;
     const deltaH = hTarget - hStation;
 
+    // 高度修正：保留實測遞減率 finalLR
     const T_adj = s.temp - finalLR * deltaH;
+
     wSum += w;
     tSum += T_adj * w;
   }
 
-  return { temp: (wSum===0 ? NaN : (tSum/wSum)), lapseRate: finalLR, used };
+  return {
+    temp: wSum === 0 ? NaN : tSum / wSum,
+    method: "idw",
+    lapseRate: finalLR,
+    used
+  };
+}
+
+/* ===========================
+   Ordinary Kriging：小矩陣 Gaussian elimination
+   =========================== */
+function solveLinearSystemGaussian(A, b) {
+  const n = A.length;
+  const M = A.map((row, i) => row.slice().concat([b[i]]));
+
+  for (let col = 0; col < n; col++) {
+    let pivot = col;
+
+    for (let r = col + 1; r < n; r++) {
+      if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+    }
+
+    if (Math.abs(M[pivot][col]) < 1e-10) return null;
+
+    if (pivot !== col) {
+      const tmp = M[col];
+      M[col] = M[pivot];
+      M[pivot] = tmp;
+    }
+
+    const div = M[col][col];
+
+    for (let c = col; c <= n; c++) {
+      M[col][c] /= div;
+    }
+
+    for (let r = 0; r < n; r++) {
+      if (r === col) continue;
+
+      const factor = M[r][col];
+      if (factor === 0) continue;
+
+      for (let c = col; c <= n; c++) {
+        M[r][c] -= factor * M[col][c];
+      }
+    }
+  }
+
+  return M.map(row => row[n]);
+}
+
+function krigingCovariance(dKm, rangeKm, sill) {
+  // 指數 covariance model：距離越遠，相關越低
+  return sill * Math.exp(-Math.max(0, dKm) / Math.max(rangeKm, 0.1));
+}
+
+/* ===========================
+   即時溫度：高度修正 Ordinary Kriging
+   保留：
+   - finalLR 高度修正
+   - 時間品質懲罰
+   - 權重異常 fallback
+   =========================== */
+function interpolateTemperatureKriging(target, env, stations, usedStations, finalLR) {
+  const { nowTs } = env;
+
+  let used = Array.isArray(usedStations) ? usedStations.slice() : [];
+
+  used = used
+    .filter(s => isValidTemp(s.temp) && isFreshObservation(s, nowTs))
+    .sort((a, b) => (a.dist || 9999) - (b.dist || 9999))
+    .slice(0, KRIGING_MAX_STATIONS);
+
+  if (used.length < KRIGING_MIN_STATIONS) {
+    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  }
+
+  const n = used.length;
+
+  const maxD = Math.max(...used.map(s => s.dist || 0));
+  const rangeKm = clamp(maxD * 1.6, 5, 20);
+  const sill = 1.0;
+  const nugget = 0.10;
+
+  const A = Array.from({ length: n + 1 }, () => Array(n + 1).fill(0));
+  const b = Array(n + 1).fill(0);
+
+  for (let i = 0; i < n; i++) {
+    const si = used[i];
+
+    for (let j = 0; j < n; j++) {
+      const sj = used[j];
+      const d = haversine(si.lat, si.lon, sj.lat, sj.lon);
+
+      A[i][j] = krigingCovariance(d, rangeKm, sill);
+
+      if (i === j) {
+        const tw = computeTimeWeight(si, nowTs);
+
+        // 越舊的測站，對角線懲罰越大
+        // 這等於把「時間不可靠」轉成 kriging 的 nugget penalty
+        A[i][j] += nugget + (1 - tw) * 0.55;
+      }
+    }
+
+    // Ordinary Kriging constraint: 權重總和 = 1
+    A[i][n] = 1;
+    A[n][i] = 1;
+
+    const dTarget = si.dist || haversine(target.lat, target.lon, si.lat, si.lon);
+    b[i] = krigingCovariance(dTarget, rangeKm, sill);
+  }
+
+  A[n][n] = 0;
+  b[n] = 1;
+
+  const x = solveLinearSystemGaussian(A, b);
+
+  if (!x) {
+    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  }
+
+  const weights = x.slice(0, n);
+
+  // 權重過度放大通常代表測站幾何不穩或矩陣病態
+  const absSum = weights.reduce((s, w) => s + Math.abs(w), 0);
+
+  if (!isFinite(absSum) || absSum > 4.5) {
+    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  }
+
+  let temp = 0;
+
+  for (let i = 0; i < n; i++) {
+    const s = used[i];
+
+    const hStation = s.alt || 0;
+    const hTarget  = target.elev || 0;
+    const deltaH = hTarget - hStation;
+
+    // 高度修正：保留實測遞減率 finalLR
+    const T_adj = s.temp - finalLR * deltaH;
+
+    temp += weights[i] * T_adj;
+  }
+
+  if (!isFinite(temp) || temp < -50 || temp > 55) {
+    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  }
+
+  return {
+    temp,
+    method: "kriging",
+    lapseRate: finalLR,
+    used,
+    kriging: {
+      rangeKm,
+      nugget,
+      weights
+    }
+  };
+}
+
+/* ===========================
+   即時溫度：自動選擇
+   =========================== */
+function interpolateTemperatureWithHeight(target, env, stations, usedStations, preferMethod = "idw") {
+  const finalLR = computeFinalLapseRate(target, env, stations);
+
+  const used = Array.isArray(usedStations) ? usedStations.slice() : [];
+
+  // 只有 10km 內 >=5 站才用克里金
+  if (preferMethod === "kriging" && used.length >= KRIGING_MIN_STATIONS) {
+    return interpolateTemperatureKriging(target, env, stations, used, finalLR);
+  }
+
+  return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
 }
 
 /* ===========================
@@ -1531,6 +1798,16 @@ function omCodeToTextIcon(code, isNight=false){
   return { text:"天氣變化", icon:isNight ? "🌙" : "⛅" };
 }
 
+function weatherTextSaysPrecip(weatherText){
+  const t = String(weatherText || "");
+  return t.includes("雷") || t.includes("雨") || t.includes("雪") || t.includes("雹") || t.includes("霰");
+}
+
+function weatherTextSaysClear(weatherText){
+  const t = String(weatherText || "");
+  return (t.includes("晴") || t.includes("大致晴朗")) && !weatherTextSaysPrecip(t);
+}
+
 function getScene({
   weatherText = "",
   hour = new Date().getHours(),
@@ -1546,10 +1823,17 @@ function getScene({
   const isSunrise = hour >= sunriseHour - 0.4 && hour < sunriseHour + 0.7;
   const isSunset = hour >= sunsetHour - 0.7 && hour < sunsetHour + 0.4;
 
+  // 動畫以「目前天氣現象」為主。
+  // 有些 CWA 測站 Now.Precipitation 可能殘留上一段雨量；若 Weather 顯示晴，不能只因雨量欄位 > 0 就切成下雨動畫。
+  const textPrecip = weatherTextSaysPrecip(t);
+  const textClear = weatherTextSaysClear(t);
+  const unknownText = !String(weatherText || "").trim() || String(weatherText || "") === "目前天氣不明";
+  const rainSignalAllowed = textPrecip || (unknownText && rain > 0.2);
+
   if (isThunder || t.includes("雷")) return isNight ? "rain-night" : "storm-day";
   if (visibility <= 2 || t.includes("霧")) return isNight ? "fog-night" : "fog-day";
-  if (rain >= 8 || t.includes("大雨") || t.includes("豪雨")) return isNight ? "rain-night" : "rain-day";
-  if (rain > 0.2 || t.includes("雨") || t.includes("陣雨")) return isNight ? "rain-night" : "rain-day";
+  if (rainSignalAllowed && (rain >= 8 || t.includes("大雨") || t.includes("豪雨"))) return isNight ? "rain-night" : "rain-day";
+  if (!textClear && rainSignalAllowed) return isNight ? "rain-night" : "rain-day";
 
   if (isSunrise) return "sunrise";
   if (isSunset) return "sunset";
@@ -1633,7 +1917,9 @@ function renderAtmosphereEffects({scene, cloud=0, weatherText="", rain=0, isNigh
 
   const t = String(weatherText || "");
   const hasSnow = t.includes("雪") || t.includes("霰");
-  const hasRain = !hasSnow && (rain > 0.05 || t.includes("雨") || t.includes("雷"));
+  // 降雨粒子動畫也跟目前天氣現象走，避免晴天只因 Now.Precipitation 殘值而出現雨線。
+  const sceneIsRain = scene === "rain-day" || scene === "rain-night" || scene === "storm-day";
+  const hasRain = !hasSnow && sceneIsRain && (t.includes("雨") || t.includes("雷") || rain > 0.2);
   const cloudAmt = isFinite(cloud) ? Math.max(0, Math.min(100, cloud)) : (t.includes("陰") ? 90 : t.includes("多雲") ? 60 : 18);
   const cloudCount = cloudAmt >= 90 ? 8 : cloudAmt >= 70 ? 6 : cloudAmt >= 45 ? 4 : cloudAmt >= 20 ? 2 : 0;
   const starCount = isNight ? (cloudAmt < 25 ? 42 : cloudAmt < 55 ? 18 : 6) : 0;
@@ -2296,7 +2582,13 @@ if (!labelHint || !labelHint.trim()) {
         rain1h: (main.precip > 0) ? 1 : 0,
         nowTs
       };
-      const itp = interpolateTemperatureWithHeight({lat,lon,elev:targetAlt}, env, cwaStations, used);
+      const itp = interpolateTemperatureWithHeight(
+        { lat, lon, elev: targetAlt },
+        env,
+        cwaStations,
+        used,
+        cwaPick.preferMethod
+      );
       const T = isFinite(itp.temp) ? itp.temp : main.temp;
       realtimeT = T;
 
@@ -2326,8 +2618,12 @@ if (!labelHint || !labelHint.trim()) {
       $("cardCondition").textContent = cond;
       $("weatherIcon").textContent = mapWeatherToIcon(cond, false);
 
+      const methodText = itp.method === "kriging" ? "高度修正克里金" : "高度修正IDW";
+      const lrKmAbs = isFinite(itp.lapseRate) ? itp.lapseRate * 1000 : NaN;
+
       $("stationLabel").textContent =
-        `即時：綜合測站（半徑≤${cwaPick.radiusKm}km）：` +
+        `即時：綜合測站（${methodText}，半徑≤${cwaPick.radiusKm}km` +
+        `${isFinite(lrKmAbs) ? `，遞減率−${lrKmAbs.toFixed(2)}°C/km` : ""}）：` +
         used.map(s => `${s.name} ${s.dist.toFixed(1)}km ${s.temp.toFixed(1)}℃`).join("，");
 
       const timeGroups = new Map();
