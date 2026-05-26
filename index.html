@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.4</title>
+  <title>天氣網站v5.5</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -439,236 +439,34 @@ body[data-scene="rain-day"] .sky-layer{
     body[data-scene="rain-day"] .rain-layer,body[data-scene="rain-night"] .rain-layer,body[data-scene="storm-day"] .rain-layer{opacity:1}
     body[data-scene="fog-day"] .fog-layer,body[data-scene="fog-night"] .fog-layer{opacity:1}
 
+
     /* ===========================
-   v5.3.1 iPhone / 小螢幕適配修正
+   v5.4 iPhone / 小螢幕適配修正
    修正：7 天預報降雨機率膠囊被吃掉
    =========================== */
+html{width:100%;min-width:0;overflow-x:hidden;}
+body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+.app{width:100%;max-width:430px;min-width:0;padding:clamp(14px,4vw,24px);}
+.card{width:100%;max-width:100%;min-width:0;padding:20px clamp(14px,4vw,22px) 18px;}
+.card,.hourly-block,.rain-block,.daily-forecast,.daily-row,.forecast-header,.realtime-metrics{min-width:0;max-width:100%;}
+.daily-forecast{margin-top:6px;display:flex;flex-direction:column;gap:4px;width:100%;min-width:0;}
+.daily-row{display:grid;grid-template-columns:42px 22px minmax(0,1fr) 32px 32px 46px;align-items:center;column-gap:6px;width:100%;min-width:0;max-width:100%;padding:6px 8px;border-radius:14px;background:var(--section-bg);font-size:12px;border:1px solid var(--section-border);overflow:hidden;transition:background .6s ease,border-color .6s ease;}
+.dr-left{min-width:0;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:clip;}
+.dr-mid,.dr-right,.dr-temp{display:contents;}
+.dr-icon{font-size:18px;line-height:1;text-align:center;min-width:0;}
+.dr-wx{min-width:0;max-width:100%;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dr-min,.dr-max{min-width:0;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.dr-min{opacity:.78;}.dr-max{font-weight:600;}
+.dr-pop{min-width:0;display:flex;justify-content:flex-end;}
+.dr-pop-pill{display:inline-flex;align-items:center;justify-content:center;width:44px;min-width:44px;max-width:44px;padding:2px 5px;border-radius:999px;background:rgba(255,255,255,.14);font-size:11px;opacity:.92;white-space:nowrap;font-variant-numeric:tabular-nums;}
+@media (max-width:390px){.daily-row{grid-template-columns:38px 20px minmax(0,1fr) 30px 30px 42px;column-gap:5px;padding:6px 7px;font-size:11.5px}.dr-icon{font-size:17px}.dr-pop-pill{width:40px;min-width:40px;max-width:40px;padding:2px 4px;font-size:10.5px}}
+@media (max-width:360px){.daily-row{grid-template-columns:36px 19px minmax(0,1fr) 28px 28px 40px;column-gap:4px;padding:6px 6px;font-size:11px}.dr-pop-pill{width:38px;min-width:38px;max-width:38px;font-size:10px}}
+.rain-controls{display:flex;gap:8px;align-items:center;min-width:0;}
+#rainMinutes{flex:1 1 auto;min-width:0;}
+#rainBtn{flex:0 0 auto;white-space:nowrap;}
+.metric-pill{max-width:100%;}
+.hourly-forecast{max-width:100%;min-width:0;}
 
-html{
-  width:100%;
-  min-width:0;
-  overflow-x:hidden;
-}
-
-body{
-  width:100%;
-  min-width:0;
-  min-height:100vh;
-  min-height:100dvh;
-  overflow-x:hidden;
-  -webkit-text-size-adjust:100%;
-}
-
-/* 外層不要讓 Safari 算錯寬度 */
-.app{
-  width:100%;
-  max-width:430px;
-  min-width:0;
-  padding:clamp(14px, 4vw, 24px);
-}
-
-.card{
-  width:100%;
-  max-width:100%;
-  min-width:0;
-  padding:20px clamp(14px, 4vw, 22px) 18px;
-}
-
-/* 避免所有子層爆寬 */
-.card,
-.hourly-block,
-.rain-block,
-.daily-forecast,
-.daily-row,
-.forecast-header,
-.realtime-metrics{
-  min-width:0;
-  max-width:100%;
-}
-
-/* 7 天預報：改成固定右側欄位 + 中間文字自動省略 */
-.daily-forecast{
-  margin-top:6px;
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  width:100%;
-  min-width:0;
-}
-
-.daily-row{
-  display:grid;
-  grid-template-columns:
-    42px          /* 星期 */
-    22px          /* icon */
-    minmax(0,1fr) /* 天氣文字，可縮 */
-    32px          /* 低溫 */
-    32px          /* 高溫 */
-    46px;         /* 降雨機率 */
-  align-items:center;
-  column-gap:6px;
-
-  width:100%;
-  min-width:0;
-  max-width:100%;
-
-  padding:6px 8px;
-  border-radius:14px;
-  background:var(--section-bg);
-  font-size:12px;
-  border:1px solid var(--section-border);
-  overflow:hidden;
-  transition:background .6s ease,border-color .6s ease;
-}
-
-.dr-left{
-  min-width:0;
-  opacity:.95;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:clip;
-}
-
-/* 讓原本 HTML 結構不要干擾 grid */
-.dr-mid,
-.dr-right,
-.dr-temp{
-  display:contents;
-}
-
-.dr-icon{
-  font-size:18px;
-  line-height:1;
-  text-align:center;
-  min-width:0;
-}
-
-.dr-wx{
-  min-width:0;
-  max-width:100%;
-  opacity:.95;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-
-.dr-min,
-.dr-max{
-  min-width:0;
-  text-align:right;
-  white-space:nowrap;
-  font-variant-numeric:tabular-nums;
-}
-
-.dr-min{
-  opacity:.78;
-}
-
-.dr-max{
-  font-weight:600;
-}
-
-.dr-pop{
-  min-width:0;
-  display:flex;
-  justify-content:flex-end;
-}
-
-.dr-pop-pill{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:44px;
-  min-width:44px;
-  max-width:44px;
-  padding:2px 5px;
-  border-radius:999px;
-  background:rgba(255,255,255,.14);
-  font-size:11px;
-  opacity:.92;
-  white-space:nowrap;
-  font-variant-numeric:tabular-nums;
-}
-
-/* 更窄的 iPhone / 小螢幕再壓縮一點 */
-@media (max-width:390px){
-  .daily-row{
-    grid-template-columns:
-      38px
-      20px
-      minmax(0,1fr)
-      30px
-      30px
-      42px;
-    column-gap:5px;
-    padding:6px 7px;
-    font-size:11.5px;
-  }
-
-  .dr-icon{
-    font-size:17px;
-  }
-
-  .dr-pop-pill{
-    width:40px;
-    min-width:40px;
-    max-width:40px;
-    padding:2px 4px;
-    font-size:10.5px;
-  }
-}
-
-/* 超窄螢幕：保住右邊，不讓降雨機率消失 */
-@media (max-width:360px){
-  .daily-row{
-    grid-template-columns:
-      36px
-      19px
-      minmax(0,1fr)
-      28px
-      28px
-      40px;
-    column-gap:4px;
-    padding:6px 6px;
-    font-size:11px;
-  }
-
-  .dr-pop-pill{
-    width:38px;
-    min-width:38px;
-    max-width:38px;
-    font-size:10px;
-  }
-}
-
-/* 降雨查詢區也順手修，避免按鈕或輸入框在小螢幕爆寬 */
-.rain-controls{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  min-width:0;
-}
-
-#rainMinutes{
-  flex:1 1 auto;
-  min-width:0;
-}
-
-#rainBtn{
-  flex:0 0 auto;
-  white-space:nowrap;
-}
-
-/* 即時資料膠囊避免撐爆 */
-.metric-pill{
-  max-width:100%;
-}
-
-/* 24 小時預報橫向滾動保護 */
-.hourly-forecast{
-  max-width:100%;
-  min-width:0;
-}
   </style>
 </head>
 
@@ -873,6 +671,48 @@ let weatherRefreshBusy = false;
 let weatherRunSeq = 0;
 let lastWeatherRefreshAt = 0;
 
+// 自動更新：使用者閒置滿 2 分鐘才刷新，避免 setInterval 巡查造成常常變成 2:30
+// 任何點擊、滑動、輸入、按鍵都會重新倒數；雷達查詢中不刷新。
+const AUTO_REFRESH_MS = 2 * 60 * 1000;
+let autoRefreshTimer = null;
+let lastAutoRefreshResetAt = 0;
+
+function clearAutoRefresh(){
+  if (autoRefreshTimer) {
+    clearTimeout(autoRefreshTimer);
+    autoRefreshTimer = null;
+  }
+}
+
+function scheduleAutoRefresh(delayMs = AUTO_REFRESH_MS){
+  clearAutoRefresh();
+  autoRefreshTimer = setTimeout(async () => {
+    if (weatherRefreshBusy || rainQueryBusy || !lastTarget) {
+      scheduleAutoRefresh(AUTO_REFRESH_MS);
+      return;
+    }
+    await runCurrentMode({ fromAuto: true });
+  }, delayMs);
+}
+
+function resetAutoRefreshCountdown(){
+  if (!lastTarget) return;
+  const now = Date.now();
+  if (now - lastAutoRefreshResetAt < 800) return;
+  lastAutoRefreshResetAt = now;
+  scheduleAutoRefresh(AUTO_REFRESH_MS);
+}
+
+function installAutoRefreshActivityReset(){
+  const opts = { passive: true };
+  ["pointerdown", "touchstart", "touchmove", "wheel", "scroll", "keydown", "input"].forEach((ev)=>{
+    window.addEventListener(ev, resetAutoRefreshCountdown, opts);
+  });
+  document.addEventListener("visibilitychange", ()=>{
+    if (!document.hidden) resetAutoRefreshCountdown();
+  });
+}
+
 function setRefreshBusy(busy, label = "更新") {
   weatherRefreshBusy = !!busy;
   const btn = $("refreshBtn");
@@ -885,9 +725,11 @@ function setRefreshBusy(busy, label = "更新") {
 
 // 降雨查詢版本序號：換地點/更新時遞增，避免上一個地點的雷達結果回寫到新地點
 let rainRunSeq = 0;
+let rainQueryBusy = false;
 
 function resetRainResult(){
   rainRunSeq++;
+  rainQueryBusy = false;
   const box = $("rainResult");
   const btn = $("rainBtn");
   if (box) {
@@ -1121,87 +963,24 @@ function isFreshObservation(station, nowTs) { return computeTimeWeight(station, 
 const OBS_RADIUS_START_KM = 10;
 const OBS_RADIUS_STEP_KM  = 5;
 const OBS_RADIUS_MAX_KM   = 99999;
-
 const IDW_MIN_STATIONS = 3;
 const KRIGING_MIN_STATIONS = 5;
 const KRIGING_FIRST_RADIUS_KM = 10;
 const KRIGING_MAX_STATIONS = 10;
-
 function pickStationsByRadiusStep(withDist, nowTs){
-  if (!withDist || !withDist.length) {
-    return {
-      used: [],
-      radiusKm: 0,
-      preferMethod: "idw",
-      reason: "no_station"
-    };
-  }
-
-  const fresh = withDist
-    .filter(s => isFreshObservation(s, nowTs))
-    .sort((a, b) => a.dist - b.dist);
-
-  if (!fresh.length) {
-    return {
-      used: [],
-      radiusKm: 0,
-      preferMethod: "idw",
-      reason: "no_fresh_station"
-    };
-  }
-
-  // 1) 先看 10km 內
+  if (!withDist || !withDist.length) return { used: [], radiusKm: 0, preferMethod: "idw", reason: "no_station" };
+  const fresh = withDist.filter(s => isFreshObservation(s, nowTs)).sort((a,b)=>a.dist-b.dist);
+  if (!fresh.length) return { used: [], radiusKm: 0, preferMethod: "idw", reason: "no_fresh_station" };
   const firstRadiusUsed = fresh.filter(s => s.dist <= KRIGING_FIRST_RADIUS_KM);
-
-  // 10km 內 >=5：用克里金
-  if (firstRadiusUsed.length >= KRIGING_MIN_STATIONS) {
-    return {
-      used: firstRadiusUsed.slice(0, KRIGING_MAX_STATIONS),
-      radiusKm: KRIGING_FIRST_RADIUS_KM,
-      preferMethod: "kriging",
-      reason: "10km_ge_5"
-    };
-  }
-
-  // 10km 內 3–4：用 IDW
-  if (firstRadiusUsed.length >= IDW_MIN_STATIONS) {
-    return {
-      used: firstRadiusUsed,
-      radiusKm: KRIGING_FIRST_RADIUS_KM,
-      preferMethod: "idw",
-      reason: "10km_3_to_4"
-    };
-  }
-
-  // 2) 10km 內 <3：每 5km 往外擴，直到 >=3；找到後只用 IDW
-  for (
-    let r = KRIGING_FIRST_RADIUS_KM + OBS_RADIUS_STEP_KM;
-    r <= OBS_RADIUS_MAX_KM;
-    r += OBS_RADIUS_STEP_KM
-  ) {
+  if (firstRadiusUsed.length >= KRIGING_MIN_STATIONS) return { used: firstRadiusUsed.slice(0, KRIGING_MAX_STATIONS), radiusKm: KRIGING_FIRST_RADIUS_KM, preferMethod: "kriging", reason: "10km_ge_5" };
+  if (firstRadiusUsed.length >= IDW_MIN_STATIONS) return { used: firstRadiusUsed, radiusKm: KRIGING_FIRST_RADIUS_KM, preferMethod: "idw", reason: "10km_3_to_4" };
+  for (let r = KRIGING_FIRST_RADIUS_KM + OBS_RADIUS_STEP_KM; r <= OBS_RADIUS_MAX_KM; r += OBS_RADIUS_STEP_KM) {
     const used = fresh.filter(s => s.dist <= r);
-
-    if (used.length >= IDW_MIN_STATIONS) {
-      return {
-        used: used.slice(0, KRIGING_MAX_STATIONS),
-        radiusKm: r,
-        preferMethod: "idw",
-        reason: "expanded_for_idw_only"
-      };
-    }
+    if (used.length >= IDW_MIN_STATIONS) return { used: used.slice(0, KRIGING_MAX_STATIONS), radiusKm: r, preferMethod: "idw", reason: "expanded_for_idw_only" };
   }
-
-  // 真的很偏遠：連 3 站都找不到，就拿最近新資料保底
   const fallback = fresh.slice(0, IDW_MIN_STATIONS);
-
-  return {
-    used: fallback,
-    radiusKm: fallback.length ? Math.max(...fallback.map(s => s.dist || 0)) : 0,
-    preferMethod: "idw",
-    reason: "fallback_less_than_3"
-  };
+  return { used: fallback, radiusKm: fallback.length ? Math.max(...fallback.map(s => s.dist || 0)) : 0, preferMethod: "idw", reason: "fallback_less_than_3" };
 }
-
 /* ===========================
    lapse rate（你的原邏輯保留）
    =========================== */
@@ -1525,247 +1304,80 @@ function weightedPressureAtTarget(stationsWithDist, nowTs, maxKm, targetAlt){
 
 /* ===========================
    即時溫度：高度修正 IDW fallback
-   保留：
-   - 實測/氣候混合遞減率 finalLR
-   - 觀測時間權重 computeTimeWeight
-   - 有效溫度/新鮮資料過濾
    =========================== */
 function interpolateTemperatureIDWFallback(target, env, stations, usedStations, finalLR) {
   const { nowTs } = env;
-
   let used = Array.isArray(usedStations) ? usedStations.slice() : null;
-
   if (!used || !used.length) {
-    let valid = stations
-      .map((s) => ({ ...s, dist: haversine(target.lat, target.lon, s.lat, s.lon) }))
-      .filter((s) => isValidTemp(s.temp) && isFreshObservation(s, nowTs))
-      .sort((a, b) => a.dist - b.dist);
-
-    if (!valid.length) {
-      return {
-        temp: NaN,
-        method: "idw",
-        lapseRate: finalLR,
-        used: []
-      };
-    }
-
-    const picked = pickStationsByRadiusStep(valid, nowTs);
-    used = picked.used;
+    let valid = stations.map((s)=>({ ...s, dist:haversine(target.lat,target.lon,s.lat,s.lon) })).filter((s)=>isValidTemp(s.temp) && isFreshObservation(s, nowTs)).sort((a,b)=>a.dist-b.dist);
+    if (!valid.length) return { temp: NaN, method: "idw", lapseRate: finalLR, used: [] };
+    used = pickStationsByRadiusStep(valid, nowTs).used;
   }
-
-  if (!used || !used.length) {
-    return {
-      temp: NaN,
-      method: "idw",
-      lapseRate: finalLR,
-      used: []
-    };
-  }
-
-  let wSum = 0;
-  let tSum = 0;
-  const p = 1.7;
-
+  if (!used || !used.length) return { temp: NaN, method: "idw", lapseRate: finalLR, used: [] };
+  let wSum=0, tSum=0; const p=1.7;
   for (const s of used) {
     if (!isValidTemp(s.temp) || !isFreshObservation(s, nowTs)) continue;
-
-    const dkm = Math.max(s.dist || haversine(target.lat, target.lon, s.lat, s.lon), 0.1);
-    const wDist = 1 / Math.pow(dkm, p);
-    const wTime = computeTimeWeight(s, nowTs);
-    const w = wDist * wTime;
+    const dkm = Math.max(s.dist || haversine(target.lat,target.lon,s.lat,s.lon), 0.1);
+    const w = (1 / Math.pow(dkm, p)) * computeTimeWeight(s, nowTs);
     if (w <= 0) continue;
-
-    const hStation = s.alt || 0;
-    const hTarget  = target.elev || 0;
-    const deltaH = hTarget - hStation;
-
-    // 高度修正：保留實測遞減率 finalLR
+    const deltaH = (target.elev || 0) - (s.alt || 0);
     const T_adj = s.temp - finalLR * deltaH;
-
-    wSum += w;
-    tSum += T_adj * w;
+    wSum += w; tSum += T_adj * w;
   }
-
-  return {
-    temp: wSum === 0 ? NaN : tSum / wSum,
-    method: "idw",
-    lapseRate: finalLR,
-    used
-  };
+  return { temp: wSum === 0 ? NaN : tSum / wSum, method: "idw", lapseRate: finalLR, used };
 }
-
-/* ===========================
-   Ordinary Kriging：小矩陣 Gaussian elimination
-   =========================== */
 function solveLinearSystemGaussian(A, b) {
-  const n = A.length;
-  const M = A.map((row, i) => row.slice().concat([b[i]]));
-
-  for (let col = 0; col < n; col++) {
-    let pivot = col;
-
-    for (let r = col + 1; r < n; r++) {
-      if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
-    }
-
+  const n=A.length; const M=A.map((row,i)=>row.slice().concat([b[i]]));
+  for (let col=0; col<n; col++) {
+    let pivot=col;
+    for (let r=col+1; r<n; r++) if (Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot=r;
     if (Math.abs(M[pivot][col]) < 1e-10) return null;
-
-    if (pivot !== col) {
-      const tmp = M[col];
-      M[col] = M[pivot];
-      M[pivot] = tmp;
-    }
-
-    const div = M[col][col];
-
-    for (let c = col; c <= n; c++) {
-      M[col][c] /= div;
-    }
-
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-
-      const factor = M[r][col];
-      if (factor === 0) continue;
-
-      for (let c = col; c <= n; c++) {
-        M[r][c] -= factor * M[col][c];
-      }
-    }
+    if (pivot !== col) { const tmp=M[col]; M[col]=M[pivot]; M[pivot]=tmp; }
+    const div=M[col][col];
+    for (let c=col; c<=n; c++) M[col][c] /= div;
+    for (let r=0; r<n; r++) { if (r===col) continue; const factor=M[r][col]; if (factor===0) continue; for (let c=col; c<=n; c++) M[r][c] -= factor*M[col][c]; }
   }
-
-  return M.map(row => row[n]);
+  return M.map(row=>row[n]);
 }
-
-function krigingCovariance(dKm, rangeKm, sill) {
-  // 指數 covariance model：距離越遠，相關越低
-  return sill * Math.exp(-Math.max(0, dKm) / Math.max(rangeKm, 0.1));
-}
-
-/* ===========================
-   即時溫度：高度修正 Ordinary Kriging
-   保留：
-   - finalLR 高度修正
-   - 時間品質懲罰
-   - 權重異常 fallback
-   =========================== */
+function krigingCovariance(dKm, rangeKm, sill) { return sill * Math.exp(-Math.max(0, dKm) / Math.max(rangeKm, 0.1)); }
 function interpolateTemperatureKriging(target, env, stations, usedStations, finalLR) {
   const { nowTs } = env;
-
   let used = Array.isArray(usedStations) ? usedStations.slice() : [];
-
-  used = used
-    .filter(s => isValidTemp(s.temp) && isFreshObservation(s, nowTs))
-    .sort((a, b) => (a.dist || 9999) - (b.dist || 9999))
-    .slice(0, KRIGING_MAX_STATIONS);
-
-  if (used.length < KRIGING_MIN_STATIONS) {
-    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
-  }
-
-  const n = used.length;
-
-  const maxD = Math.max(...used.map(s => s.dist || 0));
-  const rangeKm = clamp(maxD * 1.6, 5, 20);
-  const sill = 1.0;
-  const nugget = 0.10;
-
-  const A = Array.from({ length: n + 1 }, () => Array(n + 1).fill(0));
-  const b = Array(n + 1).fill(0);
-
-  for (let i = 0; i < n; i++) {
-    const si = used[i];
-
-    for (let j = 0; j < n; j++) {
-      const sj = used[j];
-      const d = haversine(si.lat, si.lon, sj.lat, sj.lon);
-
-      A[i][j] = krigingCovariance(d, rangeKm, sill);
-
-      if (i === j) {
-        const tw = computeTimeWeight(si, nowTs);
-
-        // 越舊的測站，對角線懲罰越大
-        // 這等於把「時間不可靠」轉成 kriging 的 nugget penalty
-        A[i][j] += nugget + (1 - tw) * 0.55;
-      }
+  used = used.filter(s=>isValidTemp(s.temp) && isFreshObservation(s, nowTs)).sort((a,b)=>(a.dist||9999)-(b.dist||9999)).slice(0, KRIGING_MAX_STATIONS);
+  if (used.length < KRIGING_MIN_STATIONS) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  const n=used.length; const maxD=Math.max(...used.map(s=>s.dist||0)); const rangeKm=clamp(maxD*1.6,5,20); const sill=1.0; const nugget=0.10;
+  const A=Array.from({length:n+1},()=>Array(n+1).fill(0)); const b=Array(n+1).fill(0);
+  for (let i=0;i<n;i++) {
+    const si=used[i];
+    for (let j=0;j<n;j++) {
+      const sj=used[j]; const d=haversine(si.lat,si.lon,sj.lat,sj.lon);
+      A[i][j]=krigingCovariance(d,rangeKm,sill);
+      if (i===j) { const tw=computeTimeWeight(si, nowTs); A[i][j]+=nugget+(1-tw)*0.55; }
     }
-
-    // Ordinary Kriging constraint: 權重總和 = 1
-    A[i][n] = 1;
-    A[n][i] = 1;
-
-    const dTarget = si.dist || haversine(target.lat, target.lon, si.lat, si.lon);
-    b[i] = krigingCovariance(dTarget, rangeKm, sill);
+    A[i][n]=1; A[n][i]=1;
+    const dTarget=si.dist || haversine(target.lat,target.lon,si.lat,si.lon);
+    b[i]=krigingCovariance(dTarget,rangeKm,sill);
   }
-
-  A[n][n] = 0;
-  b[n] = 1;
-
-  const x = solveLinearSystemGaussian(A, b);
-
-  if (!x) {
-    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  A[n][n]=0; b[n]=1;
+  const x=solveLinearSystemGaussian(A,b);
+  if (!x) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  const weights=x.slice(0,n); const absSum=weights.reduce((s,w)=>s+Math.abs(w),0);
+  if (!isFinite(absSum) || absSum > 4.5) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  let temp=0;
+  for (let i=0;i<n;i++) {
+    const s=used[i]; const deltaH=(target.elev||0)-(s.alt||0);
+    const T_adj=s.temp-finalLR*deltaH;
+    temp += weights[i]*T_adj;
   }
-
-  const weights = x.slice(0, n);
-
-  // 權重過度放大通常代表測站幾何不穩或矩陣病態
-  const absSum = weights.reduce((s, w) => s + Math.abs(w), 0);
-
-  if (!isFinite(absSum) || absSum > 4.5) {
-    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
-  }
-
-  let temp = 0;
-
-  for (let i = 0; i < n; i++) {
-    const s = used[i];
-
-    const hStation = s.alt || 0;
-    const hTarget  = target.elev || 0;
-    const deltaH = hTarget - hStation;
-
-    // 高度修正：保留實測遞減率 finalLR
-    const T_adj = s.temp - finalLR * deltaH;
-
-    temp += weights[i] * T_adj;
-  }
-
-  if (!isFinite(temp) || temp < -50 || temp > 55) {
-    return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
-  }
-
-  return {
-    temp,
-    method: "kriging",
-    lapseRate: finalLR,
-    used,
-    kriging: {
-      rangeKm,
-      nugget,
-      weights
-    }
-  };
+  if (!isFinite(temp) || temp < -50 || temp > 55) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  return { temp, method: "kriging", lapseRate: finalLR, used, kriging:{ rangeKm, nugget, weights } };
 }
-
-/* ===========================
-   即時溫度：自動選擇
-   =========================== */
 function interpolateTemperatureWithHeight(target, env, stations, usedStations, preferMethod = "idw") {
   const finalLR = computeFinalLapseRate(target, env, stations);
-
   const used = Array.isArray(usedStations) ? usedStations.slice() : [];
-
-  // 只有 10km 內 >=5 站才用克里金
-  if (preferMethod === "kriging" && used.length >= KRIGING_MIN_STATIONS) {
-    return interpolateTemperatureKriging(target, env, stations, used, finalLR);
-  }
-
+  if (preferMethod === "kriging" && used.length >= KRIGING_MIN_STATIONS) return interpolateTemperatureKriging(target, env, stations, used, finalLR);
   return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
 }
-
 /* ===========================
    Open-Meteo：weather_code -> 文字/圖示
    =========================== */
@@ -1802,45 +1414,27 @@ function weatherTextSaysPrecip(weatherText){
   const t = String(weatherText || "");
   return t.includes("雷") || t.includes("雨") || t.includes("雪") || t.includes("雹") || t.includes("霰");
 }
-
 function weatherTextSaysClear(weatherText){
   const t = String(weatherText || "");
   return (t.includes("晴") || t.includes("大致晴朗")) && !weatherTextSaysPrecip(t);
 }
-
-function getScene({
-  weatherText = "",
-  hour = new Date().getHours(),
-  rain = 0,
-  cloud = 0,
-  visibility = 20,
-  isThunder = false,
-  sunriseHour = 5.6,
-  sunsetHour = 18.2333
-}) {
+function getScene({ weatherText = "", hour = new Date().getHours(), rain = 0, cloud = 0, visibility = 20, isThunder = false, sunriseHour = 5.6, sunsetHour = 18.2333 }) {
   const t = String(weatherText || "").toLowerCase();
   const isNight = hour < sunriseHour || hour >= sunsetHour;
   const isSunrise = hour >= sunriseHour - 0.4 && hour < sunriseHour + 0.7;
   const isSunset = hour >= sunsetHour - 0.7 && hour < sunsetHour + 0.4;
-
-  // 動畫以「目前天氣現象」為主。
-  // 有些 CWA 測站 Now.Precipitation 可能殘留上一段雨量；若 Weather 顯示晴，不能只因雨量欄位 > 0 就切成下雨動畫。
   const textPrecip = weatherTextSaysPrecip(t);
   const textClear = weatherTextSaysClear(t);
   const unknownText = !String(weatherText || "").trim() || String(weatherText || "") === "目前天氣不明";
   const rainSignalAllowed = textPrecip || (unknownText && rain > 0.2);
-
   if (isThunder || t.includes("雷")) return isNight ? "rain-night" : "storm-day";
   if (visibility <= 2 || t.includes("霧")) return isNight ? "fog-night" : "fog-day";
   if (rainSignalAllowed && (rain >= 8 || t.includes("大雨") || t.includes("豪雨"))) return isNight ? "rain-night" : "rain-day";
   if (!textClear && rainSignalAllowed) return isNight ? "rain-night" : "rain-day";
-
   if (isSunrise) return "sunrise";
   if (isSunset) return "sunset";
-
   if (cloud >= 92 || t.includes("陰")) return isNight ? "cloudy-night" : "overcast-day";
   if (cloud >= 60 || t.includes("多雲")) return isNight ? "cloudy-night" : "partly-day";
-
   return isNight ? "clear-night" : "clear-day";
 }
 function applyScene(scene){
@@ -1917,7 +1511,6 @@ function renderAtmosphereEffects({scene, cloud=0, weatherText="", rain=0, isNigh
 
   const t = String(weatherText || "");
   const hasSnow = t.includes("雪") || t.includes("霰");
-  // 降雨粒子動畫也跟目前天氣現象走，避免晴天只因 Now.Precipitation 殘值而出現雨線。
   const sceneIsRain = scene === "rain-day" || scene === "rain-night" || scene === "storm-day";
   const hasRain = !hasSnow && sceneIsRain && (t.includes("雨") || t.includes("雷") || rain > 0.2);
   const cloudAmt = isFinite(cloud) ? Math.max(0, Math.min(100, cloud)) : (t.includes("陰") ? 90 : t.includes("多雲") ? 60 : 18);
@@ -2620,7 +2213,6 @@ if (!labelHint || !labelHint.trim()) {
 
       const methodText = itp.method === "kriging" ? "高度修正克里金" : "高度修正IDW";
       const lrKmAbs = isFinite(itp.lapseRate) ? itp.lapseRate * 1000 : NaN;
-
       $("stationLabel").textContent =
         `即時：綜合測站（${methodText}，半徑≤${cwaPick.radiusKm}km` +
         `${isFinite(lrKmAbs) ? `，遞減率−${lrKmAbs.toFixed(2)}°C/km` : ""}）：` +
@@ -3339,12 +2931,13 @@ async function runCoordMode(){
 /* ===========================
    綁定按鈕 / 切換
    =========================== */
-async function runCurrentMode(){
+async function runCurrentMode(options = {}){
   if (weatherRefreshBusy) return;
+  clearAutoRefresh();
   const mySeq = ++weatherRunSeq;
   setRefreshBusy(true);
-  resetRainResult();
-  $("stationLabel").textContent = "更新中…";
+  if (!options.fromAuto) resetRainResult();
+  $("stationLabel").textContent = options.fromAuto ? "自動更新中…" : "更新中…";
   try {
     const mode = document.querySelector('input[name="mode"]:checked').value;
     if(mode==="gps") await runGpsMode();
@@ -3357,18 +2950,14 @@ async function runCurrentMode(){
     if (mySeq === weatherRunSeq) {
       lastWeatherRefreshAt = Date.now();
       setRefreshBusy(false);
+      scheduleAutoRefresh();
     }
   }
 }
 
 $("refreshBtn").onclick = runCurrentMode;
 
-// 超過 2 分鐘沒有手動更新時，自動用同一個位置刷新一次；若正在更新中就跳過。
-setInterval(async ()=>{
-  if (weatherRefreshBusy || !lastTarget) return;
-  if (Date.now() - lastWeatherRefreshAt < 120000) return;
-  await runCurrentMode();
-}, 30000);
+// 自動更新由 scheduleAutoRefresh() 控制：使用者閒置 2 分鐘後才刷新。
 
 document.querySelectorAll(".forecast-mode-btn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
@@ -3390,6 +2979,7 @@ $("toggle7dTempMode").onclick = ()=>{
    init
    =========================== */
 updateModeUI();
+installAutoRefreshActivityReset();
 runCurrentMode();
   
   // ===== 降雨預測 =====
@@ -3415,6 +3005,8 @@ $("rainBtn").onclick = async () => {
 
   const { lat, lon } = lastTarget;
 
+  rainQueryBusy = true;
+  clearAutoRefresh();
   btn.disabled = true;
   btn.textContent = "計算中";
   btn.style.opacity = "0.6";
@@ -3470,6 +3062,8 @@ $("rainBtn").onclick = async () => {
     if (myRainSeq === rainRunSeq) box.textContent = "取得失敗";
   } finally {
     if (myRainSeq === rainRunSeq) {
+      rainQueryBusy = false;
+      scheduleAutoRefresh(AUTO_REFRESH_MS);
       btn.disabled = false;
       btn.textContent = "查詢降雨";
       btn.style.opacity = "";
