@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.5</title>
+  <title>天氣網站v5.6</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -467,6 +467,17 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 .metric-pill{max-width:100%;}
 .hourly-forecast{max-width:100%;min-width:0;}
 
+    .version-badge{
+      margin-top:10px;
+      text-align:center;
+      font-size:11px;
+      font-weight:800;
+      color:rgba(255,255,255,.90);
+      text-shadow:0 1px 4px rgba(0,0,0,.45);
+      letter-spacing:.3px;
+      user-select:none;
+    }
+
   </style>
 </head>
 
@@ -599,6 +610,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
+      <div class="version-badge" id="versionLabel">v5.6</div>
     </div>
   </div>
 
@@ -607,6 +619,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
+const APP_VERSION = "v5.6";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -614,6 +627,9 @@ const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Obse
 const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ return ""; }})();
 const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0003-001") : "";
 const CWA_OBS_1H_PROXY  = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0001-001") : "";
+
+// v5.8：台灣即時資料改走後端整合 API。預報仍保留前端原本 CWA / Open-Meteo 邏輯。
+const CWA_FULL_ENDPOINT = WORKER_ORIGIN ? (WORKER_ORIGIN + "/cwa/full") : "/cwa/full";
 
 const ELEVATION_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/elev") : "/elev";
 const elevationCache = new Map();
@@ -1087,6 +1103,87 @@ function computeFinalLapseRate(target, env, stations) {
   return weight*obsLR + (1-weight)*climateLR;
 }
 
+
+function computeMeasuredLapseRate15km(target, stations, nowTs) {
+  const candidates = (stations || [])
+    .map(s => ({ ...s, _dist: haversine(target.lat, target.lon, s.lat, s.lon) }))
+    .filter(s => s._dist <= 15 && isValidTemp(s.temp) && isFreshObservation(s, nowTs));
+
+  if (candidates.length < 3) {
+    return { ok:false, lr:NaN, reason:"nearby_station_lt_3", used:[] };
+  }
+
+  const hs0 = candidates.map(s => s.alt || 0);
+  const minH0 = Math.min(...hs0);
+  const maxH0 = Math.max(...hs0);
+  if (maxH0 - minH0 < 200) {
+    return { ok:false, lr:NaN, reason:"height_range_lt_200m", used:candidates };
+  }
+
+  let avgT = candidates.reduce((sum, s) => sum + s.temp, 0) / candidates.length;
+  let selected = candidates.filter(s => Math.abs(s.temp - avgT) <= 4.0);
+  if (selected.length < 3) selected = candidates;
+
+  function regress(points) {
+    let Sw=0, Swh=0, Swt=0, Swhh=0, Swht=0;
+    for (const s of points) {
+      const h = s.alt || 0;
+      const t = s.temp;
+      const d = Math.max(s._dist || 0.1, 0.1);
+      const w = computeTimeWeight(s, nowTs) / Math.pow(d, 1.4);
+      if (w <= 0) continue;
+      Sw += w; Swh += w*h; Swt += w*t; Swhh += w*h*h; Swht += w*h*t;
+    }
+    const denom = Sw*Swhh - Swh*Swh;
+    if (Sw <= 0 || Math.abs(denom) < 1e-9) return null;
+    const b = (Sw*Swht - Swh*Swt) / denom; // °C/m
+    const a = (Swt - b*Swh) / Sw;
+    let ssTot=0, ssRes=0;
+    const tMean = Swt / Sw;
+    for (const s of points) {
+      const h = s.alt || 0;
+      const t = s.temp;
+      const d = Math.max(s._dist || 0.1, 0.1);
+      const w = computeTimeWeight(s, nowTs) / Math.pow(d, 1.4);
+      if (w <= 0) continue;
+      const fit = a + b*h;
+      ssTot += w*(t - tMean)*(t - tMean);
+      ssRes += w*(t - fit)*(t - fit);
+    }
+    const r2 = ssTot > 0 ? 1 - ssRes/ssTot : 0;
+    return { a, b, r2 };
+  }
+
+  let reg = regress(selected);
+  if (!reg) return { ok:false, lr:NaN, reason:"regression_failed", used:selected };
+
+  const cleaned = selected.filter(s => Math.abs(s.temp - (reg.a + reg.b*(s.alt || 0))) <= 2.8);
+  if (cleaned.length >= 3) {
+    const hs = cleaned.map(s => s.alt || 0);
+    if (Math.max(...hs) - Math.min(...hs) >= 200) {
+      const reg2 = regress(cleaned);
+      if (reg2) { reg = reg2; selected = cleaned; }
+    }
+  }
+
+  // 垂直遞減率取正值；若回歸斜率反常，仍限制在可用範圍避免預報爆掉。
+  let lr = Math.abs(reg.b);
+  lr = clamp(lr, 0.002, 0.009);
+  return {
+    ok:true,
+    lr,
+    reason:"measured_15km_height_range_ge_200m",
+    r2: reg.r2,
+    used:selected.sort((a,b)=>a._dist-b._dist)
+  };
+}
+
+function formatLapseRateLine(lr) {
+  const lrKmAbs = isFinite(lr) ? lr * 1000 : NaN;
+  if (!isFinite(lrKmAbs)) return "垂直遞減率：--";
+  return `垂直遞減率：<b>−${lrKmAbs.toFixed(2)}°C/km</b>`;
+}
+
 /* ===========================
    解析 CWA 自動測站（O-A0003 / O-A0001）
    =========================== */
@@ -1369,7 +1466,9 @@ function interpolateTemperatureKriging(target, env, stations, usedStations, fina
     const T_adj=s.temp-finalLR*deltaH;
     temp += weights[i]*T_adj;
   }
-  if (!isFinite(temp) || temp < -50 || temp > 55) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
+  // 高度修正後溫度不再套用 -50～55°C 檢查；只要是有限數字就保留。
+  // -50～55°C 只用於測站原始溫度，避免 CWA 缺值或異常值進入計算。
+  if (!isFinite(temp)) return interpolateTemperatureIDWFallback(target, env, stations, used, finalLR);
   return { temp, method: "kriging", lapseRate: finalLR, used, kriging:{ rangeKm, nugget, weights } };
 }
 function interpolateTemperatureWithHeight(target, env, stations, usedStations, preferMethod = "idw") {
@@ -1604,21 +1703,30 @@ async function getSunriseSunsetHourForScene(lat, lon, useCwaRealtime, om, inTW){
     catch { tz = "UTC"; }
   }
 
-  try {
-    const ss = await fetchSunriseSunsetUTC(lat, lon);
-    const sunriseHour = utcIsoToHourFloatInTimeZone(ss.sunriseUTC, tz);
-    const sunsetHour  = utcIsoToHourFloatInTimeZone(ss.sunsetUTC, tz);
-    return {
-      sunriseHour: isFinite(sunriseHour) ? sunriseHour : 5.6,
-      sunsetHour: isFinite(sunsetHour) ? sunsetHour : 18.2333
-    };
-  } catch(e) {
-    return {
-      sunriseHour: 5.6,
-      sunsetHour: 18.2333
-    };
+  // 優先使用 Open-Meteo daily.sunrise / daily.sunset，避免額外 API 卡住。
+  const sunriseLocal = om?.daily?.sunrise?.[0];
+  const sunsetLocal = om?.daily?.sunset?.[0];
+
+  function localIsoToHourFloat(s){
+    if (!s) return NaN;
+    const m = String(s).match(/T(\d{2}):(\d{2})/);
+    if (!m) return NaN;
+    return Number(m[1]) + Number(m[2]) / 60;
   }
+
+  const sunriseHour = localIsoToHourFloat(sunriseLocal);
+  const sunsetHour = localIsoToHourFloat(sunsetLocal);
+
+  if (isFinite(sunriseHour) && isFinite(sunsetHour)) {
+    return { sunriseHour, sunsetHour };
+  }
+
+  return {
+    sunriseHour: 5.6,
+    sunsetHour: 18.2333
+  };
 }
+
 
 /* ===========================
    CWA 預報索引解析（你原本的函式）
@@ -1986,15 +2094,14 @@ function buildOpenMeteoUrl(lat, lon){
     latitude: String(lat),
     longitude: String(lon),
     daily: "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_mean,sunrise,sunset",
-    hourly: "temperature_2m,apparent_temperature,precipitation_probability,weather_code,cloud_cover",
+    hourly: "temperature_2m,apparent_temperature,precipitation_probability,weather_code,cloud_cover,visibility",
     current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m",
-    minutely_15: "visibility",
     timezone: "auto"
   });
   return `${OM_FORECAST}?${params.toString()}`;
 }
 function normalizeVisibilityKmFromOpenMeteo(d){
-  const visArr = d?.minutely_15?.visibility;
+  const visArr = d?.hourly?.visibility;
   if(!Array.isArray(visArr) || !visArr.length) return NaN;
   const v = Number(visArr[0]);
   if(!isFinite(v)) return NaN;
@@ -2004,6 +2111,113 @@ function normalizeVisibilityKmFromOpenMeteo(d){
 async function fetchOpenMeteoAll(lat, lon){
   const url = buildOpenMeteoUrl(lat, lon);
   return await fetchJson(url, 6500);
+}
+
+// 高度不做合理性限制：使用者/GPS 給多少就送多少；只保留測站原始溫度合理性檢查。
+function normalizeWeatherCalcAltitude(alt){
+  const n = Number(alt);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function normalizeAltForCwaFull(alt){
+  if (alt === "auto" || alt == null || alt === "") return "auto";
+  const n = normalizeWeatherCalcAltitude(alt);
+  return Number.isFinite(n) ? String(n) : "auto";
+}
+
+async function fetchCwaFull(lat, lon, alt = "auto", extra = {}){
+  const u = new URL(CWA_FULL_ENDPOINT);
+  u.searchParams.set("lat", String(lat));
+  u.searchParams.set("lon", String(lon));
+  u.searchParams.set("alt", normalizeAltForCwaFull(alt));
+  if (extra.county) u.searchParams.set("county", extra.county);
+  if (extra.district) u.searchParams.set("district", extra.district);
+  if (extra.label) u.searchParams.set("label", extra.label);
+
+  const data = await fetchJson(u.toString(), 8000);
+  if (!data || data.ok !== true) throw new Error(data?.error || "CWA_FULL_FAILED");
+  return data;
+}
+
+function formatVisibilityForUi(v){
+  const s = String(v ?? "").trim();
+  if (!s || s === "--") return "--";
+  if (/km/i.test(s)) return s;
+  if (/^>?\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?$/.test(s)) return `${s} km`;
+  return s;
+}
+
+
+function formatBackendStationList(stations){
+  const arr = Array.isArray(stations) ? stations : [];
+  if (!arr.length) return "測站：--";
+  return "測站：" + arr.map(s => {
+    const name = s.name || s.id || "--";
+    const dist = Number.isFinite(Number(s.distKm)) ? `${Number(s.distKm).toFixed(1)}km` : "--km";
+    const temp = Number.isFinite(Number(s.temp)) ? `${Number(s.temp).toFixed(1)}°C` : "--°C";
+    return `${name} ${dist} ${temp}`;
+  }).join("、");
+}
+
+function formatBackendObsTimeGroups(stations){
+  const arr = Array.isArray(stations) ? stations : [];
+  const groups = new Map();
+  for (const s of arr) {
+    const hhmm = s.obsTime ? formatObsTimeHHMM(s.obsTime) : "";
+    if (!hhmm) continue;
+    if (!groups.has(hhmm)) groups.set(hhmm, []);
+    groups.get(hhmm).push(s.name || s.id || "--");
+  }
+  const parts = Array.from(groups.entries())
+    .sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([hhmm, names]) => `${hhmm}：${Array.from(new Set(names)).join("、")}`);
+  return parts.length ? `觀測時間：${parts.join("　")}` : "觀測時間：--";
+}
+
+function formatBackendRealtimeSource(data){
+  const sd = data?.realtime?.stationDebug || {};
+  const usedCount = Number.isFinite(Number(sd.usedCount)) ? Number(sd.usedCount) : 0;
+  const radius = Number.isFinite(Number(sd.radiusKm)) ? `${Number(sd.radiusKm).toFixed(0)}km` : "--km";
+  return `即時：CWA 後端，使用 ${usedCount} 個測站，半徑 ${radius}<br/>${formatBackendStationList(sd.stations)}`;
+}
+
+function renderCwaFullRealtime(data){
+  const r = data?.realtime || {};
+  const loc = data?.location || {};
+  const sp = data?.sourcePanel || {};
+
+  if (loc.label && loc.label !== "目前位置") $("locationName").textContent = loc.label;
+  if (Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lon))) {
+    $("coordLabel").textContent = `座標：${Number(loc.lat).toFixed(5)}, ${Number(loc.lon).toFixed(5)}`;
+  }
+  if (Number.isFinite(Number(loc.alt))) {
+    $("altitudeLabel").textContent = `${Math.round(Number(loc.alt))} m`;
+  }
+
+  $("cardTemp").textContent = Number.isFinite(Number(r.temp)) ? `${Number(r.temp).toFixed(1)}°` : "--.-°";
+  $("feelsLabel").textContent = Number.isFinite(Number(r.feels)) ? `體感 ${Number(r.feels).toFixed(1)}°` : "體感 --.-°";
+  $("cardCondition").textContent = r.condition || "--";
+  $("weatherIcon").textContent = r.icon || "？";
+
+  $("mWind").innerHTML = `風 <b>${r.windText || "--"}</b>`;
+  $("mHum").innerHTML  = `濕度 <b>${Number.isFinite(Number(r.humidity)) ? Math.round(Number(r.humidity)) + "%" : "--"}</b>`;
+  $("mPres").innerHTML = `氣壓 <b>${Number.isFinite(Number(r.pressure)) ? Number(r.pressure).toFixed(1) + " hPa" : "--"}</b>`;
+  $("mSun").innerHTML  = `日照 <b>${Number.isFinite(Number(r.sunshine)) ? Number(r.sunshine).toFixed(1) + "h" : "--"}</b>`;
+  $("mVis").innerHTML  = `能見度 <b>${formatVisibilityForUi(r.visibility)}</b>`;
+
+  $("stationLabel").innerHTML = formatBackendRealtimeSource(data);
+  $("timeLabel").textContent = formatBackendObsTimeGroups(r.stationDebug?.stations || []);
+  $("hintBar").innerHTML = "";
+  $("footerLabel").innerHTML = "即時：CWA 後端<br/>預報：前端 CWA / Open-Meteo";
+}
+
+function visibilityTextToKm(v){
+  const s = String(v ?? "").trim();
+  if (!s || s === "--") return NaN;
+  const nums = s.match(/\d+(?:\.\d+)?/g);
+  if (!nums || !nums.length) return NaN;
+  if (nums.length >= 2) return (Number(nums[0]) + Number(nums[1])) / 2;
+  return Number(nums[0]);
 }
 
 /* ===========================
@@ -2080,35 +2294,61 @@ if (!labelHint || !labelHint.trim()) {
   $("locationName").textContent = labelHint.trim();
 }
 
-  // ===== target altitude =====
-  let targetAlt = alt;
-  if (targetAlt == null || !isFinite(targetAlt)) targetAlt = await getElevation(lat, lon, null);
+  // ===== target altitude / CWA backend realtime =====
+  let targetAlt = Number.isFinite(Number(alt)) ? normalizeWeatherCalcAltitude(alt) : NaN;
+  const altForCwaFull = normalizeAltForCwaFull(alt);
+  let useCwaBackendRealtime = false;
+  let cwaFullData = null;
+
+  if (inTW) {
+    try {
+      $("stationLabel").textContent = "讀取 CWA 後端即時資料…";
+      cwaFullData = await fetchCwaFull(lat, lon, altForCwaFull, {
+        county: forecastCountyName || "",
+        district: adminOverride || "",
+        label: $("locationName").textContent || labelHint || "目前位置"
+      });
+      if (Number.isFinite(Number(cwaFullData?.location?.alt))) {
+        targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
+      }
+      useCwaBackendRealtime = true;
+    } catch(e) {
+      dbg("[cwa/full] fail " + e);
+      useCwaBackendRealtime = false;
+      cwaFullData = null;
+    }
+  }
+
+  if (!Number.isFinite(targetAlt)) targetAlt = normalizeWeatherCalcAltitude(await getElevation(lat, lon, null));
   $("altitudeLabel").textContent = `${Math.round(targetAlt)} m`;
 
   const nowTs = Date.now();
 
-  // ===== 先準備 Open-Meteo（全球必備）=====
+  // ===== Open-Meteo：非台灣 / CWA 後端失敗 / 預報 fallback 才需要 =====
   let om = null;
-  try {
-    $("stationLabel").textContent = "讀取 Open-Meteo…";
-    om = await fetchOpenMeteoAll(lat, lon);
-  } catch (e) {
-    dbg("[open-meteo] fail " + e);
-    om = null;
+  if (!useCwaBackendRealtime) {
+    try {
+      $("stationLabel").textContent = "讀取 Open-Meteo…";
+      om = await fetchOpenMeteoAll(lat, lon);
+    } catch (e) {
+      dbg("[open-meteo] fail " + e);
+      om = null;
+    }
   }
 
-  const gridElev = (om && typeof om.elevation === "number" && isFinite(om.elevation)) ? om.elevation : 0;
+  const gridElev = (om && typeof om.elevation === "number" && isFinite(om.elevation)) ? om.elevation : targetAlt;
   const dH = (isFinite(targetAlt) ? targetAlt : 0) - gridElev;
 
-  // ===== 台灣：嘗試 CWA 觀測（30km 規則）=====
+  // ===== 台灣：CWA 後端失敗時才回退前端舊觀測邏輯 =====
   let useCwaRealtime = false;
   let cwaStations = [];
   let cwaWithDist = [];
   let cwaPick = { used: [], radiusKm: 0 };
   let finalLRRealtime = computeLapseRate(new Date().getMonth()+1, 80, 0);
+  let measuredLapseInfo = null;
 
   if (inTW) {
-    $("stationLabel").textContent = "讀取 CWA 觀測…";
+    if (!useCwaBackendRealtime) $("stationLabel").textContent = "讀取 CWA 觀測…";
 
     let data10=null, data1h=null;
     const [d10, d1h] = await Promise.allSettled([
@@ -2133,23 +2373,30 @@ if (!labelHint || !labelHint.trim()) {
       cwaWithDist = cwaStations
         .map(s=>({...s, dist:haversine(lat,lon,s.lat,s.lon)}))
         .sort((a,b)=>a.dist-b.dist);
+      // v5.6 修正：垂直遞減率改回 v5.5 的 computeFinalLapseRate() 混合算法。
+      // 不再使用 15km 純實測回歸值覆蓋 finalLRRealtime，避免顯示/套用 −2°C/km 這種過低值。
+      measuredLapseInfo = null;
 
       const nearestFresh = cwaWithDist.find(s=>isFreshObservation(s, nowTs));
       const nearestFreshDist = nearestFresh ? nearestFresh.dist : Infinity;
 
-      useCwaRealtime = (nearestFreshDist <= 30);
+      if (!useCwaBackendRealtime) {
+        useCwaRealtime = (nearestFreshDist <= 30);
 
-      if (useCwaRealtime) {
-        cwaPick = pickStationsByRadiusStep(cwaWithDist, nowTs);
+        if (useCwaRealtime) {
+          cwaPick = pickStationsByRadiusStep(cwaWithDist, nowTs);
 
-        const main = cwaPick.used[0] || nearestFresh;
-        const env = {
-          month: new Date().getMonth() + 1,
-          rh: isFinite(main?.rh) ? main.rh : 80,
-          rain1h: (main?.precip > 0) ? 1 : 0,
-          nowTs
-        };
-        finalLRRealtime = computeFinalLapseRate({lat,lon,elev:targetAlt}, env, cwaStations);
+          const main = cwaPick.used[0] || nearestFresh;
+          const env = {
+            month: new Date().getMonth() + 1,
+            rh: isFinite(main?.rh) ? main.rh : 80,
+            rain1h: (main?.precip > 0) ? 1 : 0,
+            nowTs
+          };
+          if (!measuredLapseInfo.ok) {
+            finalLRRealtime = computeFinalLapseRate({lat,lon,elev:targetAlt}, env, cwaStations);
+          }
+        }
       }
     }
   }
@@ -2163,7 +2410,21 @@ if (!labelHint || !labelHint.trim()) {
   let realtimeVisKm = NaN;
   let realtimeThunder = false;
 
-  if (useCwaRealtime) {
+  if (useCwaBackendRealtime && cwaFullData) {
+    const br = cwaFullData.realtime || {};
+    realtimeT = Number(br.temp);
+    realtimeAT = Number(br.feels);
+    realtimeCondText = br.condition || "";
+    realtimeRain = Number(br.rain1h || 0);
+    realtimeVisKm = visibilityTextToKm(br.visibility);
+    realtimeThunder = String(br.condition || "").includes("雷");
+    if (String(br.condition || "").includes("陰")) realtimeCloud = 82;
+    else if (String(br.condition || "").includes("多雲")) realtimeCloud = 52;
+    else if (String(br.condition || "").includes("晴")) realtimeCloud = 12;
+    renderCwaFullRealtime(cwaFullData);
+  }
+
+  if (!useCwaBackendRealtime && useCwaRealtime) {
     const used = cwaPick.used || [];
     if (!used.length) {
       useCwaRealtime = false;
@@ -2262,7 +2523,7 @@ if (!labelHint || !labelHint.trim()) {
     }
   }
 
-  if (!useCwaRealtime) {
+  if (!useCwaBackendRealtime && !useCwaRealtime) {
     if (!om?.current) {
       $("stationLabel").textContent = "即時：Open-Meteo 暫時無法取得。";
     } else {
@@ -2311,8 +2572,8 @@ if (!labelHint || !labelHint.trim()) {
     }
   }
 
-const hourFloat = getHourFloatForScene(useCwaRealtime, om);
-const ss = await getSunriseSunsetHourForScene(lat, lon, useCwaRealtime, om, inTW);
+const hourFloat = getHourFloatForScene((useCwaRealtime || useCwaBackendRealtime), om);
+const ss = await getSunriseSunsetHourForScene(lat, lon, (useCwaRealtime || useCwaBackendRealtime), om, inTW);
 currentSunriseHour = ss.sunriseHour;
 currentSunsetHour = ss.sunsetHour;
 const iconNight = isNightHour(hourFloat, ss.sunriseHour, ss.sunsetHour);
@@ -2404,10 +2665,9 @@ if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
       return `${prefix}${nm}（${p.datasetId}・${dist}km）`;
     }).join("、");
 
-    const lrKmAbs = lr * 1000; // °C/km
     $("hintBar").innerHTML =
       `預報：<b>CWA</b>｜使用：<b>${usedStr}</b>` +
-      `<br/>垂直遞減率：<b>−${lrKmAbs.toFixed(2)}°C/km</b>（每上升 1km 約降 ${lrKmAbs.toFixed(2)}°C）`;
+      `<br/>${formatLapseRateLine(lr, measuredLapseInfo)}`;
 
 // ✅ D0047/B0053 常見 elementName：T / AT / Wx / PoP3h|PoP6h|PoP12h
 const pointSeries3 = pickedAlt.map(p=>{
@@ -2595,6 +2855,15 @@ const pointSeries3 = pickedAlt.map(p=>{
     renderDailyForecast(false);
 
   } else {
+    if (!om) {
+      try {
+        $("stationLabel").textContent = "讀取 Open-Meteo 預報…";
+        om = await fetchOpenMeteoAll(lat, lon);
+      } catch(e) {
+        dbg("[open-meteo forecast fallback] fail " + e);
+        om = null;
+      }
+    }
     const lrStdStr = `−${(LR_STD*1000).toFixed(2)}°C/km`;
     $("hintBar").innerHTML = inTW
       ? `預報：<b>Open-Meteo（≤30km 無 CWA 預報點）</b><br/>垂直遞減率：<b>${lrStdStr}</b>（標準）`
@@ -2855,8 +3124,8 @@ async function runGpsMode(){
           const lat = pos.coords.latitude;
           const lon = pos.coords.longitude;
 
-          let alt = (typeof pos.coords.altitude === "number" && isFinite(pos.coords.altitude)) ? pos.coords.altitude : null;
-          if(alt == null) alt = await getElevation(lat, lon, null);
+          // GPS 有高度就用 GPS，但氣象計算只支援對流層內，避免極端高度把溫度修正到失真。
+          let alt = (typeof pos.coords.altitude === "number" && isFinite(pos.coords.altitude)) ? normalizeWeatherCalcAltitude(pos.coords.altitude) : "auto";
 
           lastTarget = { lat, lon, alt, label:"", adminOverride:null };
           await runAllForTarget(lat, lon, alt, "", null);
@@ -2896,7 +3165,8 @@ async function runTownMode(){
       lat = p.lat; lon = p.lon; label = p.label || name;
     }
 
-    const alt = await getElevation(lat, lon, null);
+    // 地點模式一律用 auto，高度由 CWA 後端或 Open-Meteo fallback 處理。
+    const alt = "auto";
 
     // ✅ 關鍵：若使用者輸入為鄉鎮市區，直接用這個作為 adminOverride，避免顯示里
     const adminOverride = isTwTown ? name : null;
@@ -2921,8 +3191,9 @@ async function runCoordMode(){
     $("stationLabel").textContent = "請輸入正確的緯度 / 經度。";
     return;
   }
-  if(!isFinite(alt)) alt = null;
-  if(alt == null) alt = await getElevation(lat, lon, null);
+  // 座標模式：有填高度就用使用者高度，不限制高度；高度修正後溫度不做 -50°C 下限檢查。
+  if(!isFinite(alt)) alt = "auto";
+  else alt = normalizeWeatherCalcAltitude(alt);
 
   lastTarget = { lat, lon, alt, label:"自訂座標", adminOverride:null };
   await runAllForTarget(lat, lon, alt, "自訂座標", null);
@@ -2978,6 +3249,7 @@ $("toggle7dTempMode").onclick = ()=>{
 /* ===========================
    init
    =========================== */
+if ($("versionLabel")) $("versionLabel").textContent = APP_VERSION;
 updateModeUI();
 installAutoRefreshActivityReset();
 runCurrentMode();
