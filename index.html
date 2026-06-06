@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.6</title>
+  <title>天氣網站 v5.7</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -610,7 +610,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v5.6</div>
+      <div class="version-badge" id="versionLabel">v5.7</div>
     </div>
   </div>
 
@@ -619,7 +619,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v5.6";
+const APP_VERSION = "v5.7";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -1369,6 +1369,12 @@ function pressureAtHeightFromSeaLevel(p0_hPa, h_m){
   const x = 1 - 2.25577e-5 * h_m;
   if(x <= 0) return NaN;
   return p0_hPa * Math.pow(x, 5.25588);
+}
+function pressureFromGridToTarget(pGrid_hPa, gridAlt_m, targetAlt_m){
+  if(!isFinite(pGrid_hPa) || !isFinite(gridAlt_m) || !isFinite(targetAlt_m)) return NaN;
+  const p0 = seaLevelPressureFromStation(pGrid_hPa, gridAlt_m);
+  if(!isFinite(p0)) return NaN;
+  return pressureAtHeightFromSeaLevel(p0, targetAlt_m);
 }
 function weightedPressureAtTarget(stationsWithDist, nowTs, maxKm, targetAlt){
   const p = 1.7;
@@ -2147,6 +2153,16 @@ function formatVisibilityForUi(v){
   return s;
 }
 
+// 後端回 null / undefined / 空字串時，不可用 Number(null) 變成 0。
+function backendNumber(v){
+  if (v === null || v === undefined || v === "") return NaN;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : NaN;
+}
+function formatBackendNumber(v, decimals = 1, suffix = ""){
+  const n = backendNumber(v);
+  return Number.isFinite(n) ? `${n.toFixed(decimals)}${suffix}` : "--";
+}
 
 function formatBackendStationList(stations){
   const arr = Array.isArray(stations) ? stations : [];
@@ -2194,15 +2210,18 @@ function renderCwaFullRealtime(data){
     $("altitudeLabel").textContent = `${Math.round(Number(loc.alt))} m`;
   }
 
-  $("cardTemp").textContent = Number.isFinite(Number(r.temp)) ? `${Number(r.temp).toFixed(1)}°` : "--.-°";
-  $("feelsLabel").textContent = Number.isFinite(Number(r.feels)) ? `體感 ${Number(r.feels).toFixed(1)}°` : "體感 --.-°";
+  const tempVal = backendNumber(r.temp);
+  const feelsVal = backendNumber(r.feels);
+  $("cardTemp").textContent = Number.isFinite(tempVal) ? `${tempVal.toFixed(1)}°` : "--.-°";
+  $("feelsLabel").textContent = Number.isFinite(feelsVal) ? `體感 ${feelsVal.toFixed(1)}°` : "體感 --.-°";
   $("cardCondition").textContent = r.condition || "--";
   $("weatherIcon").textContent = r.icon || "？";
 
   $("mWind").innerHTML = `風 <b>${r.windText || "--"}</b>`;
-  $("mHum").innerHTML  = `濕度 <b>${Number.isFinite(Number(r.humidity)) ? Math.round(Number(r.humidity)) + "%" : "--"}</b>`;
-  $("mPres").innerHTML = `氣壓 <b>${Number.isFinite(Number(r.pressure)) ? Number(r.pressure).toFixed(1) + " hPa" : "--"}</b>`;
-  $("mSun").innerHTML  = `日照 <b>${Number.isFinite(Number(r.sunshine)) ? Number(r.sunshine).toFixed(1) + "h" : "--"}</b>`;
+  const humVal = backendNumber(r.humidity);
+  $("mHum").innerHTML  = `濕度 <b>${Number.isFinite(humVal) ? Math.round(humVal) + "%" : "--"}</b>`;
+  $("mPres").innerHTML = `氣壓 <b>${formatBackendNumber(r.pressure, 1, " hPa")}</b>`;
+  $("mSun").innerHTML  = `日照 <b>${formatBackendNumber(r.sunshine, 1, "h")}</b>`;
   $("mVis").innerHTML  = `能見度 <b>${formatVisibilityForUi(r.visibility)}</b>`;
 
   $("stationLabel").innerHTML = formatBackendRealtimeSource(data);
@@ -2380,23 +2399,24 @@ if (!labelHint || !labelHint.trim()) {
       const nearestFresh = cwaWithDist.find(s=>isFreshObservation(s, nowTs));
       const nearestFreshDist = nearestFresh ? nearestFresh.dist : Infinity;
 
+      // v5.6 修正：垂直遞減率一律用 v5.5 的 computeFinalLapseRate() 混合算法。
+      // 即時溫度即使走 CWA 後端，預報高度修正仍要用前端測站算 finalLRRealtime，
+      // 否則會永遠停在氣候預設值 6.00°C/km。
+      const hasFreshNearby = nearestFreshDist <= 30;
+      if (hasFreshNearby) {
+        cwaPick = pickStationsByRadiusStep(cwaWithDist, nowTs);
+        const main = cwaPick.used[0] || nearestFresh;
+        const env = {
+          month: new Date().getMonth() + 1,
+          rh: isFinite(main?.rh) ? main.rh : 80,
+          rain1h: (main?.precip > 0) ? 1 : 0,
+          nowTs
+        };
+        finalLRRealtime = computeFinalLapseRate({lat,lon,elev:targetAlt}, env, cwaStations);
+      }
+
       if (!useCwaBackendRealtime) {
-        useCwaRealtime = (nearestFreshDist <= 30);
-
-        if (useCwaRealtime) {
-          cwaPick = pickStationsByRadiusStep(cwaWithDist, nowTs);
-
-          const main = cwaPick.used[0] || nearestFresh;
-          const env = {
-            month: new Date().getMonth() + 1,
-            rh: isFinite(main?.rh) ? main.rh : 80,
-            rain1h: (main?.precip > 0) ? 1 : 0,
-            nowTs
-          };
-          if (!measuredLapseInfo.ok) {
-            finalLRRealtime = computeFinalLapseRate({lat,lon,elev:targetAlt}, env, cwaStations);
-          }
-        }
+        useCwaRealtime = hasFreshNearby;
       }
     }
   }
@@ -2412,10 +2432,10 @@ if (!labelHint || !labelHint.trim()) {
 
   if (useCwaBackendRealtime && cwaFullData) {
     const br = cwaFullData.realtime || {};
-    realtimeT = Number(br.temp);
-    realtimeAT = Number(br.feels);
+    realtimeT = backendNumber(br.temp);
+    realtimeAT = backendNumber(br.feels);
     realtimeCondText = br.condition || "";
-    realtimeRain = Number(br.rain1h || 0);
+    realtimeRain = Number.isFinite(backendNumber(br.rain1h)) ? backendNumber(br.rain1h) : 0;
     realtimeVisKm = visibilityTextToKm(br.visibility);
     realtimeThunder = String(br.condition || "").includes("雷");
     if (String(br.condition || "").includes("陰")) realtimeCloud = 82;
@@ -2532,6 +2552,7 @@ if (!labelHint || !labelHint.trim()) {
       const AT0 = Number(cur.apparent_temperature);
       const rh = Number(cur.relative_humidity_2m);
       const pres = Number(cur.surface_pressure);
+      const presAtTarget = pressureFromGridToTarget(pres, gridElev, targetAlt);
       const wind = Number(cur.wind_speed_10m);
       const windDir = Number(cur.wind_direction_10m);
       const provisionalNight = useCwaRealtime ? false : (()=>{
@@ -2565,7 +2586,7 @@ if (!labelHint || !labelHint.trim()) {
       const windTxt = (isFinite(wind) && isFinite(windDir)) ? `${wind.toFixed(1)} m/s ${degToDir16(windDir)}` : "--";
       $("mWind").innerHTML = `風 <b>${windTxt}</b>`;
       $("mHum").innerHTML  = `濕度 <b>${isFinite(rh) ? Math.round(rh)+"%" : "--"}</b>`;
-      $("mPres").innerHTML = `氣壓 <b>${isFinite(pres) ? pres.toFixed(1)+" hPa" : "--"}</b>`;
+      $("mPres").innerHTML = `氣壓 <b>${isFinite(presAtTarget) ? presAtTarget.toFixed(1)+" hPa" : "--"}</b>`;
       $("mSun").innerHTML  = `日照 <b>--</b>`;
       const visKm = normalizeVisibilityKmFromOpenMeteo(om);
       $("mVis").innerHTML  = `能見度（km） <b>${isFinite(visKm) ? visKm.toFixed(1) : "--"}</b>`;
