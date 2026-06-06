@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站 v5.7</title>
+  <title>天氣網站v5.8</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -610,7 +610,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v5.7</div>
+      <div class="version-badge" id="versionLabel">v5.8</div>
     </div>
   </div>
 
@@ -619,7 +619,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v5.7";
+const APP_VERSION = "v5.8";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -636,6 +636,7 @@ const elevationCache = new Map();
 
 const OM_FORECAST = "https://api.open-meteo.com/v1/forecast";
 const OM_ELEVATION = "https://api.open-meteo.com/v1/elevation";
+const OM_FORECAST_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/om/forecast") : "";
 
 // Open-Meteo 標準遞減率（°C/m）
 const LR_STD = 0.0065;
@@ -2115,8 +2116,29 @@ function normalizeVisibilityKmFromOpenMeteo(d){
   return v;
 }
 async function fetchOpenMeteoAll(lat, lon){
-  const url = buildOpenMeteoUrl(lat, lon);
-  return await fetchJson(url, 6500);
+  // v5.8.1：先走 Worker 的 /om/forecast，失敗再直連 Open-Meteo。
+  // 這樣外海 fallback 時比較不會因 CORS / 網路 / 快取造成畫面停在「讀取 Open-Meteo 預報…」。
+  const urls = [];
+  if (OM_FORECAST_PROXY) {
+    const u = new URL(OM_FORECAST_PROXY);
+    u.searchParams.set("lat", String(lat));
+    u.searchParams.set("lon", String(lon));
+    urls.push(u.toString());
+  }
+  urls.push(buildOpenMeteoUrl(lat, lon));
+
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      const data = await fetchJson(url, 8000);
+      if (data && (data.current || data.hourly || data.daily)) return data;
+      lastErr = new Error("Open-Meteo response missing current/hourly/daily");
+    } catch (e) {
+      lastErr = e;
+      dbg("[open-meteo try fail] " + url + " " + e);
+    }
+  }
+  throw lastErr || new Error("Open-Meteo failed");
 }
 
 // 高度不做合理性限制：使用者/GPS 給多少就送多少；只保留測站原始溫度合理性檢查。
@@ -2162,6 +2184,22 @@ function backendNumber(v){
 function formatBackendNumber(v, decimals = 1, suffix = ""){
   const n = backendNumber(v);
   return Number.isFinite(n) ? `${n.toFixed(decimals)}${suffix}` : "--";
+}
+
+function isBadCwaBackendRealtime(data){
+  const rt = data?.realtime || {};
+  const sd = rt?.stationDebug || {};
+  const reason = String(sd?.fallbackReason || sd?.reason || "");
+  const temp = backendNumber(rt.temp);
+
+  // v5.8.1：後端若自檢最近有效測站超過 30km / 無可用測站，
+  // 或 temp/null + method:none，前端立刻改走 Open-Meteo。
+  // 不要讓 CWA 後端「成功回應但無資料」卡住後續預報流程。
+  if (!data || data.ok !== true) return true;
+  if (!Number.isFinite(temp)) return true;
+  if (sd?.method === "none") return true;
+  if (reason === "nearest_station_over_30km" || reason === "no_station_within_30km" || reason === "no_fresh_station") return true;
+  return false;
 }
 
 function formatBackendStationList(stations){
@@ -2317,6 +2355,7 @@ if (!labelHint || !labelHint.trim()) {
   let targetAlt = Number.isFinite(Number(alt)) ? normalizeWeatherCalcAltitude(alt) : NaN;
   const altForCwaFull = normalizeAltForCwaFull(alt);
   let useCwaBackendRealtime = false;
+  let cwaBackendRealtimeBad = false;
   let cwaFullData = null;
 
   if (inTW) {
@@ -2330,10 +2369,21 @@ if (!labelHint || !labelHint.trim()) {
       if (Number.isFinite(Number(cwaFullData?.location?.alt))) {
         targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
       }
-      useCwaBackendRealtime = true;
+
+      // v5.8：後端回報最近有效測站超過 30km / 無可用測站時，
+      // CWA 即時資料視為不可用，改由 Open-Meteo 顯示，避免外海拿遠方陸地測站。
+      useCwaBackendRealtime = !isBadCwaBackendRealtime(cwaFullData);
+      cwaBackendRealtimeBad = !useCwaBackendRealtime;
+      if (!useCwaBackendRealtime) {
+        const badReason = cwaFullData?.realtime?.stationDebug?.fallbackReason || cwaFullData?.realtime?.stationDebug?.reason || "temp_null";
+        dbg("[cwa/full] realtime unusable fallback=" + badReason);
+        // 保留後端 debug，但即時顯示和預報 fallback 直接改走 Open-Meteo。
+        $("stationLabel").textContent = "CWA 即時測站超過 30km，改用 Open-Meteo…";
+      }
     } catch(e) {
       dbg("[cwa/full] fail " + e);
       useCwaBackendRealtime = false;
+      cwaBackendRealtimeBad = true;
       cwaFullData = null;
     }
   }
@@ -2343,16 +2393,24 @@ if (!labelHint || !labelHint.trim()) {
 
   const nowTs = Date.now();
 
-  // ===== Open-Meteo：非台灣 / CWA 後端失敗 / 預報 fallback 才需要 =====
+  // ===== Open-Meteo：非台灣 / CWA 後端不可用 / 預報 fallback 才需要 =====
   let om = null;
-  if (!useCwaBackendRealtime) {
+
+  async function ensureOpenMeteoLoaded(reasonText = "讀取 Open-Meteo…"){
+    if (om && (om.current || om.hourly || om.daily)) return om;
     try {
-      $("stationLabel").textContent = "讀取 Open-Meteo…";
+      $("stationLabel").textContent = reasonText;
       om = await fetchOpenMeteoAll(lat, lon);
+      return om;
     } catch (e) {
       dbg("[open-meteo] fail " + e);
       om = null;
+      return null;
     }
+  }
+
+  if (!useCwaBackendRealtime) {
+    await ensureOpenMeteoLoaded(cwaBackendRealtimeBad ? "CWA 即時測站超過 30km，讀取 Open-Meteo…" : "讀取 Open-Meteo…");
   }
 
   const gridElev = (om && typeof om.elevation === "number" && isFinite(om.elevation)) ? om.elevation : targetAlt;
@@ -2366,7 +2424,9 @@ if (!labelHint || !labelHint.trim()) {
   let finalLRRealtime = computeLapseRate(new Date().getMonth()+1, 80, 0);
   let measuredLapseInfo = null;
 
-  if (inTW) {
+  // CWA 後端已判定外海 / 最近測站 >30km 時，不再跑前端舊版 CWA 測站 fallback，
+  // 避免又把遠方測站抓回來或拖慢 Open-Meteo fallback。
+  if (inTW && !cwaBackendRealtimeBad) {
     if (!useCwaBackendRealtime) $("stationLabel").textContent = "讀取 CWA 觀測…";
 
     let data10=null, data1h=null;
@@ -2623,22 +2683,16 @@ if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
   let useCwaForecast = false;
   let selectedForecastIndex = [];
 
-  if (inTW) {
+  if (inTW && !cwaBackendRealtimeBad) {
     try {
-      // 先只讀目前縣市的 D0047，避免第一次就抓全台索引造成 10+ 秒延遲
-      selectedForecastIndex = forecastCountyName ? await ensureCountyIndex(forecastCountyName) : [];
+      // v5.8：台灣範圍內預報一律使用全台 CWA 預報索引，
+      // 包含 F-D0047 鄉鎮市區 + F-B0053 育樂預報。
+      // 不再只讀目前縣市 D0047，避免山區/景點附近育樂預報點消失。
+      selectedForecastIndex = await ensureGlobalIndex();
 
-      // 如果縣市判斷失敗或距離太遠，再 fallback 全台索引
-      let nearest = selectedForecastIndex
+      const nearest = selectedForecastIndex
         .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
         .sort((a,b)=>a.d-b.d)[0];
-
-      if (!nearest || !isFinite(nearest.d) || nearest.d > 30) {
-        selectedForecastIndex = await ensureGlobalIndex();
-        nearest = selectedForecastIndex
-          .map(p=>({ ...p, d: haversine(lat, lon, p.lat, p.lon) }))
-          .sort((a,b)=>a.d-b.d)[0];
-      }
 
       if (nearest && isFinite(nearest.d)) {
         useCwaForecast = (nearest.d <= 30);
@@ -2877,14 +2931,22 @@ const pointSeries3 = pickedAlt.map(p=>{
 
   } else {
     if (!om) {
-      try {
-        $("stationLabel").textContent = "讀取 Open-Meteo 預報…";
-        om = await fetchOpenMeteoAll(lat, lon);
-      } catch(e) {
-        dbg("[open-meteo forecast fallback] fail " + e);
-        om = null;
-      }
+      await ensureOpenMeteoLoaded("讀取 Open-Meteo 預報…");
     }
+
+    if (!om || !om.hourly || !Array.isArray(om.hourly.time)) {
+      hourly1h = [];
+      hourly10m = [];
+      daily7 = [];
+      renderHourlyForecast(false);
+      renderDailyForecast(false);
+      $("stationLabel").textContent = "即時：Open-Meteo 暫時無法取得";
+      $("timeLabel").textContent = "";
+      $("hintBar").innerHTML = `預報：Open-Meteo 暫時無法取得資料<br/>可能原因：外海格點無資料、網路逾時，或 Open-Meteo 回傳不完整`;
+      $("footerLabel").innerHTML = "即時：Open-Meteo<br/>預報：Open-Meteo";
+      return;
+    }
+
     const lrStdStr = `−${(LR_STD*1000).toFixed(2)}°C/km`;
     $("hintBar").innerHTML = inTW
       ? `預報：<b>Open-Meteo（≤30km 無 CWA 預報點）</b><br/>垂直遞減率：<b>${lrStdStr}</b>（標準）`
