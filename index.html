@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.8</title>
+  <title>天氣網站v5.9</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -342,10 +342,8 @@
 #rainResult{
   margin-top:10px;
   min-height:42px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:10px 12px;
+  display:block;
+  padding:12px 13px;
   border-radius:14px;
   background:rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.06);
@@ -353,6 +351,48 @@
   font-weight:700;
   color:rgba(255,255,255,.96);
   text-align:center;
+  line-height:1.55;
+}
+
+.rain-main{
+  font-size:14px;
+  font-weight:850;
+  color:rgba(255,255,255,.98);
+}
+
+.rain-detail{
+  margin-top:4px;
+  font-size:12px;
+  font-weight:650;
+  color:rgba(255,255,255,.86);
+}
+
+.rain-trend{
+  margin-top:7px;
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+.rain-chip{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:3px 8px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:800;
+  background:rgba(255,255,255,.12);
+  color:rgba(255,255,255,.95);
+  border:1px solid rgba(255,255,255,.08);
+}
+
+.rain-radar-time{
+  margin-top:7px;
+  font-size:11px;
+  font-weight:600;
+  color:rgba(255,255,255,.68);
 }
 
 
@@ -610,7 +650,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v5.8</div>
+      <div class="version-badge" id="versionLabel">v5.9</div>
     </div>
   </div>
 
@@ -619,7 +659,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v5.8";
+const APP_VERSION = "v5.9";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -3338,6 +3378,160 @@ installAutoRefreshActivityReset();
 runCurrentMode();
   
   // ===== 降雨預測 =====
+function avgRain(arr){
+  const xs = (arr || []).map(Number).filter(Number.isFinite);
+  return xs.length ? xs.reduce((a,b)=>a+b,0) / xs.length : 0;
+}
+
+function rainLevelText(rate){
+  if (rate < 0.5) return "無雨";
+  if (rate < 3) return "微雨";
+  if (rate < 10) return "小雨";
+  if (rate < 30) return "中雨";
+  if (rate < 50) return "大雨";
+  if (rate < 70) return "強降雨";
+  return "劇烈降雨";
+}
+
+function rainColorFromRate(rate){
+  if (rate < 1) return "";
+  if (rate < 5) return "blue";
+  if (rate < 15) return "green";
+  if (rate < 35) return "yellow";
+  if (rate < 55) return "orange";
+  if (rate <= 70) return "red";
+  return "purple";
+}
+
+function formatRadarTime(baseTime, bridgeMinutes){
+  let radarText = "";
+  if (baseTime) {
+    const d = new Date(baseTime);
+    if (!isNaN(d.getTime())) {
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      radarText = `雷達基準：${hh}:${mm}`;
+    }
+  }
+
+  const b = Number(bridgeMinutes);
+  if (Number.isFinite(b)) {
+    const delayText = `延遲約 ${Math.round(b)} 分鐘`;
+    return radarText ? `${radarText}，${delayText}` : delayText;
+  }
+
+  return radarText;
+}
+
+function buildRainTrendChips(series, minutes){
+  const m = Math.max(1, Math.min(60, Math.floor(Number(minutes) || 1)));
+  const arr = (series || []).slice(0, m).map(v => Math.max(0, Number(v) || 0));
+  const chips = [];
+
+  for (let start = 0; start < m; start += 10) {
+    const end = Math.min(start + 10, m);
+    const chunk = arr.slice(start, end);
+    const sum = chunk.reduce((a,b)=>a+b,0);
+    const dur = Math.max(1, end - start);
+    const rate = sum / dur * 60;
+    const level = rainLevelText(rate);
+    chips.push(`<span class="rain-chip">${start}–${end}分 ${level}</span>`);
+  }
+
+  return chips.join("");
+}
+
+function buildRainSummaryHtml(data, minutes){
+  const m = Math.max(1, Math.min(60, Math.floor(Number(minutes) || 1)));
+
+  const rawSeries =
+    Array.isArray(data.series) ? data.series :
+    Array.isArray(data.p60_series) ? data.p60_series :
+    Array.isArray(data.mean_series) ? data.mean_series :
+    [];
+
+  const series = rawSeries.slice(0, m).map(v => Math.max(0, Number(v) || 0));
+
+  const total = Number.isFinite(Number(data.accum_mm))
+    ? Number(data.accum_mm)
+    : series.reduce((a,b)=>a+b,0);
+
+  const rateSeries = series.map(v => v * 60);
+  const peakRate = rateSeries.length ? Math.max(...rateSeries) : 0;
+  const peakIdx = rateSeries.indexOf(peakRate);
+  const peakMinute = peakIdx >= 0 ? peakIdx + 1 : null;
+
+  const first3Rate = avgRain(series.slice(0, Math.min(3, series.length))) * 60;
+  const currentlyRaining = first3Rate >= 0.5;
+
+  const startIdx = rateSeries.findIndex(r => r >= 0.5);
+  const startMinute = startIdx >= 0 ? startIdx + 1 : null;
+
+  const level = rainLevelText(peakRate);
+  const radarTime = formatRadarTime(data.base_time, data.bridge_minutes ?? data.delay_minutes);
+  const trendChips = buildRainTrendChips(series, m);
+
+  let main = "";
+  let detail = "";
+
+  if (peakRate < 0.5 && total < 0.1) {
+    main = `未來 ${m} 分鐘無明顯降雨`;
+    detail = "附近短時間內沒有明顯降雨訊號。";
+  } else if (currentlyRaining) {
+    main = "目前正在下雨";
+    if (peakMinute !== null && peakMinute <= 3) {
+      detail = `雨勢已接近最強。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+    } else {
+      detail = `未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm。約 ${peakMinute} 分鐘後雨勢最明顯，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+    }
+  } else if (startMinute !== null) {
+    if (startMinute <= 5) {
+      main = "約 5 分鐘內可能開始下雨";
+      detail = `未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+    } else {
+      main = `約 ${startMinute} 分鐘後可能開始下雨`;
+      detail = `${peakMinute} 分鐘後雨勢最明顯。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+    }
+  } else {
+    main = `未來 ${m} 分鐘無明顯降雨`;
+    detail = `累積雨量約 ${total.toFixed(1)} mm。`;
+  }
+
+  return `
+    <div class="rain-main">${main}</div>
+    <div class="rain-detail">${detail}</div>
+    ${trendChips ? `<div class="rain-trend">${trendChips}</div>` : ""}
+    ${radarTime ? `<div class="rain-radar-time">${radarTime}</div>` : ""}
+  `;
+}
+
+async function fetchRainJson(url, timeoutMs = 60000){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      signal: ctrl.signal
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`RAIN_HTTP_${res.status}: ${text.slice(0, 180)}`);
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`RAIN_NOT_JSON: ${text.slice(0, 180)}`);
+    }
+
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 const RAIN_API = "https://api.leochangrainapi.com/api/rain";
 
 $("rainBtn").onclick = async () => {
@@ -3347,13 +3541,16 @@ $("rainBtn").onclick = async () => {
   const rawMinutes = $("rainMinutes").value.trim();
   const minutes = Number(rawMinutes);
 
-  // 驗證
   if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) {
-    box.textContent = "請輸入1-60間的整數";
+    box.style.background = "rgba(255,255,255,.08)";
+    box.style.color = "rgba(255,255,255,.96)";
+    box.textContent = "請輸入1–60間的整數";
     return;
   }
 
   if (!lastTarget) {
+    box.style.background = "rgba(255,255,255,.08)";
+    box.style.color = "rgba(255,255,255,.96)";
     box.textContent = "尚未取得位置";
     return;
   }
@@ -3362,63 +3559,65 @@ $("rainBtn").onclick = async () => {
 
   rainQueryBusy = true;
   clearAutoRefresh();
+
   btn.disabled = true;
   btn.textContent = "計算中";
   btn.style.opacity = "0.6";
   btn.style.cursor = "not-allowed";
+
   box.textContent = "計算中...";
+  box.style.background = "rgba(0,0,0,.18)";
+  box.style.color = "rgba(255,255,255,.96)";
 
   try {
     const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (myRainSeq !== rainRunSeq) return;
-    if (!res.ok) throw new Error("RAIN_API_HTTP_" + res.status);
-    const data = await res.json();
-    if (myRainSeq !== rainRunSeq) return;
-    if (data.ok === false) throw new Error(data.error || "RAIN_API_OK_FALSE");
 
-    const series = Array.isArray(data.series)
-      ? data.series.map(Number).filter(Number.isFinite)
-      : [];
+    // 降雨 API 使用專用 fetch，錯誤會顯示 HTTP 狀態 / 非 JSON / timeout 內容，方便抓「有雨時取得失敗」原因。
+    const data = await fetchRainJson(url, 180000);
 
-    if (!series.length && !Number.isFinite(Number(data.accum_mm))) {
+    if (myRainSeq !== rainRunSeq) return;
+    if (!data || data.ok === false) throw new Error(data?.error || "RAIN_API_OK_FALSE");
+
+    const rawSeries =
+      Array.isArray(data.series) ? data.series :
+      Array.isArray(data.p60_series) ? data.p60_series :
+      Array.isArray(data.mean_series) ? data.mean_series :
+      [];
+
+    const series = rawSeries
+      .slice(0, minutes)
+      .map(v => Math.max(0, Number(v) || 0));
+
+    const total = Number.isFinite(Number(data.accum_mm))
+      ? Number(data.accum_mm)
+      : series.reduce((a, b) => a + b, 0);
+
+    if (!series.length && !Number.isFinite(total)) {
       if (myRainSeq === rainRunSeq) box.textContent = "無資料";
       return;
     }
 
-    // ===== 累積雨量 =====
-    const total = Number.isFinite(Number(data.accum_mm))
-      ? Number(data.accum_mm)
-      : series.reduce((a, b) => a + (Number(b) || 0), 0);
-
-    // ===== 最大雨強（用來上色）=====
     const maxRainHr = series.length ? Math.max(...series) * 60 : 0;
-
-    // ===== 顏色判斷 =====
-    // 分級：<1 無色｜1–5 藍色｜5–15 綠色｜15–35 黃色｜35–55 橘色｜55–70 紅色｜>70 紫色
-    let color = "";
-    if (maxRainHr < 1) color = "";
-    else if (maxRainHr < 5) color = "blue";
-    else if (maxRainHr < 15) color = "green";
-    else if (maxRainHr < 35) color = "yellow";
-    else if (maxRainHr < 55) color = "orange";
-    else if (maxRainHr <= 70) color = "red";
-    else color = "purple";
+    const color = rainColorFromRate(maxRainHr);
 
     if (myRainSeq !== rainRunSeq) return;
 
-    // ===== 套顏色 =====
     box.style.background = getRainBg(color);
-
-    // ===== 顯示 =====
-    box.textContent = `未來${minutes}分鐘降雨量為 ${total.toFixed(1)} 毫米`;
+    box.innerHTML = buildRainSummaryHtml(data, minutes);
 
   } catch (e) {
-    if (myRainSeq === rainRunSeq) box.textContent = "取得失敗";
+    console.error("[rain api error]", e);
+    if (myRainSeq === rainRunSeq) {
+      const msg = e && e.message ? e.message : String(e);
+      box.style.background = "rgba(0,0,0,.18)";
+      box.style.color = "rgba(255,255,255,.96)";
+      box.textContent = `取得失敗：${msg}`;
+    }
   } finally {
     if (myRainSeq === rainRunSeq) {
       rainQueryBusy = false;
       scheduleAutoRefresh(AUTO_REFRESH_MS);
+
       btn.disabled = false;
       btn.textContent = "查詢降雨";
       btn.style.opacity = "";
