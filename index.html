@@ -388,6 +388,41 @@
   border:1px solid rgba(255,255,255,.08);
 }
 
+.rain-chip-none{
+  background:rgba(255,255,255,.10);
+  color:rgba(255,255,255,.82);
+}
+
+.rain-chip-blue{
+  background:rgba(60,150,255,0.48);
+  color:rgba(255,255,255,.96);
+}
+
+.rain-chip-green{
+  background:rgba(0,200,0,0.48);
+  color:rgba(255,255,255,.96);
+}
+
+.rain-chip-yellow{
+  background:rgba(255,200,0,0.62);
+  color:rgba(45,38,8,.96);
+}
+
+.rain-chip-orange{
+  background:rgba(255,140,0,0.64);
+  color:rgba(255,255,255,.98);
+}
+
+.rain-chip-red{
+  background:rgba(255,0,0,0.64);
+  color:rgba(255,255,255,.98);
+}
+
+.rain-chip-purple{
+  background:rgba(180,0,255,0.66);
+  color:rgba(255,255,255,.98);
+}
+
 .rain-radar-time{
   margin-top:7px;
   font-size:11px;
@@ -650,7 +685,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v5.10.1</div>
+      <div class="version-badge" id="versionLabel">v6.0</div>
     </div>
   </div>
 
@@ -659,7 +694,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v5.10.1";
+const APP_VERSION = "v6.0";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -668,7 +703,7 @@ const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ ret
 const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0003-001") : "";
 const CWA_OBS_1H_PROXY  = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0001-001") : "";
 
-// v5.10.1：即時資料統一走後端 /full，自動分流：台灣 CWA、大陸 CMA、無測站/其他地區 Open-Meteo fallback。
+// v6.0：即時資料統一走後端 /full，自動分流：台灣 CWA、大陸 CMA、無測站/其他地區 Open-Meteo fallback。
 // 預報仍保留前端原本 CWA / Open-Meteo 邏輯。
 const WEATHER_FULL_ENDPOINT = WORKER_ORIGIN ? (WORKER_ORIGIN + "/full") : "/full";
 
@@ -2485,7 +2520,7 @@ if (!labelHint || !labelHint.trim()) {
       targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
     }
 
-    // v5.10.1：/full 會自動分流 CWA / CMA / Open-Meteo fallback。
+    // v6.0：/full 會自動分流 CWA / CMA / Open-Meteo fallback。
     // 只要後端有有效 realtime.temp，前端就直接使用，不再限制台灣才走後端。
     useCwaBackendRealtime = !isBadCwaBackendRealtime(cwaFullData);
     cwaBackendRealtimeBad = !useCwaBackendRealtime;
@@ -3482,26 +3517,26 @@ function avgRain(arr){
 }
 
 function rainLevelText(rate){
-  if (rate < 0.5) return "無雨";
-  if (rate < 3) return "微雨";
-  if (rate < 10) return "小雨";
-  if (rate < 30) return "中雨";
-  if (rate < 50) return "大雨";
+  if (rate < 1) return "無雨";
+  if (rate < 5) return "微雨";
+  if (rate < 15) return "小雨";
+  if (rate < 35) return "中雨";
+  if (rate < 55) return "大雨";
   if (rate < 70) return "強降雨";
   return "劇烈降雨";
 }
 
 function rainColorFromRate(rate){
-  if (rate < 1) return "";
+  if (rate < 1) return "none";
   if (rate < 5) return "blue";
   if (rate < 15) return "green";
   if (rate < 35) return "yellow";
   if (rate < 55) return "orange";
-  if (rate <= 70) return "red";
+  if (rate < 70) return "red";
   return "purple";
 }
 
-function formatRadarTime(baseTime, bridgeMinutes){
+function formatRadarTime(baseTime, delayMinutes){
   let radarText = "";
   if (baseTime) {
     const d = new Date(baseTime);
@@ -3512,7 +3547,7 @@ function formatRadarTime(baseTime, bridgeMinutes){
     }
   }
 
-  const b = Number(bridgeMinutes);
+  const b = Number(delayMinutes);
   if (Number.isFinite(b)) {
     const delayText = `延遲約 ${Math.round(b)} 分鐘`;
     return radarText ? `${radarText}，${delayText}` : delayText;
@@ -3531,9 +3566,13 @@ function buildRainTrendChips(series, minutes){
     const chunk = arr.slice(start, end);
     const sum = chunk.reduce((a,b)=>a+b,0);
     const dur = Math.max(1, end - start);
+
+    // 每 10 分鐘趨勢使用該區間「平均時雨量 mm/h」
     const rate = sum / dur * 60;
+
     const level = rainLevelText(rate);
-    chips.push(`<span class="rain-chip">${start}–${end}分 ${level}</span>`);
+    const color = rainColorFromRate(rate);
+    chips.push(`<span class="rain-chip rain-chip-${color}">${start}–${end}分 ${level}</span>`);
   }
 
   return chips.join("");
@@ -3560,19 +3599,19 @@ function buildRainSummaryHtml(data, minutes){
   const peakMinute = peakIdx >= 0 ? peakIdx + 1 : null;
 
   const first3Rate = avgRain(series.slice(0, Math.min(3, series.length))) * 60;
-  const currentlyRaining = first3Rate >= 0.5;
+  const currentlyRaining = first3Rate >= 1;
 
-  const startIdx = rateSeries.findIndex(r => r >= 0.5);
+  const startIdx = rateSeries.findIndex(r => r >= 1);
   const startMinute = startIdx >= 0 ? startIdx + 1 : null;
 
   const level = rainLevelText(peakRate);
-  const radarTime = formatRadarTime(data.base_time, data.bridge_minutes ?? data.delay_minutes);
+  const radarTime = formatRadarTime(data.base_time, data.delay_minutes ?? data.bridge_minutes);
   const trendChips = buildRainTrendChips(series, m);
 
   let main = "";
   let detail = "";
 
-  if (peakRate < 0.5 && total < 0.1) {
+  if (peakRate < 1 && total < 0.1) {
     main = `未來 ${m} 分鐘無明顯降雨`;
     detail = "附近短時間內沒有明顯降雨訊號。";
   } else if (currentlyRaining) {
