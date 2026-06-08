@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v5.9</title>
+  <title>天氣網站v5.10</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -642,7 +642,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
           <div id="hintBar"></div>
 
           <div class="card-footer" id="footerLabel">
-            即時：台灣優先 CWA（30km 內有測站）；否則 Open-Meteo current
+            即時：自動分流 CWA / CMA；附近無測站時 Open-Meteo fallback
             <br/>
             預報：台灣優先 CWA（30km 內有預報點）；否則 Open-Meteo forecast
           </div>
@@ -650,7 +650,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v5.9</div>
+      <div class="version-badge" id="versionLabel">v5.10</div>
     </div>
   </div>
 
@@ -659,7 +659,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v5.9";
+const APP_VERSION = "v5.10";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -668,8 +668,9 @@ const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ ret
 const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0003-001") : "";
 const CWA_OBS_1H_PROXY  = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0001-001") : "";
 
-// v5.8：台灣即時資料改走後端整合 API。預報仍保留前端原本 CWA / Open-Meteo 邏輯。
-const CWA_FULL_ENDPOINT = WORKER_ORIGIN ? (WORKER_ORIGIN + "/cwa/full") : "/cwa/full";
+// v5.10：即時資料統一走後端 /full，自動分流：台灣 CWA、大陸 CMA、無測站/其他地區 Open-Meteo fallback。
+// 預報仍保留前端原本 CWA / Open-Meteo 邏輯。
+const WEATHER_FULL_ENDPOINT = WORKER_ORIGIN ? (WORKER_ORIGIN + "/full") : "/full";
 
 const ELEVATION_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/elev") : "/elev";
 const elevationCache = new Map();
@@ -817,7 +818,8 @@ $("toggleSourceBtn").onclick = ()=>setSourceOpen(!sourceOpen);
    台澎金馬概略範圍
    =========================== */
 function isInsideTaiwan(lat, lon) {
-  return (lat >= 3.9739 && lat <= 26.3895 && lon >= 108.3326 && lon <= 124.5611);
+  // 與後端 CWA 範圍一致，避免中國華南座標誤判成台灣而跑 CWA 預報。
+  return (lat >= 21.5 && lat <= 26.5 && lon >= 118.0 && lon <= 123.8);
 }
 
 /* ===========================
@@ -2194,7 +2196,7 @@ function normalizeAltForCwaFull(alt){
 }
 
 async function fetchCwaFull(lat, lon, alt = "auto", extra = {}){
-  const u = new URL(CWA_FULL_ENDPOINT);
+  const u = new URL(WEATHER_FULL_ENDPOINT);
   u.searchParams.set("lat", String(lat));
   u.searchParams.set("lon", String(lon));
   u.searchParams.set("alt", normalizeAltForCwaFull(alt));
@@ -2203,7 +2205,7 @@ async function fetchCwaFull(lat, lon, alt = "auto", extra = {}){
   if (extra.label) u.searchParams.set("label", extra.label);
 
   const data = await fetchJson(u.toString(), 8000);
-  if (!data || data.ok !== true) throw new Error(data?.error || "CWA_FULL_FAILED");
+  if (!data || data.ok !== true) throw new Error(data?.error || "WEATHER_FULL_FAILED");
   return data;
 }
 
@@ -2268,11 +2270,29 @@ function formatBackendObsTimeGroups(stations){
   return parts.length ? `觀測時間：${parts.join("　")}` : "觀測時間：--";
 }
 
+function backendProviderName(data){
+  if (data?.provider === "cwa-backend") return "CWA 中央氣象署";
+  if (data?.provider === "cma-backend") return "CMA 中國氣象局";
+  if (data?.provider === "open-meteo-backend") return "Open-Meteo";
+  return data?.provider || "整合後端";
+}
+
+function backendFallbackText(data){
+  const reason = data?.fallbackFrom || data?.meta?.fallbackReason || data?.realtime?.stationDebug?.fallbackReason || "";
+  if (!reason) return "";
+  if (reason === "no_cma_station_within_30km") return "附近 30 公里內無 CMA 測站，已改用 Open-Meteo 網格資料。";
+  if (reason === "cma_all_station_fetch_failed") return "CMA 測站資料暫時抓取失敗，已改用 Open-Meteo。";
+  if (reason === "outside_cwa_and_cma_supported_area") return "此位置不在 CWA / CMA 測站範圍內，已改用 Open-Meteo。";
+  if (reason === "nearest_station_over_30km" || reason === "no_station_within_30km") return "附近無可用 CWA/CMA 測站，已改用 Open-Meteo。";
+  return `已改用備援資料：${reason}`;
+}
+
 function formatBackendRealtimeSource(data){
   const sd = data?.realtime?.stationDebug || {};
   const usedCount = Number.isFinite(Number(sd.usedCount)) ? Number(sd.usedCount) : 0;
   const radius = Number.isFinite(Number(sd.radiusKm)) ? `${Number(sd.radiusKm).toFixed(0)}km` : "--km";
-  return `即時：CWA 後端，使用 ${usedCount} 個測站，半徑 ${radius}<br/>${formatBackendStationList(sd.stations)}`;
+  const provider = backendProviderName(data);
+  return `即時：${provider}，使用 ${usedCount} 個測站，半徑 ${radius}<br/>${formatBackendStationList(sd.stations)}`;
 }
 
 function renderCwaFullRealtime(data){
@@ -2302,10 +2322,15 @@ function renderCwaFullRealtime(data){
   $("mSun").innerHTML  = `日照 <b>${formatBackendNumber(r.sunshine, 1, "h")}</b>`;
   $("mVis").innerHTML  = `能見度 <b>${formatVisibilityForUi(r.visibility)}</b>`;
 
-  $("stationLabel").innerHTML = formatBackendRealtimeSource(data);
-  $("timeLabel").textContent = formatBackendObsTimeGroups(r.stationDebug?.stations || []);
-  $("hintBar").innerHTML = "";
-  $("footerLabel").innerHTML = "即時：CWA 後端<br/>預報：前端 CWA / Open-Meteo";
+  $("stationLabel").innerHTML = sp.stationLabel || formatBackendRealtimeSource(data);
+  $("timeLabel").textContent = sp.timeLabel || formatBackendObsTimeGroups(r.stationDebug?.stations || []);
+
+  const fallbackMsg = backendFallbackText(data);
+  const seaText = Number.isFinite(backendNumber(r.seaLevelPressure))
+    ? `海平面氣壓：<b>${formatBackendNumber(r.seaLevelPressure, 1, " hPa")}</b>`
+    : "";
+  $("hintBar").innerHTML = [fallbackMsg, sp.hintBar || "", seaText].filter(Boolean).join("<br/>");
+  $("footerLabel").innerHTML = sp.footerLabel || `即時：${backendProviderName(data)}<br/>預報：前端 CWA / Open-Meteo`;
 }
 
 function visibilityTextToKm(v){
@@ -2398,34 +2423,31 @@ if (!labelHint || !labelHint.trim()) {
   let cwaBackendRealtimeBad = false;
   let cwaFullData = null;
 
-  if (inTW) {
-    try {
-      $("stationLabel").textContent = "讀取 CWA 後端即時資料…";
-      cwaFullData = await fetchCwaFull(lat, lon, altForCwaFull, {
-        county: forecastCountyName || "",
-        district: adminOverride || "",
-        label: $("locationName").textContent || labelHint || "目前位置"
-      });
-      if (Number.isFinite(Number(cwaFullData?.location?.alt))) {
-        targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
-      }
-
-      // v5.8：後端回報最近有效測站超過 30km / 無可用測站時，
-      // CWA 即時資料視為不可用，改由 Open-Meteo 顯示，避免外海拿遠方陸地測站。
-      useCwaBackendRealtime = !isBadCwaBackendRealtime(cwaFullData);
-      cwaBackendRealtimeBad = !useCwaBackendRealtime;
-      if (!useCwaBackendRealtime) {
-        const badReason = cwaFullData?.realtime?.stationDebug?.fallbackReason || cwaFullData?.realtime?.stationDebug?.reason || "temp_null";
-        dbg("[cwa/full] realtime unusable fallback=" + badReason);
-        // 保留後端 debug，但即時顯示和預報 fallback 直接改走 Open-Meteo。
-        $("stationLabel").textContent = "CWA 即時測站超過 30km，改用 Open-Meteo…";
-      }
-    } catch(e) {
-      dbg("[cwa/full] fail " + e);
-      useCwaBackendRealtime = false;
-      cwaBackendRealtimeBad = true;
-      cwaFullData = null;
+  try {
+    $("stationLabel").textContent = "讀取整合後端即時資料…";
+    cwaFullData = await fetchCwaFull(lat, lon, altForCwaFull, {
+      county: forecastCountyName || "",
+      district: adminOverride || "",
+      label: $("locationName").textContent || labelHint || "目前位置"
+    });
+    if (Number.isFinite(Number(cwaFullData?.location?.alt))) {
+      targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
     }
+
+    // v5.10：/full 會自動分流 CWA / CMA / Open-Meteo fallback。
+    // 只要後端有有效 realtime.temp，前端就直接使用，不再限制台灣才走後端。
+    useCwaBackendRealtime = !isBadCwaBackendRealtime(cwaFullData);
+    cwaBackendRealtimeBad = !useCwaBackendRealtime;
+    if (!useCwaBackendRealtime) {
+      const badReason = cwaFullData?.realtime?.stationDebug?.fallbackReason || cwaFullData?.realtime?.stationDebug?.reason || "temp_null";
+      dbg("[/full] realtime unusable fallback=" + badReason);
+      $("stationLabel").textContent = "整合後端即時資料不可用，改用 Open-Meteo…";
+    }
+  } catch(e) {
+    dbg("[/full] fail " + e);
+    useCwaBackendRealtime = false;
+    cwaBackendRealtimeBad = true;
+    cwaFullData = null;
   }
 
   if (!Number.isFinite(targetAlt)) targetAlt = normalizeWeatherCalcAltitude(await getElevation(lat, lon, null));
@@ -2433,7 +2455,7 @@ if (!labelHint || !labelHint.trim()) {
 
   const nowTs = Date.now();
 
-  // ===== Open-Meteo：非台灣 / CWA 後端不可用 / 預報 fallback 才需要 =====
+  // ===== Open-Meteo：整合後端不可用 / 預報 fallback 才需要 =====
   let om = null;
 
   async function ensureOpenMeteoLoaded(reasonText = "讀取 Open-Meteo…"){
@@ -2450,13 +2472,13 @@ if (!labelHint || !labelHint.trim()) {
   }
 
   if (!useCwaBackendRealtime) {
-    await ensureOpenMeteoLoaded(cwaBackendRealtimeBad ? "CWA 即時測站超過 30km，讀取 Open-Meteo…" : "讀取 Open-Meteo…");
+    await ensureOpenMeteoLoaded(cwaBackendRealtimeBad ? "整合後端即時資料不可用，讀取 Open-Meteo…" : "讀取 Open-Meteo…");
   }
 
   const gridElev = (om && typeof om.elevation === "number" && isFinite(om.elevation)) ? om.elevation : targetAlt;
   const dH = (isFinite(targetAlt) ? targetAlt : 0) - gridElev;
 
-  // ===== 台灣：CWA 後端失敗時才回退前端舊觀測邏輯 =====
+  // ===== 台灣：整合後端失敗時才回退前端舊 CWA 觀測邏輯 =====
   let useCwaRealtime = false;
   let cwaStations = [];
   let cwaWithDist = [];
@@ -2678,7 +2700,7 @@ if (!labelHint || !labelHint.trim()) {
       $("weatherIcon").textContent = wx.icon;
 
       $("stationLabel").textContent = inTW
-        ? "即時：Open-Meteo（≤30km 無 CWA 測站或 CWA 失敗）"
+        ? "即時：Open-Meteo（整合後端備援）"
         : "即時：Open-Meteo（全球）";
 
       $("timeLabel").textContent = cur.time ? ("更新時間：" + cur.time.replace("T"," ")) : "";
