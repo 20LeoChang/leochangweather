@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.0</title>
+  <title>天氣網站v6.1</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -636,7 +636,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 <div class="rain-block">
   <div class="rain-header">
     <div class="rain-title">即時降雨預測</div>
-    <div class="rain-subtitle">查詢未來指定分鐘內降雨量</div>
+    <div class="rain-subtitle">查詢未來指定分鐘內降雨量與雨停時間</div>
   </div>
 
   <div class="rain-controls">
@@ -685,7 +685,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v6.0</div>
+      <div class="version-badge" id="versionLabel">v6.1</div>
     </div>
   </div>
 
@@ -694,7 +694,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.0";
+const APP_VERSION = "v6.1";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -703,7 +703,7 @@ const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ ret
 const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0003-001") : "";
 const CWA_OBS_1H_PROXY  = WORKER_ORIGIN ? (WORKER_ORIGIN + "/obs/O-A0001-001") : "";
 
-// v6.0：即時資料統一走後端 /full，自動分流：台灣 CWA、大陸 CMA、無測站/其他地區 Open-Meteo fallback。
+// v6.1：即時資料統一走後端 /full，自動分流：台灣 CWA、大陸 CMA、無測站/其他地區 Open-Meteo fallback。
 // 預報仍保留前端原本 CWA / Open-Meteo 邏輯。
 const WEATHER_FULL_ENDPOINT = WORKER_ORIGIN ? (WORKER_ORIGIN + "/full") : "/full";
 
@@ -2520,7 +2520,7 @@ if (!labelHint || !labelHint.trim()) {
       targetAlt = normalizeWeatherCalcAltitude(cwaFullData.location.alt);
     }
 
-    // v6.0：/full 會自動分流 CWA / CMA / Open-Meteo fallback。
+    // v6.1：/full 會自動分流 CWA / CMA / Open-Meteo fallback。
     // 只要後端有有效 realtime.temp，前端就直接使用，不再限制台灣才走後端。
     useCwaBackendRealtime = !isBadCwaBackendRealtime(cwaFullData);
     cwaBackendRealtimeBad = !useCwaBackendRealtime;
@@ -3593,42 +3593,98 @@ function buildRainSummaryHtml(data, minutes){
     ? Number(data.accum_mm)
     : series.reduce((a,b)=>a+b,0);
 
-  const rateSeries = series.map(v => v * 60);
+  const rateSeries = series.map(v => v * 60); // mm/min -> mm/h
   const peakRate = rateSeries.length ? Math.max(...rateSeries) : 0;
   const peakIdx = rateSeries.indexOf(peakRate);
   const peakMinute = peakIdx >= 0 ? peakIdx + 1 : null;
 
-  const first3Rate = avgRain(series.slice(0, Math.min(3, series.length))) * 60;
-  const currentlyRaining = first3Rate >= 1;
+  // v6.1：雨停判斷
+  // 1 mm/h 以上才算「明顯下雨」；連續 3 分鐘低於門檻才算雨停，避免單分鐘跳 0 誤判。
+  const WET_RATE_MIN = 1;
+  const DRY_NEED_MINUTES = 3;
 
-  const startIdx = rateSeries.findIndex(r => r >= 1);
-  const startMinute = startIdx >= 0 ? startIdx + 1 : null;
+  const first3Rate = avgRain(series.slice(0, Math.min(3, series.length))) * 60;
+  const currentlyRaining = first3Rate >= WET_RATE_MIN;
+
+  function findRainEventFrom(startIndex){
+    let firstWet = -1;
+
+    for (let i = Math.max(0, startIndex || 0); i < rateSeries.length; i++) {
+      if (rateSeries[i] >= WET_RATE_MIN) {
+        firstWet = i;
+        break;
+      }
+    }
+
+    if (firstWet < 0) return null;
+
+    let lastWet = firstWet;
+    let dryRun = 0;
+
+    for (let i = firstWet + 1; i < rateSeries.length; i++) {
+      if (rateSeries[i] >= WET_RATE_MIN) {
+        lastWet = i;
+        dryRun = 0;
+      } else {
+        dryRun++;
+
+        if (dryRun >= DRY_NEED_MINUTES) {
+          const firstDryIdx = i - DRY_NEED_MINUTES + 1;
+          return {
+            startMinute: firstWet + 1,
+            stopMinute: firstDryIdx + 1,
+            lastWetMinute: lastWet + 1,
+            continues: false
+          };
+        }
+      }
+    }
+
+    return {
+      startMinute: firstWet + 1,
+      stopMinute: null,
+      lastWetMinute: lastWet + 1,
+      continues: true
+    };
+  }
+
+  const rainEvent = findRainEventFrom(0);
+  const startMinute = rainEvent ? rainEvent.startMinute : null;
+  const stopMinute = rainEvent ? rainEvent.stopMinute : null;
 
   const level = rainLevelText(peakRate);
   const radarTime = formatRadarTime(data.base_time, data.delay_minutes ?? data.bridge_minutes);
   const trendChips = buildRainTrendChips(series, m);
 
+  const stopText = rainEvent
+    ? (stopMinute !== null ? `約 ${stopMinute} 分鐘後雨停` : `查詢的 ${m} 分鐘內尚未明顯雨停`)
+    : "";
+
   let main = "";
   let detail = "";
 
-  if (peakRate < 1 && total < 0.1) {
+  if (peakRate < WET_RATE_MIN && total < 0.1) {
     main = `未來 ${m} 分鐘無明顯降雨`;
     detail = "附近短時間內沒有明顯降雨訊號。";
+
   } else if (currentlyRaining) {
     main = "目前正在下雨";
+
     if (peakMinute !== null && peakMinute <= 3) {
-      detail = `雨勢已接近最強。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      detail = `雨勢已接近最強，${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
     } else {
-      detail = `未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm。約 ${peakMinute} 分鐘後雨勢最明顯，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      detail = `${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm。約 ${peakMinute} 分鐘後雨勢最明顯，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
     }
+
   } else if (startMinute !== null) {
     if (startMinute <= 5) {
       main = "約 5 分鐘內可能開始下雨";
-      detail = `未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      detail = `${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
     } else {
       main = `約 ${startMinute} 分鐘後可能開始下雨`;
-      detail = `${peakMinute} 分鐘後雨勢最明顯。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      detail = `${peakMinute} 分鐘後雨勢最明顯，${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
     }
+
   } else {
     main = `未來 ${m} 分鐘無明顯降雨`;
     detail = `累積雨量約 ${total.toFixed(1)} mm。`;
@@ -3707,7 +3763,7 @@ $("rainBtn").onclick = async () => {
   box.style.color = "rgba(255,255,255,.96)";
 
   try {
-    const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean`;
+    const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean&debug=0`;
 
     // 降雨 API 使用專用 fetch，錯誤會顯示 HTTP 狀態 / 非 JSON / timeout 內容，方便抓「有雨時取得失敗」原因。
     const data = await fetchRainJson(url, 180000);
