@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.2</title>
+  <title>天氣網站v6.2.1</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -685,7 +685,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v6.2</div>
+      <div class="version-badge" id="versionLabel">v6.2.1</div>
     </div>
   </div>
 
@@ -694,7 +694,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.2";
+const APP_VERSION = "v6.2.1";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -3517,7 +3517,7 @@ function avgRain(arr){
 }
 
 function rainLevelText(rate){
-  if (rate < 1) return "無雨";
+  if (rate < 0.5) return "無雨";
   if (rate < 5) return "微雨";
   if (rate < 15) return "小雨";
   if (rate < 35) return "中雨";
@@ -3527,7 +3527,7 @@ function rainLevelText(rate){
 }
 
 function rainColorFromRate(rate){
-  if (rate < 1) return "none";
+  if (rate < 0.5) return "none";
   if (rate < 5) return "blue";
   if (rate < 15) return "green";
   if (rate < 35) return "yellow";
@@ -3598,9 +3598,9 @@ function buildRainSummaryHtml(data, minutes){
   const peakIdx = rateSeries.indexOf(peakRate);
   const peakMinute = peakIdx >= 0 ? peakIdx + 1 : null;
 
-  // v6.1：雨停判斷
-  // 1 mm/h 以上才算「明顯下雨」；連續 3 分鐘低於門檻才算雨停，避免單分鐘跳 0 誤判。
-  const WET_RATE_MIN = 1;
+  // v6.2.1：雨停判斷
+  // 0.5 mm/h 以上才算「明顯下雨」；連續 3 分鐘低於門檻才算雨停，避免單分鐘跳 0 誤判。
+  const WET_RATE_MIN = 0.5;
   const DRY_NEED_MINUTES = 3;
 
   const first3Rate = avgRain(series.slice(0, Math.min(3, series.length))) * 60;
@@ -3766,7 +3766,7 @@ $("rainBtn").onclick = async () => {
     const url = `${RAIN_API}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=${encodeURIComponent(minutes)}&mode=mean&debug=0`;
 
     // 降雨 API 使用專用 fetch，錯誤會顯示 HTTP 狀態 / 非 JSON / timeout 內容，方便抓「有雨時取得失敗」原因。
-    const data = await fetchRainJson(url, 180000);
+    const data = await fetchRainJson(url, 10000);
 
     if (myRainSeq !== rainRunSeq) return;
     if (!data || data.ok === false) throw new Error(data?.error || "RAIN_API_OK_FALSE");
@@ -3838,4 +3838,3 @@ function getRainBg(color) {
 </script>
 </body>
 </html>
-
