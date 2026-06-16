@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.2.1</title>
+  <title>天氣網站v6.2.2</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -685,7 +685,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v6.2.1</div>
+      <div class="version-badge" id="versionLabel">v6.2.2<div>
     </div>
   </div>
 
@@ -694,7 +694,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.2.1";
+const APP_VERSION = "v6.2.2";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -3656,38 +3656,50 @@ function buildRainSummaryHtml(data, minutes){
   const radarTime = formatRadarTime(data.base_time, data.delay_minutes ?? data.bridge_minutes);
   const trendChips = buildRainTrendChips(series, m);
 
-  const stopText = rainEvent
-    ? (stopMinute !== null ? `約 ${stopMinute} 分鐘後雨停` : `查詢的 ${m} 分鐘內尚未明顯雨停`)
-    : "";
+// 1. 讓雨停的描述更直覺
+  const stopText = stopMinute !== null 
+    ? `預計 ${stopMinute} 分鐘後雨停` 
+    : `在 ${m} 分鐘內無雨停跡象`;
 
   let main = "";
   let detail = "";
 
   if (peakRate < WET_RATE_MIN && total < 0.1) {
     main = `未來 ${m} 分鐘無明顯降雨`;
-    detail = "附近短時間內沒有明顯降雨訊號。";
+    // 修正了引號與「時間」的語病
+    detail = `根據最新資料，未來 ${m} 分鐘內沒有明顯降雨訊號。`;
 
   } else if (currentlyRaining) {
     main = "目前正在下雨";
-
+    
+    // 2. 避開「最大」的絕對說法，改描述「趨勢」
+    let peakText = "";
     if (peakMinute !== null && peakMinute <= 3) {
-      detail = `雨勢已接近最強，${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      peakText = "雨勢正在逐漸趨緩";
     } else {
-      detail = `${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm。約 ${peakMinute} 分鐘後雨勢最明顯，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
+      peakText = `約 ${peakMinute} 分鐘後雨勢相對明顯`; // 改回較穩妥的說法
     }
+
+    // 統一在最前面加上「根據最新資料，」，並使用「期間預估」精簡字數
+    detail = `根據最新資料，${peakText}，且${stopText}。期間預估累積雨量 ${total.toFixed(1)} mm，最大雨強 ${peakRate.toFixed(1)} mm/h（${level}）。`;
 
   } else if (startMinute !== null) {
-    if (startMinute <= 5) {
-      main = "約 5 分鐘內可能開始下雨";
-      detail = `${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
-    } else {
-      main = `約 ${startMinute} 分鐘後可能開始下雨`;
-      detail = `${peakMinute} 分鐘後雨勢最明顯，${stopText}。未來 ${m} 分鐘累積雨量約 ${total.toFixed(1)} mm，最大雨強約 ${peakRate.toFixed(1)} mm/h（${level}）。`;
-    }
+    // 3. 處理即將下雨的情況
+    main = startMinute <= 5 
+      ? "未來 5 分鐘內即將開始下雨" 
+      : `約 ${startMinute} 分鐘後可能開始下雨`;
+
+    const eventText = stopMinute !== null
+      ? `降雨將持續至第 ${stopMinute} 分鐘左右雨停`
+      : `開始後，在 ${m} 分鐘內將持續有雨`;
+
+    // 統一在最前面加上「根據最新資料，」
+    detail = `根據最新資料，${eventText}。約 ${peakMinute} 分鐘後雨勢最明顯，期間預估累積 ${total.toFixed(1)} mm，最大雨強 ${peakRate.toFixed(1)} mm/h（${level}）。`;
 
   } else {
+    // 4. 處理零星降雨
     main = `未來 ${m} 分鐘無明顯降雨`;
-    detail = `累積雨量約 ${total.toFixed(1)} mm。`;
+    detail = `根據最新資料，仍有零星降雨，預估累積約 ${total.toFixed(1)} mm。`;
   }
 
   return `
