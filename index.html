@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.3</title>
+  <title>天氣網站v6.4</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -122,6 +122,14 @@
     .metric-vis{background:#BFC9D4;color:#1E2A36;}
     .metric-air{background:#D9E1E8;color:#1E2A36;}
     .metric-uv{background:#D9E1E8;color:#1E2A36;}
+    .metric-rainobs{
+      background:rgba(0,0,0,.18);
+      color:#FFFFFF;
+    }
+    .metric-rainobs b{
+      font-variant-numeric:tabular-nums;
+    }
+
 
     .card-subtitle{margin-top:8px;font-size:12px;opacity:.9;line-height:1.6}
     .card-time{margin-top:4px;font-size:11px;opacity:.8;text-align:left}
@@ -629,6 +637,8 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
           <span class="metric-pill metric-pres" id="mPres">氣壓 <b>--</b></span>
           <span class="metric-pill metric-sun" id="mSun">日照 <b>--</b></span>
           <span class="metric-pill metric-vis" id="mVis">能見度 <b>--</b></span>
+          <span class="metric-pill metric-rainobs" id="mRain10">10分鐘雨量 <b>--</b></span>
+          <span class="metric-pill metric-rainobs" id="mRain1h">1小時雨量 <b>--</b></span>
           <span class="metric-pill metric-air" id="mAir">空氣品質 <b>--</b></span>
           <span class="metric-pill metric-uv" id="mUv">紫外線指數 <b>--</b></span>
         </div>
@@ -689,7 +699,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       </div>
 
       <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v6.3<div>
+      <div class="version-badge" id="versionLabel">v6.4</div>
     </div>
   </div>
 
@@ -698,7 +708,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.3";
+const APP_VERSION = "v6.4";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -2437,6 +2447,7 @@ function resetEnvMetricPills(){
     uvEl.innerHTML = `紫外線指數 <b>--</b>`;
     applyMetricPillColor(uvEl, "#D9E1E8");
   }
+  renderObservedRainPills(null);
 }
 
 function renderAirQualityPill(air){
@@ -2475,6 +2486,32 @@ function renderUvIndexPill(uv){
   applyMetricPillColor(el, color);
 }
 
+function rainObservedTextColor(color){
+  return color === "yellow" ? "rgba(45,38,8,.96)" : "#FFFFFF";
+}
+
+function setObservedRainPill(el, label, valueMm, rateForColor){
+  if (!el) return;
+
+  const valid = Number.isFinite(valueMm);
+  const color = valid ? rainColorFromRate(rateForColor) : "none";
+
+  el.dataset.rainColor = color;
+  el.style.background = getRainBg(color);
+  el.style.borderColor = color === "none" ? "rgba(255,255,255,.10)" : "rgba(255,255,255,.18)";
+  el.style.color = rainObservedTextColor(color);
+  el.innerHTML = `${label} <b>${valid ? valueMm.toFixed(1) + " mm" : "--"}</b>`;
+}
+
+function renderObservedRainPills(realtime){
+  const rain10min = backendNumber(realtime?.rain10min);
+  const rain1h = backendNumber(realtime?.rain1h);
+
+  // 10 分鐘雨量要換算成等效時雨量，套用「即時降雨預測」同一套色階
+  setObservedRainPill($("mRain10"), "10分鐘雨量", rain10min, rain10min * 6);
+  setObservedRainPill($("mRain1h"), "1小時雨量", rain1h, rain1h);
+}
+
 function renderCwaFullRealtime(data){
   const r = data?.realtime || {};
   const loc = data?.location || {};
@@ -2501,6 +2538,7 @@ function renderCwaFullRealtime(data){
   $("mPres").innerHTML = `氣壓 <b>${formatBackendNumber(r.pressure, 1, " hPa")}</b>`;
   $("mSun").innerHTML  = `日照 <b>${formatBackendNumber(r.sunshine, 1, "h")}</b>`;
   $("mVis").innerHTML  = `能見度 <b>${formatVisibilityForUi(r.visibility)}</b>`;
+  renderObservedRainPills(r);
   renderAirQualityPill(r.air);
   renderUvIndexPill(r.uv);
 
@@ -2734,7 +2772,12 @@ if (!labelHint || !labelHint.trim()) {
     realtimeT = backendNumber(br.temp);
     realtimeAT = backendNumber(br.feels);
     realtimeCondText = br.condition || "";
-    realtimeRain = Number.isFinite(backendNumber(br.rain1h)) ? backendNumber(br.rain1h) : 0;
+    const obsRain10 = backendNumber(br.rain10min);
+    const obsRain1h = backendNumber(br.rain1h);
+    realtimeRain = Math.max(
+      Number.isFinite(obsRain10) ? obsRain10 * 6 : 0,
+      Number.isFinite(obsRain1h) ? obsRain1h : 0
+    );
     realtimeVisKm = visibilityTextToKm(br.visibility);
     realtimeThunder = String(br.condition || "").includes("雷");
     if (String(br.condition || "").includes("陰")) realtimeCloud = 82;
