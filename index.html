@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.4</title>
+  <title>天氣網站v6.4.1</title>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -708,7 +708,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.4";
+const APP_VERSION = "v6.4.1";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -2512,6 +2512,215 @@ function renderObservedRainPills(realtime){
   setObservedRainPill($("mRain1h"), "1小時雨量", rain1h, rain1h);
 }
 
+/* ===========================
+   v6.4.1：CWA 雨量站近場校正
+   修正：10km 內測站太多、很多 0 時，純 IDW 會把局部強雨抹平。
+   規則：
+   1) 10km 內才使用
+   2) 最近站 ≤0.5km：直接 snap 最近站
+   3) 否則只取最近最多 5 站做 IDW
+   4) 一般 p=2.5，強降雨 p=3.0，強雨但其他站多為 0 時 p=3.2
+   5) top2 強雨保護，避免被 0 測站壓太低
+   =========================== */
+const RAIN_GAUGE_MAX_RADIUS_KM = 10;
+const RAIN_GAUGE_MAX_STATIONS = 5;
+const RAIN_GAUGE_SNAP_KM = 0.5;
+const RAIN_GAUGE_MAX_AGE_MIN = 40;
+
+function parseCwaRainGaugeStations(raw){
+  const stations = raw?.cwaopendata?.dataset?.Station || raw?.cwaopendata?.Dataset?.Station || raw?.records?.Station || [];
+  const out = [];
+
+  for (const st of stations || []) {
+    const geo = st.GeoInfo || {};
+    const coords = geo.Coordinates || [];
+    const wgs = Array.isArray(coords) ? coords.find(c => c.CoordinateName === "WGS84") : null;
+    if (!wgs) continue;
+
+    const lat = Number(wgs.StationLatitude);
+    const lon = Number(wgs.StationLongitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+    const we = st.WeatherElement || {};
+    const now = we.Now || {};
+    const rainRaw = now.Precipitation ?? we.Precipitation;
+    const rain = Number(rainRaw);
+    if (!Number.isFinite(rain) || rain < 0 || rain > 999) continue;
+
+    const obsTime = st.ObsTime?.DateTime || st.ObsTime || null;
+    out.push({
+      id: st.StationId || st.stationId || "",
+      name: st.StationName || st.stationName || "",
+      lat,
+      lon,
+      rain,
+      obsTime
+    });
+  }
+
+  return out;
+}
+
+function getRainGaugeAgeMinutes(g, nowTs){
+  if (!g?.obsTime) return 0;
+  const ts = Date.parse(g.obsTime);
+  if (!Number.isFinite(ts)) return 0;
+  return Math.abs(nowTs - ts) / 60000;
+}
+
+function estimateRainGaugeNearest5Idw(gauges, lat, lon){
+  const nowTs = Date.now();
+  const valid = [];
+
+  for (const g of gauges || []) {
+    const distKm = haversine(lat, lon, g.lat, g.lon);
+    const ageMin = getRainGaugeAgeMinutes(g, nowTs);
+    const rain = Number(g.rain);
+
+    if (!Number.isFinite(distKm) || distKm > RAIN_GAUGE_MAX_RADIUS_KM) continue;
+    if (!Number.isFinite(rain) || rain < 0) continue;
+    if (Number.isFinite(ageMin) && ageMin > RAIN_GAUGE_MAX_AGE_MIN) continue;
+
+    valid.push({
+      ...g,
+      distKm,
+      ageMin,
+      rain
+    });
+  }
+
+  valid.sort((a,b) => a.distKm - b.distKm);
+
+  if (!valid.length) {
+    return {
+      ok: false,
+      value: NaN,
+      method: "no_gauge_within_10km",
+      used: [],
+      confidence: "none"
+    };
+  }
+
+  const nearest = valid[0];
+
+  // 查詢點幾乎就在測站上：不要 IDW，直接採用最近站
+  if (nearest.distKm <= RAIN_GAUGE_SNAP_KM) {
+    return {
+      ok: true,
+      value: nearest.rain,
+      method: "nearest_snap",
+      radiusKm: nearest.distKm,
+      power: null,
+      used: [nearest],
+      confidence: "high"
+    };
+  }
+
+  // 只用最近最多 5 個，避免 10km 內 20~30 個 0 測站把雨芯抹平
+  const used = valid.slice(0, RAIN_GAUGE_MAX_STATIONS);
+  const rains = used.map(g => g.rain);
+  const top = Math.max(...rains);
+  const low = Math.min(...rains);
+
+  let power = 2.5;
+  if (top >= 5.0 && low <= top * 0.4) power = 3.2;
+  else if (top >= 5.0) power = 3.0;
+
+  let num = 0;
+  let den = 0;
+
+  for (const g of used) {
+    const d = Math.max(g.distKm, 0.05);
+    const wDist = 1 / Math.pow(d, power);
+    const wTime = Math.max(0, 1 - (Number(g.ageMin) || 0) / 45);
+    const w = wDist * wTime;
+
+    if (w <= 0) continue;
+    num += g.rain * w;
+    den += w;
+  }
+
+  let value = den > 0 ? num / den : NaN;
+
+  // 強雨保護：最近 5 站內有 2 站都明顯有雨，就不允許被其他 0 測站壓太低
+  const rainy = rains.filter(v => Number.isFinite(v) && v >= 1.0).sort((a,b) => b-a);
+  if (Number.isFinite(value) && rainy.length >= 2) {
+    const top2Mean = (rainy[0] + rainy[1]) / 2;
+    if (top2Mean >= 5.0) {
+      value = Math.max(value, top2Mean * 0.8);
+    }
+  }
+
+  let confidence = "medium";
+  if (used.length >= 2 && used[0].distKm <= 3 && used[1].distKm <= 3) {
+    const r0 = rains[0] || 0;
+    const r1 = rains[1] || 0;
+    const ratio = Math.min(r0, r1) / Math.max(r0, r1, 0.001);
+    confidence = ratio >= 0.55 ? "high" : "medium";
+  } else if (used[0]?.distKm > 5 || used.length < 2) {
+    confidence = "low";
+  }
+
+  return {
+    ok: Number.isFinite(value),
+    value,
+    method: "nearest5_idw_heavy_protected",
+    radiusKm: used.length ? Math.max(...used.map(g => g.distKm)) : NaN,
+    power,
+    used,
+    confidence
+  };
+}
+
+function formatRainGaugeDebug(result, label){
+  if (!result?.ok) return `${label}：附近 10km 內無可用雨量站`;
+  const used = (result.used || []).map(g => {
+    const name = g.name || g.id || "--";
+    const dist = Number.isFinite(g.distKm) ? g.distKm.toFixed(2) : "--";
+    const rain = Number.isFinite(g.rain) ? g.rain.toFixed(1) : "--";
+    return `${name} ${dist}km ${rain}mm`;
+  }).join("、");
+
+  const val = Number.isFinite(result.value) ? result.value.toFixed(1) : "--";
+  const p = Number.isFinite(result.power) ? `，p=${result.power}` : "";
+  return `${label}：${val}mm（${result.method}${p}）｜${used}`;
+}
+
+async function loadObservedRainGaugeCorrection(lat, lon){
+  if (!isInsideTaiwan(lat, lon)) return null;
+
+  const [r10, r1h] = await Promise.allSettled([
+    fetchObsResilient(CWA_OBS_10M_S3, CWA_OBS_10M_PROXY || ""),
+    fetchObsResilient(CWA_OBS_1H_S3,  CWA_OBS_1H_PROXY  || "")
+  ]);
+
+  const raw10 = r10.status === "fulfilled" ? r10.value : null;
+  const raw1h = r1h.status === "fulfilled" ? r1h.value : null;
+
+  const gauges10 = parseCwaRainGaugeStations(raw10);
+  const gauges1h = parseCwaRainGaugeStations(raw1h);
+
+  const rain10 = estimateRainGaugeNearest5Idw(gauges10, lat, lon);
+  const rain1h = estimateRainGaugeNearest5Idw(gauges1h, lat, lon);
+
+  return {
+    rain10,
+    rain1h,
+    debugHtml: [
+      formatRainGaugeDebug(rain10, "10分鐘雨量近場校正"),
+      formatRainGaugeDebug(rain1h, "1小時雨量近場校正")
+    ].join("<br/>")
+  };
+}
+
+function appendObservedRainGaugeHint(correction){
+  if (!correction?.debugHtml) return;
+  const hb = $("hintBar");
+  if (!hb) return;
+  const old = hb.innerHTML || "";
+  hb.innerHTML = old ? `${old}<br/>${correction.debugHtml}` : correction.debugHtml;
+}
+
 function renderCwaFullRealtime(data){
   const r = data?.realtime || {};
   const loc = data?.location || {};
@@ -2766,6 +2975,8 @@ if (!labelHint || !labelHint.trim()) {
   let realtimeCloud = NaN;
   let realtimeVisKm = NaN;
   let realtimeThunder = false;
+  let observedRain10ForPill = NaN;
+  let observedRain1hForPill = NaN;
 
   if (useCwaBackendRealtime && cwaFullData) {
     const br = cwaFullData.realtime || {};
@@ -2774,6 +2985,8 @@ if (!labelHint || !labelHint.trim()) {
     realtimeCondText = br.condition || "";
     const obsRain10 = backendNumber(br.rain10min);
     const obsRain1h = backendNumber(br.rain1h);
+    observedRain10ForPill = obsRain10;
+    observedRain1hForPill = obsRain1h;
     realtimeRain = Math.max(
       Number.isFinite(obsRain10) ? obsRain10 * 6 : 0,
       Number.isFinite(obsRain1h) ? obsRain1h : 0
@@ -2825,7 +3038,8 @@ if (!labelHint || !labelHint.trim()) {
 
       const cond = pickConditionByDistance(used);
       realtimeCondText = cond;
-      realtimeRain = isFinite(main?.precip) ? main.precip : 0;
+      observedRain10ForPill = Number.isFinite(Number(main?.precip)) ? Number(main.precip) : NaN;
+      realtimeRain = Number.isFinite(observedRain10ForPill) ? observedRain10ForPill * 6 : 0;
       realtimeThunder = cond.includes("雷");
       if (cond.includes("陰")) realtimeCloud = 82;
       else if (cond.includes("多雲")) realtimeCloud = 52;
@@ -2933,6 +3147,32 @@ if (!labelHint || !labelHint.trim()) {
       const visKm = normalizeVisibilityKmFromOpenMeteo(om);
       $("mVis").innerHTML  = `能見度（km） <b>${isFinite(visKm) ? visKm.toFixed(1) : "--"}</b>`;
     }
+  }
+
+  // v6.4.1：不完全相信後端 /full 的雨量 IDW。
+  // 重新用前端 CWA 雨量站做「最近5站 + p=2.5~3.2 + nearest snap」校正，
+  // 避免 10km 內大量 0 測站把永和/中和這種局部強雨拉低。
+  try {
+    const rainCorrection = await loadObservedRainGaugeCorrection(lat, lon);
+    if (rainCorrection) {
+      if (rainCorrection.rain10?.ok) observedRain10ForPill = rainCorrection.rain10.value;
+      if (rainCorrection.rain1h?.ok) observedRain1hForPill = rainCorrection.rain1h.value;
+
+      renderObservedRainPills({
+        rain10min: observedRain10ForPill,
+        rain1h: observedRain1hForPill
+      });
+
+      realtimeRain = Math.max(
+        Number.isFinite(observedRain10ForPill) ? observedRain10ForPill * 6 : 0,
+        Number.isFinite(observedRain1hForPill) ? observedRain1hForPill : 0,
+        Number.isFinite(realtimeRain) ? realtimeRain : 0
+      );
+
+      appendObservedRainGaugeHint(rainCorrection);
+    }
+  } catch (e) {
+    dbg("[rain gauge correction] fail " + e);
   }
 
   // CMA 即時 API 只有 precipitation，後端只能先回「有降水／無降水」。
