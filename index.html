@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v6.4.1</title>
+  <title>天氣網站v7.0</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
     *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
@@ -552,6 +555,538 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 .metric-pill{max-width:100%;}
 .hourly-forecast{max-width:100%;min-width:0;}
 
+
+
+    /* ===========================
+       v7.0 整張介面橫向滑動
+       =========================== */
+    .interface-viewport{
+      width:100%;
+      max-width:100%;
+      overflow:hidden;
+      position:relative;
+      z-index:2;
+      touch-action:pan-y;
+    }
+    .interface-track{
+      display:flex;
+      align-items:flex-start;
+      width:100%;
+      min-width:0;
+      transform:translateX(0);
+      transition:transform .38s cubic-bezier(.22,.72,.16,1);
+      will-change:transform;
+    }
+    body[data-page="observation"] .interface-track{transform:translateX(-100%);}
+    body[data-page="forecast"] .interface-track{transform:translateX(0);}
+    .interface-page{
+      flex:0 0 100%;
+      width:100%;
+      min-width:0;
+      padding:0 2px;
+    }
+    .interface-page .card{
+      width:100%;
+      min-width:0;
+    }
+    .view-switch{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      padding:4px;
+      border-radius:999px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+      user-select:none;
+    }
+    .view-tab{
+      border:none;
+      border-radius:999px;
+      padding:9px 8px;
+      background:transparent;
+      color:rgba(255,255,255,.72);
+      font-size:12px;
+      font-weight:850;
+      letter-spacing:.5px;
+      cursor:pointer;
+      transition:transform .16s ease,background .18s ease,color .18s ease,box-shadow .18s ease;
+    }
+    .view-tab.on{
+      background:rgba(255,255,255,.94);
+      color:#075fc7;
+      box-shadow:0 8px 18px rgba(0,0,0,.16);
+    }
+    .view-tab:active{transform:scale(.985)}
+    .page-hint{
+      margin-top:7px;
+      text-align:center;
+      font-size:10.5px;
+      font-weight:650;
+      color:rgba(255,255,255,.62);
+      letter-spacing:.3px;
+      user-select:none;
+    }
+    .weather-page{
+      display:block;
+      min-width:0;
+      max-width:100%;
+    }
+    .observation-card .mode-note{
+      margin-top:10px;
+      padding:8px 10px;
+      border-radius:14px;
+      background:rgba(255,255,255,.09);
+      border:1px solid rgba(255,255,255,.08);
+      color:rgba(255,255,255,.74);
+      font-size:11px;
+      font-weight:650;
+      line-height:1.45;
+    }
+    .page-title-row{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:10px;
+      margin:4px 0 10px;
+    }
+    .page-kicker{
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:1.4px;
+      color:rgba(255,255,255,.58);
+    }
+    .page-title{
+      margin-top:2px;
+      font-size:17px;
+      font-weight:900;
+      color:rgba(255,255,255,.98);
+      letter-spacing:.5px;
+    }
+    .page-index{
+      flex:0 0 auto;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.11);
+      border:1px solid rgba(255,255,255,.08);
+      color:rgba(255,255,255,.72);
+      font-size:10px;
+      font-weight:850;
+      font-variant-numeric:tabular-nums;
+    }
+    .wx-map-block{
+      margin-top:12px;
+      padding:12px;
+      border-radius:18px;
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      transition:background .6s ease,border-color .6s ease;
+    }
+    .wx-map-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:9px;
+    }
+    .wx-map-title{
+      font-size:13px;
+      font-weight:850;
+      letter-spacing:.4px;
+      color:rgba(255,255,255,.96);
+    }
+    .wx-map-note{
+      font-size:10px;
+      font-weight:750;
+      color:rgba(255,255,255,.60);
+      white-space:nowrap;
+    }
+    .wx-map-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .wx-map-card{
+      min-height:76px;
+      border-radius:16px;
+      padding:10px;
+      background:rgba(255,255,255,.095);
+      border:1px solid rgba(255,255,255,.085);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px rgba(0,0,0,.08);
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      overflow:hidden;
+      position:relative;
+    }
+    .wx-map-card::after{
+      content:"";
+      position:absolute;
+      inset:auto -20% -45% auto;
+      width:92px;
+      height:92px;
+      border-radius:50%;
+      background:radial-gradient(circle, rgba(255,255,255,.14), transparent 68%);
+      pointer-events:none;
+    }
+    .wx-map-icon{font-size:23px;line-height:1}
+    .wx-map-label{
+      margin-top:7px;
+      font-size:12px;
+      font-weight:900;
+      color:rgba(255,255,255,.96);
+    }
+    .wx-map-sub{
+      margin-top:3px;
+      font-size:10px;
+      font-weight:650;
+      line-height:1.25;
+      color:rgba(255,255,255,.64);
+    }
+
+
+    .qpf-map-panel{
+      margin-top:12px;
+      padding:12px;
+      border-radius:18px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.10);
+    }
+    .qpf-map-toolbar{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      overflow-x:auto;
+      padding:0 1px 9px;
+      scrollbar-width:none;
+      -webkit-overflow-scrolling:touch;
+    }
+    .qpf-map-toolbar::-webkit-scrollbar{display:none;}
+    .qpf-map-btn{
+      flex:0 0 auto;
+      border:none;
+      border-radius:999px;
+      padding:7px 10px;
+      background:rgba(255,255,255,.13);
+      border:1px solid rgba(255,255,255,.10);
+      color:#fff;
+      font-size:10.5px;
+      font-weight:850;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .qpf-opacity-control{
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      gap:7px;
+      padding:7px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.09);
+      color:rgba(255,255,255,.78);
+      font-size:10.5px;
+      font-weight:850;
+      white-space:nowrap;
+    }
+    .qpf-opacity-control input{
+      width:92px;
+      accent-color:#fff;
+    }
+    .qpf-map-wrap{
+      position:relative;
+      height:min(58vh,430px);
+      min-height:320px;
+      border-radius:18px;
+      overflow:hidden;
+      background:rgba(0,0,0,.20);
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 12px 26px rgba(0,0,0,.15);
+      touch-action:none;
+      overscroll-behavior:contain;
+    }
+    #qpfMap{
+      width:100%;
+      height:100%;
+      touch-action:none;
+      background:rgba(6,18,32,.50);
+    }
+    #qpfMap .leaflet-control-attribution{
+      font-size:9px;
+      background:rgba(255,255,255,.72);
+    }
+    #qpfMap .leaflet-control-zoom a{
+      width:30px;
+      height:30px;
+      line-height:30px;
+    }
+    .qpf-map-meta{
+      margin-top:8px;
+      font-size:10.5px;
+      font-weight:650;
+      line-height:1.45;
+      color:rgba(255,255,255,.64);
+    }
+    .qpf-map-error{
+      position:absolute;
+      left:12px;
+      right:12px;
+      top:50%;
+      transform:translateY(-50%);
+      padding:12px;
+      border-radius:14px;
+      background:rgba(0,0,0,.42);
+      color:rgba(255,255,255,.86);
+      font-size:12px;
+      font-weight:800;
+      line-height:1.45;
+      text-align:center;
+      display:none;
+      z-index:500;
+    }
+
+    .forecast-placeholder{
+      margin-top:12px;
+      padding:14px 12px;
+      border-radius:18px;
+      background:rgba(255,255,255,.08);
+      border:1px dashed rgba(255,255,255,.18);
+      color:rgba(255,255,255,.78);
+      font-size:12px;
+      font-weight:700;
+      line-height:1.55;
+    }
+    .obs-asset-block{
+      margin-top:12px;
+      padding:12px;
+      border-radius:18px;
+      background:var(--section-bg);
+      border:1px solid var(--section-border);
+      transition:background .6s ease,border-color .6s ease;
+    }
+    .obs-asset-tabs{
+      display:flex;
+      gap:7px;
+      overflow-x:auto;
+      padding:2px 1px 8px;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .obs-asset-tabs::-webkit-scrollbar{display:none;}
+    .obs-asset-tab{
+      flex:0 0 auto;
+      border:none;
+      border-radius:999px;
+      padding:7px 10px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.09);
+      color:rgba(255,255,255,.76);
+      font-size:11px;
+      font-weight:850;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+    .obs-asset-tab.on{
+      background:rgba(255,255,255,.94);
+      color:#075fc7;
+      box-shadow:0 7px 15px rgba(0,0,0,.15);
+    }
+    .obs-asset-viewer{
+      margin-top:6px;
+      border-radius:18px;
+      overflow:hidden;
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.14);
+    }
+    .obs-asset-img{
+      width:100%;
+      display:block;
+      background:rgba(0,0,0,.12);
+    }
+    .obs-asset-info{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 11px 11px;
+      background:rgba(0,0,0,.10);
+    }
+    .obs-asset-title{
+      font-size:12px;
+      font-weight:900;
+      color:rgba(255,255,255,.96);
+      line-height:1.35;
+    }
+    .obs-asset-note{
+      margin-top:3px;
+      font-size:10.5px;
+      font-weight:650;
+      color:rgba(255,255,255,.64);
+      line-height:1.35;
+    }
+    .obs-asset-refresh{
+      flex:0 0 auto;
+      border:none;
+      border-radius:999px;
+      padding:6px 10px;
+      background:rgba(255,255,255,.13);
+      border:1px solid rgba(255,255,255,.10);
+      color:#fff;
+      font-size:10.5px;
+      font-weight:850;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .obs-asset-img{
+      cursor:zoom-in;
+      touch-action:manipulation;
+    }
+    .obs-asset-zoom-hint{
+      margin-top:6px;
+      font-size:10px;
+      font-weight:750;
+      color:rgba(255,255,255,.56);
+    }
+    body.image-lightbox-open{overflow:hidden;}
+    .image-lightbox{
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      display:none;
+      flex-direction:column;
+      background:rgba(0,0,0,.92);
+      backdrop-filter:blur(18px) saturate(1.15);
+      -webkit-backdrop-filter:blur(18px) saturate(1.15);
+      color:#fff;
+      touch-action:none;
+      overscroll-behavior:contain;
+    }
+    .image-lightbox.open{display:flex;}
+    .image-lightbox-top{
+      flex:0 0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 10px;
+      background:linear-gradient(to bottom,rgba(0,0,0,.58),rgba(0,0,0,0));
+      pointer-events:auto;
+    }
+    .image-lightbox-title{
+      min-width:0;
+      font-size:14px;
+      font-weight:900;
+      line-height:1.25;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .image-lightbox-subtitle{
+      margin-top:2px;
+      font-size:10.5px;
+      font-weight:700;
+      color:rgba(255,255,255,.62);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .image-lightbox-close{
+      flex:0 0 auto;
+      width:38px;
+      height:38px;
+      border:none;
+      border-radius:999px;
+      background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.14);
+      color:#fff;
+      font-size:24px;
+      line-height:1;
+      font-weight:500;
+      cursor:pointer;
+    }
+    .image-lightbox-stage{
+      position:relative;
+      flex:1 1 auto;
+      min-height:0;
+      overflow:hidden;
+      touch-action:none;
+      cursor:grab;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .image-lightbox-stage.dragging{cursor:grabbing;}
+    .image-lightbox-img{
+      position:absolute;
+      left:50%;
+      top:50%;
+      max-width:94vw;
+      max-height:78vh;
+      transform:translate(-50%,-50%) scale(1);
+      transform-origin:center center;
+      border-radius:14px;
+      box-shadow:0 18px 48px rgba(0,0,0,.55);
+      background:#111;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-user-drag:none;
+      touch-action:none;
+      will-change:transform;
+    }
+    .image-lightbox-bottom{
+      flex:0 0 auto;
+      padding:9px 16px calc(env(safe-area-inset-bottom,0px) + 14px);
+      text-align:center;
+      font-size:11px;
+      font-weight:750;
+      color:rgba(255,255,255,.62);
+      background:linear-gradient(to top,rgba(0,0,0,.50),rgba(0,0,0,0));
+      pointer-events:none;
+    }
+    .observation-page .realtime-metrics-wrap{margin-top:12px;}
+    .forecast-page .rain-block{margin-top:12px;}
+    .forecast-page .forecast-header{margin-top:12px;}
+    .forecast-page .hourly-block{margin-top:12px;}
+    @media (max-width:380px){
+      .wx-map-grid{grid-template-columns:1fr;}
+      .wx-map-card{min-height:68px;}
+      .view-tab{font-size:11.5px;padding:8px 6px;}
+    }
+
+
+
+    /* ===========================
+       v7.0 三介面整張橫向滑動覆蓋
+       第 1 頁：即時溫度｜第 2 頁：預報圖資｜第 3 頁：觀測資料
+       =========================== */
+    body[data-page="current"] .interface-track{transform:translateX(0);}
+    body[data-page="forecast"] .interface-track{transform:translateX(-100%);}
+    body[data-page="observation"] .interface-track{transform:translateX(-200%);}
+    .view-switch{grid-template-columns:repeat(3,1fr);}
+    .view-tab{font-size:11.5px;padding:8px 6px;}
+    .current-hero{
+      margin-top:18px;
+      padding:18px 8px 8px;
+      text-align:center;
+    }
+    .current-hero-title{
+      margin-top:2px;
+      font-size:19px;
+      font-weight:900;
+      letter-spacing:.6px;
+      color:rgba(255,255,255,.98);
+    }
+    .current-card .temp-row{margin-top:8px;}
+    .current-card .card-temp{font-size:80px;}
+    .top-page-title{margin-top:0;margin-bottom:12px;}
+    .forecast-card,.observation-card{padding-top:20px;}
+    @media (max-width:380px){
+      .view-tab{font-size:10.5px;padding:8px 4px;letter-spacing:.1px;}
+      .current-card .card-temp{font-size:72px;}
+    }
+
     .version-badge{
       margin-top:10px;
       text-align:center;
@@ -566,7 +1101,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
   </style>
 </head>
 
-<body data-scene="clear-day">
+<body data-scene="clear-day" data-page="current">
   <div class="sky-layer"></div>
   <div class="stars-layer" id="starsLayer"></div>
   <div class="cloud-layer" id="cloudLayer"></div>
@@ -575,132 +1110,265 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
   <div class="fog-layer"></div>
 
   <div class="app">
-    <div class="card">
+    <div class="interface-viewport" id="interfaceViewport">
+      <div class="interface-track" id="interfaceTrack">
 
-      <div class="card-top">
-        <div>
-          <div class="card-location">
-            <span id="locationName">目前位置</span>
-            <span class="dot"> · </span>
-            <span id="altitudeLabel">-- m</span>
+        <!-- 第 1 頁：即時溫度主畫面 -->
+        <section class="interface-page interface-current" aria-label="即時溫度主介面">
+          <div class="card current-card">
+            <div class="card-top">
+              <div>
+                <div class="card-location">
+                  <span id="locationName">目前位置</span>
+                  <span class="dot"> · </span>
+                  <span id="altitudeLabel">-- m</span>
+                </div>
+                <div class="card-coord" id="coordLabel">座標：--, --</div>
+              </div>
+              <button id="refreshBtn" type="button">更新</button>
+            </div>
+
+            <div class="mode-selector">
+              <label data-mode="gps" class="active-mode">
+                <input type="radio" name="mode" value="gps" checked />
+                使用目前位置 (GPS)
+              </label>
+              <label data-mode="town">
+                <input type="radio" name="mode" value="town" />
+                輸入地點(城市或景點/地點)
+              </label>
+              <label data-mode="coord">
+                <input type="radio" name="mode" value="coord" />
+                輸入座標
+              </label>
+            </div>
+
+            <div class="mode-input" id="mode-town" style="display:none;">
+              <input id="townName" type="text" placeholder="例如：北京、天安門廣場、秀林鄉" />
+              <small>台灣鄉鎮市區：以公所座標；其他：以城市/景點座標。</small>
+            </div>
+
+            <div class="mode-input" id="mode-coord" style="display:none;">
+              <div class="coord-row">
+                <input id="manualLat" type="text" placeholder="緯度 (24.1234)" />
+                <input id="manualLon" type="text" placeholder="經度 (121.5678)" />
+              </div>
+              <input id="manualAlt" type="text" placeholder="高度 (m，可留白自動估算)" />
+            </div>
+
+            <div class="current-hero" aria-label="即時溫度">
+              <div class="page-kicker">LIVE WEATHER</div>
+              <div class="current-hero-title">即時溫度</div>
+              <div class="temp-row">
+                <div class="card-temp" id="cardTemp">--.-°</div>
+                <div class="card-feels" id="feelsLabel">體感 --.-°</div>
+              </div>
+
+              <div class="condition-row">
+                <div class="card-icon" id="weatherIcon">？</div>
+                <div class="card-condition" id="cardCondition">--</div>
+              </div>
+            </div>
+
+            <div class="view-switch" aria-label="天氣頁面切換">
+              <button class="view-tab on" type="button" data-page-target="current">即時溫度</button>
+              <button class="view-tab" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
+            </div>
+            <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
+
+            <pre id="debugBox"></pre>
+            <div class="version-badge" id="versionLabel">v7.0</div>
           </div>
-          <div class="card-coord" id="coordLabel">座標：--, --</div>
-        </div>
-        <button id="refreshBtn" type="button">更新</button>
-      </div>
+        </section>
 
-      <div class="mode-selector">
-        <label data-mode="gps" class="active-mode">
-          <input type="radio" name="mode" value="gps" checked />
-          使用目前位置 (GPS)
-        </label>
-        <label data-mode="town">
-          <input type="radio" name="mode" value="town" />
-          輸入地點(城市或景點/地點)
-        </label>
-        <label data-mode="coord">
-          <input type="radio" name="mode" value="coord" />
-          輸入座標
-        </label>
-      </div>
+        <!-- 第 2 頁：預報 + 預報圖資 -->
+        <section class="interface-page interface-forecast" aria-label="預報圖資主介面">
+          <div class="card forecast-card">
+            <div class="page-title-row top-page-title">
+              <div>
+                <div class="page-kicker">FORECAST</div>
+                <div class="page-title">預報圖資</div>
+              </div>
+              <div class="page-index">2 / 3</div>
+            </div>
 
-      <div class="mode-input" id="mode-town" style="display:none;">
-        <input id="townName" type="text" placeholder="例如：北京、天安門廣場、秀林鄉" />
-        <small>台灣鄉鎮市區：以公所座標；其他：以城市/景點座標。</small>
-      </div>
+            <div class="view-switch" aria-label="天氣頁面切換">
+              <button class="view-tab" type="button" data-page-target="current">即時溫度</button>
+              <button class="view-tab on" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
+            </div>
+            <div class="page-hint">向左滑到觀測資料，向右滑回即時溫度</div>
 
-      <div class="mode-input" id="mode-coord" style="display:none;">
-        <div class="coord-row">
-          <input id="manualLat" type="text" placeholder="緯度 (24.1234)" />
-          <input id="manualLon" type="text" placeholder="經度 (121.5678)" />
-        </div>
-        <input id="manualAlt" type="text" placeholder="高度 (m，可留白自動估算)" />
-      </div>
+            <hr class="card-divider" />
+            <section class="weather-page forecast-page" id="forecastPage" aria-label="預報與圖資">
+              <div class="wx-map-block">
+                <div class="wx-map-head">
+                  <div class="wx-map-title">雷達外推雨量預報(beta版)</div>
+                  <div class="wx-map-note">未來60分鐘雨量預估</div>
+                </div>
+                <div class="qpf-map-panel">
+                  <div class="qpf-map-toolbar" aria-label="雷達外推雨量圖層控制">
+                    <button class="qpf-map-btn" id="qpfFitBtn" type="button">回到全域</button>
+                    <button class="qpf-map-btn" id="qpfRefreshBtn" type="button">更新圖層</button>
+                    <label class="qpf-opacity-control">
+                      透明度
+                      <input id="qpfOpacity" type="range" min="0.25" max="1" step="0.05" value="0.78" />
+                    </label>
+                  </div>
+                  <div class="qpf-map-wrap">
+                    <div id="qpfMap" aria-label="未來 60 分鐘雷達外推雨量地圖"></div>
+                    <div id="qpfMapError" class="qpf-map-error">地圖載入失敗，請檢查 Leaflet 或網路連線。</div>
+                  </div>
+                  <div class="qpf-map-meta" id="qpfMapMeta">
+                    可雙指縮放、拖曳地圖
+                  </div>
+                </div>
+              </div>
 
-      <div class="temp-row">
-        <div class="card-temp" id="cardTemp">--.-°</div>
-        <div class="card-feels" id="feelsLabel">體感 --.-°</div>
-      </div>
+              <div class="rain-block">
+                <div class="rain-header">
+                  <div class="rain-title">即時降雨預測</div>
+                  <div class="rain-subtitle">查詢未來指定分鐘內降雨量與雨停時間</div>
+                </div>
 
-      <div class="condition-row">
-        <div class="card-icon" id="weatherIcon">？</div>
-        <div class="card-condition" id="cardCondition">--</div>
-      </div>
+                <div class="rain-controls">
+                  <input id="rainMinutes" type="number" min="1" max="60" step="1" placeholder="輸入1–60分鐘的整數" />
+                  <button id="rainBtn">查詢降雨</button>
+                </div>
 
-      <div class="realtime-metrics-wrap">
-        <div class="realtime-metrics-top">
-          <div class="realtime-metrics-title">更多天氣資料</div>
-        </div>
-        <div class="realtime-metrics" id="realtimeMetrics">
-          <span class="metric-pill metric-wind" id="mWind">風 <b>--</b></span>
-          <span class="metric-pill metric-hum" id="mHum">濕度 <b>--</b></span>
-          <span class="metric-pill metric-pres" id="mPres">氣壓 <b>--</b></span>
-          <span class="metric-pill metric-sun" id="mSun">日照 <b>--</b></span>
-          <span class="metric-pill metric-vis" id="mVis">能見度 <b>--</b></span>
-          <span class="metric-pill metric-rainobs" id="mRain10">10分鐘雨量 <b>--</b></span>
-          <span class="metric-pill metric-rainobs" id="mRain1h">1小時雨量 <b>--</b></span>
-          <span class="metric-pill metric-air" id="mAir">空氣品質 <b>--</b></span>
-          <span class="metric-pill metric-uv" id="mUv">紫外線指數 <b>--</b></span>
-        </div>
-      </div>
+                <div id="rainResult">--</div>
+              </div>
 
-      <hr class="card-divider" />
-      
-      <!-- 降雨預測 -->
-<div class="rain-block">
-  <div class="rain-header">
-    <div class="rain-title">即時降雨預測</div>
-    <div class="rain-subtitle">查詢未來指定分鐘內降雨量與雨停時間</div>
-  </div>
+              <div class="hourly-block">
+                <div class="forecast-header">
+                  <div class="forecast-title" id="fcTitle">未來 24 小時預報</div>
+                  <div class="forecast-mode-toggle">
+                    <button class="forecast-mode-btn on" data-forecast-mode="10m">10 分鐘</button>
+                    <button class="forecast-mode-btn" data-forecast-mode="1h">1 小時</button>
+                  </div>
+                </div>
+                <div class="hourly-forecast" id="hourlyForecast">
+                  <div class="forecast-empty">尚無預報資料</div>
+                </div>
+              </div>
 
-  <div class="rain-controls">
-    <input id="rainMinutes" type="number" min="1" max="60" step="1" placeholder="輸入1–60分鐘的整數" />
-    <button id="rainBtn">查詢降雨</button>
-  </div>
+              <div class="forecast-header" style="margin-top:10px;">
+                <div class="forecast-title">未來 7 天天氣預報</div>
+                <button id="toggle7dTempMode" class="mini-toggle-btn">顯示體感</button>
+              </div>
+              <div class="daily-forecast" id="dailyForecast">
+                <div class="forecast-empty">尚無預報資料</div>
+              </div>
+            </section>
 
-  <div id="rainResult">--</div>
-</div>
-
-      <div class="hourly-block">
-        <div class="forecast-header">
-          <div class="forecast-title" id="fcTitle">未來 24 小時預報</div>
-          <div class="forecast-mode-toggle">
-            <button class="forecast-mode-btn on" data-forecast-mode="10m">10 分鐘</button>
-            <button class="forecast-mode-btn" data-forecast-mode="1h">1 小時</button>
+            <div class="version-badge">v7.0</div>
           </div>
-        </div>
-        <div class="hourly-forecast" id="hourlyForecast">
-          <div class="forecast-empty">尚無預報資料</div>
-        </div>
-      </div>
+        </section>
 
-      <div class="forecast-header" style="margin-top:10px;">
-        <div class="forecast-title">未來 7 天天氣預報</div>
-        <button id="toggle7dTempMode" class="mini-toggle-btn">顯示體感</button>
-      </div>
-      <div class="daily-forecast" id="dailyForecast">
-        <div class="forecast-empty">尚無預報資料</div>
-      </div>
+        <!-- 第 3 頁：觀測資料 + 觀測圖資 -->
+        <section class="interface-page interface-observation" aria-label="觀測資料主介面">
+          <div class="card observation-card">
+            <div class="page-title-row top-page-title">
+              <div>
+                <div class="page-kicker">OBSERVATION</div>
+                <div class="page-title">觀測資料</div>
+              </div>
+              <div class="page-index">3 / 3</div>
+            </div>
 
-      <div class="source-wrap">
-        <button id="toggleSourceBtn" class="source-toggle-btn" type="button">資料來源</button>
+            <div class="view-switch" aria-label="天氣頁面切換">
+              <button class="view-tab" type="button" data-page-target="current">即時溫度</button>
+              <button class="view-tab" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab on" type="button" data-page-target="observation">觀測資料</button>
+            </div>
+            <div class="page-hint">向右滑回預報圖資</div>
 
-        <div id="sourcePanel" class="source-panel" style="display:none;">
-          <div class="card-subtitle" id="stationLabel">選擇模式後按「更新」。</div>
-          <div class="card-time" id="timeLabel"></div>
-          <div id="hintBar"></div>
+            <hr class="card-divider" />
+            <section class="weather-page observation-page" id="observationPage" aria-label="觀測資料與圖資">
+              <div class="obs-asset-block">
+                <div class="wx-map-head">
+                  <div>
+                    <div class="wx-map-title">觀測圖資</div>
+                    <div class="wx-map-note" style="margin-top:3px;white-space:normal;">雷達、衛星、雨量皆為即時觀測資料</div>
+                  </div>
+                </div>
 
-          <div class="card-footer" id="footerLabel">
-            即時：自動分流 CWA / CMA；附近無測站時 Open-Meteo fallback
-            <br/>
-            預報：台灣優先 CWA（30km 內有預報點）；否則 Open-Meteo forecast
+                <div class="obs-asset-tabs" id="obsAssetTabs" aria-label="觀測圖資切換">
+                  <button class="obs-asset-tab on" type="button" data-obs-asset="radar_tw">雷達台灣</button>
+                  <button class="obs-asset-tab" type="button" data-obs-asset="radar_wide">雷達大範圍</button>
+                  <button class="obs-asset-tab" type="button" data-obs-asset="rain">雨量</button>
+                  <button class="obs-asset-tab" type="button" data-obs-asset="sat_tw">衛星台灣</button>
+                  <button class="obs-asset-tab" type="button" data-obs-asset="sat_east_asia">衛星東亞</button>
+                </div>
+
+                <div class="obs-asset-viewer">
+                  <img id="obsAssetImg" class="obs-asset-img" alt="觀測圖資" loading="lazy" />
+                  <div class="obs-asset-info">
+                    <div>
+                      <div class="obs-asset-title" id="obsAssetTitle">雷達台灣</div>
+                      <div class="obs-asset-note" id="obsAssetNote">中央氣象署雷達觀測圖，每次切換或更新會加上防快取參數。</div>
+                      <div class="obs-asset-zoom-hint">點擊圖片可放大；放大後可雙指縮放、單指拖曳。</div>
+                    </div>
+                    <button id="obsAssetRefreshBtn" class="obs-asset-refresh" type="button">更新圖資</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="realtime-metrics-wrap">
+                <div class="realtime-metrics-top">
+                  <div class="realtime-metrics-title">更多天氣資料</div>
+                </div>
+                <div class="realtime-metrics" id="realtimeMetrics">
+                  <span class="metric-pill metric-wind" id="mWind">風 <b>--</b></span>
+                  <span class="metric-pill metric-hum" id="mHum">濕度 <b>--</b></span>
+                  <span class="metric-pill metric-pres" id="mPres">氣壓 <b>--</b></span>
+                  <span class="metric-pill metric-sun" id="mSun">日照 <b>--</b></span>
+                  <span class="metric-pill metric-vis" id="mVis">能見度 <b>--</b></span>
+                  <span class="metric-pill metric-rainobs" id="mRain10">10分鐘雨量 <b>--</b></span>
+                  <span class="metric-pill metric-rainobs" id="mRain1h">1小時雨量 <b>--</b></span>
+                  <span class="metric-pill metric-air" id="mAir">空氣品質 <b>--</b></span>
+                  <span class="metric-pill metric-uv" id="mUv">紫外線指數 <b>--</b></span>
+                </div>
+              </div>
+
+              <div class="source-wrap">
+                <button id="toggleSourceBtn" class="source-toggle-btn" type="button">資料來源</button>
+
+                <div id="sourcePanel" class="source-panel" style="display:none;">
+                  <div class="card-subtitle" id="stationLabel">選擇模式後按「更新」。</div>
+                  <div class="card-time" id="timeLabel"></div>
+                  <div id="hintBar"></div>
+
+                  <div class="card-footer" id="footerLabel">
+                    即時：自動分流 CWA / CMA；附近無測站時 Open-Meteo fallback
+                    <br/>
+                    預報：台灣優先 CWA（30km 內有預報點）；否則 Open-Meteo forecast
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <div class="version-badge">v7.0</div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <pre id="debugBox"></pre>
-      <div class="version-badge" id="versionLabel">v6.4</div>
+      </div>
     </div>
+  </div>
+
+  <div id="imageLightbox" class="image-lightbox" aria-hidden="true" role="dialog" aria-label="觀測圖資放大檢視">
+    <div class="image-lightbox-top">
+      <div style="min-width:0;">
+        <div class="image-lightbox-title" id="imageLightboxTitle">觀測圖資</div>
+        <div class="image-lightbox-subtitle" id="imageLightboxSubtitle">雙指縮放，單指拖曳</div>
+      </div>
+      <button id="imageLightboxClose" class="image-lightbox-close" type="button" aria-label="關閉放大圖片">×</button>
+    </div>
+    <div id="imageLightboxStage" class="image-lightbox-stage">
+      <img id="imageLightboxImg" class="image-lightbox-img" alt="觀測圖資放大" draggable="false" />
+    </div>
+    <div class="image-lightbox-bottom">雙指縮放｜單指拖曳｜點空白處或按 × 關閉｜雙擊圖片快速放大/還原</div>
   </div>
 
 <script>
@@ -708,7 +1376,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v6.4.1";
+const APP_VERSION = "v7.0";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -760,9 +1428,570 @@ function weeklyIdFromThreeDay(threeDayId){
    UI helpers / debug
    =========================== */
 const $ = (id)=>document.getElementById(id);
+
+const OBS_ASSET_LAYERS = {
+  radar_tw: {
+    title: "雷達台灣",
+    note: "中央氣象署雷達觀測：台灣範圍。",
+    url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-003.png"
+  },
+  radar_wide: {
+    title: "雷達大範圍",
+    note: "中央氣象署雷達觀測：大範圍回波。",
+    url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-001.png"
+  },
+  rain: {
+    title: "雨量觀測",
+    note: "中央氣象署雨量觀測圖資。",
+    url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0040-002.jpg"
+  },
+  sat_tw: {
+    title: "衛星台灣",
+    note: "中央氣象署衛星雲圖：台灣範圍。",
+    url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-C0042-002.jpg"
+  },
+  sat_east_asia: {
+    title: "衛星東亞",
+    note: "中央氣象署衛星雲圖：東亞範圍。",
+    url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-B0032-002.jpg"
+  }
+};
+let currentObsAssetKey = "radar_tw";
+function obsAssetNoCache(url){
+  return url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+}
+function setObsAsset(key, forceRefresh = false){
+  const layer = OBS_ASSET_LAYERS[key] || OBS_ASSET_LAYERS.radar_tw;
+  currentObsAssetKey = Object.prototype.hasOwnProperty.call(OBS_ASSET_LAYERS, key) ? key : "radar_tw";
+  document.querySelectorAll(".obs-asset-tab").forEach(btn=>{
+    btn.classList.toggle("on", btn.dataset.obsAsset === currentObsAssetKey);
+  });
+  const img = $("obsAssetImg");
+  const title = $("obsAssetTitle");
+  const note = $("obsAssetNote");
+  if (title) title.textContent = layer.title;
+  if (note) note.textContent = layer.note;
+  if (img) {
+    img.alt = layer.title;
+    img.src = obsAssetNoCache(layer.url);
+  }
+}
+function installObsAssetControls(){
+  document.querySelectorAll(".obs-asset-tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>setObsAsset(btn.dataset.obsAsset || "radar_tw", true));
+  });
+  const refreshBtn = $("obsAssetRefreshBtn");
+  if (refreshBtn) refreshBtn.addEventListener("click", ()=>setObsAsset(currentObsAssetKey, true));
+  setObsAsset(currentObsAssetKey, true);
+}
+
+const QPF60_URL = "https://api.leochangrainapi.com/api/qpf60.png";
+const QPF60_BOUNDS = [[18.0, 115.0], [29.0125, 126.5125]];
+let qpfMap = null;
+let qpfOverlay = null;
+let qpfBoundsBox = null;
+let qpfMapInstalled = false;
+let leafletLoadPromise = null;
+
+function loadLeafletScriptFrom(url){
+  return new Promise((resolve, reject) => {
+    const existed = [...document.scripts].some(s => s.src === url);
+    if (existed) {
+      const waitStartedAt = Date.now();
+      const timer = setInterval(() => {
+        if (typeof L !== "undefined") {
+          clearInterval(timer);
+          resolve(true);
+        } else if (Date.now() - waitStartedAt > 6500) {
+          clearInterval(timer);
+          reject(new Error("Leaflet script existed but L was not ready"));
+        }
+      }, 80);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = url;
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => reject(new Error("Leaflet script load failed: " + url));
+    document.head.appendChild(script);
+  });
+}
+
+function ensureLeafletReady(){
+  if (typeof L !== "undefined") return Promise.resolve(true);
+  if (leafletLoadPromise) return leafletLoadPromise;
+  const urls = [
+    "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+    "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+  ];
+  leafletLoadPromise = urls.reduce((p, url) => {
+    return p.catch(() => loadLeafletScriptFrom(url).then(() => typeof L !== "undefined"));
+  }, Promise.reject()).catch(() => false);
+  return leafletLoadPromise;
+}
+
+function qpfNoCache(url){
+  return url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+}
+
+function setQpfMeta(text){
+  const el = $("qpfMapMeta");
+  if (el) el.textContent = text;
+}
+
+function refreshQpfOverlay(){
+  if (!qpfOverlay) return;
+  qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
+  setQpfMeta("可雙指縮放、拖曳地圖");
+}
+
+function fitQpfBounds(){
+  if (!qpfMap) return;
+  qpfMap.fitBounds(QPF60_BOUNDS, { padding:[10,10], animate:true });
+}
+
+function initQpfForecastMap(){
+  const mapEl = $("qpfMap");
+  const errEl = $("qpfMapError");
+  if (!mapEl) return;
+
+  if (typeof L === "undefined") {
+    if (errEl) {
+      errEl.style.display = "block";
+      errEl.textContent = "地圖套件載入中…";
+    }
+    setQpfMeta("正在載入 Leaflet 地圖套件…");
+    ensureLeafletReady().then((ok) => {
+      if (ok && typeof L !== "undefined") {
+        initQpfForecastMap();
+      } else {
+        if (errEl) {
+          errEl.style.display = "block";
+          errEl.textContent = "地圖載入失敗，請檢查 Leaflet 或網路連線。";
+        }
+        setQpfMeta("Leaflet 載入失敗，暫時無法顯示透明疊圖地圖。");
+      }
+    });
+    return;
+  }
+
+  if (errEl) errEl.style.display = "none";
+
+  if (qpfMap) {
+    setTimeout(()=>qpfMap.invalidateSize(), 80);
+    return;
+  }
+
+  qpfMap = L.map("qpfMap", {
+    center:[23.5, 120.8],
+    zoom:6,
+    minZoom:4,
+    maxZoom:12,
+    zoomControl:true,
+    attributionControl:true,
+    preferCanvas:true,
+    tap:true
+  });
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom:18,
+    attribution:"&copy; OpenStreetMap"
+  }).addTo(qpfMap);
+
+  qpfOverlay = L.imageOverlay(qpfNoCache(QPF60_URL), QPF60_BOUNDS, {
+    opacity:0.78,
+    interactive:false,
+    crossOrigin:false
+  }).addTo(qpfMap);
+
+  qpfBoundsBox = L.rectangle(QPF60_BOUNDS, {
+    weight:1,
+    opacity:0.45,
+    fill:false,
+    dashArray:"4 6"
+  }).addTo(qpfMap);
+
+  fitQpfBounds();
+  setTimeout(()=>qpfMap.invalidateSize(), 120);
+  setQpfMeta("可雙指縮放、拖曳地圖");
+}
+
+function installQpfForecastMap(){
+  if (qpfMapInstalled) return;
+  qpfMapInstalled = true;
+
+  const refreshBtn = $("qpfRefreshBtn");
+  if (refreshBtn) refreshBtn.addEventListener("click", refreshQpfOverlay);
+
+  const fitBtn = $("qpfFitBtn");
+  if (fitBtn) fitBtn.addEventListener("click", fitQpfBounds);
+
+  const opacity = $("qpfOpacity");
+  if (opacity) {
+    opacity.addEventListener("input", () => {
+      const v = Math.max(0.25, Math.min(1, parseFloat(opacity.value) || 0.78));
+      if (qpfOverlay) qpfOverlay.setOpacity(v);
+    });
+  }
+
+  initQpfForecastMap();
+}
+
+const imageLightboxState = {
+  scale:1,
+  tx:0,
+  ty:0,
+  pointers:new Map(),
+  startScale:1,
+  startTx:0,
+  startTy:0,
+  startDist:0,
+  startMid:{x:0,y:0},
+  dragStart:{x:0,y:0},
+  moved:false,
+  pointerStartedAt:0
+};
+
+function clampImageZoom(v){
+  return Math.max(1, Math.min(6, v));
+}
+
+function applyImageLightboxTransform(){
+  const img = $("imageLightboxImg");
+  if (!img) return;
+  const st = imageLightboxState;
+  img.style.transform = `translate(calc(-50% + ${st.tx}px), calc(-50% + ${st.ty}px)) scale(${st.scale})`;
+}
+
+function resetImageLightboxTransform(){
+  const st = imageLightboxState;
+  st.scale = 1;
+  st.tx = 0;
+  st.ty = 0;
+  st.pointers.clear();
+  applyImageLightboxTransform();
+}
+
+function getImageLightboxMidAndDist(){
+  const pts = Array.from(imageLightboxState.pointers.values());
+  if (pts.length < 2) return null;
+  const a = pts[0];
+  const b = pts[1];
+  return {
+    mid:{x:(a.x + b.x) / 2, y:(a.y + b.y) / 2},
+    dist:Math.hypot(a.x - b.x, a.y - b.y)
+  };
+}
+
+function openImageLightbox(src, title, subtitle){
+  const modal = $("imageLightbox");
+  const img = $("imageLightboxImg");
+  if (!modal || !img || !src) return;
+  const titleEl = $("imageLightboxTitle");
+  const subEl = $("imageLightboxSubtitle");
+  if (titleEl) titleEl.textContent = title || "觀測圖資";
+  if (subEl) subEl.textContent = subtitle || "雙指縮放，單指拖曳";
+  img.alt = title || "觀測圖資放大";
+  img.src = src;
+  resetImageLightboxTransform();
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("image-lightbox-open");
+}
+
+function closeImageLightbox(){
+  const modal = $("imageLightbox");
+  const img = $("imageLightboxImg");
+  const stage = $("imageLightboxStage");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("image-lightbox-open");
+  if (stage) stage.classList.remove("dragging");
+  imageLightboxState.pointers.clear();
+  if (img) img.removeAttribute("src");
+}
+
+function installImageLightbox(){
+  const obsImg = $("obsAssetImg");
+  const modal = $("imageLightbox");
+  const stage = $("imageLightboxStage");
+  const zoomImg = $("imageLightboxImg");
+  const closeBtn = $("imageLightboxClose");
+  if (!modal || !stage || !zoomImg) return;
+
+  if (obsImg) {
+    obsImg.addEventListener("click", () => {
+      const layer = OBS_ASSET_LAYERS[currentObsAssetKey] || OBS_ASSET_LAYERS.radar_tw;
+      openImageLightbox(obsImg.currentSrc || obsImg.src, layer.title, layer.note);
+    });
+  }
+
+  if (closeBtn) closeBtn.addEventListener("click", closeImageLightbox);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeImageLightbox();
+  });
+  stage.addEventListener("click", (e) => {
+    if (e.target === stage && !imageLightboxState.moved) closeImageLightbox();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modal.classList.contains("open")) closeImageLightbox();
+  });
+
+  stage.addEventListener("pointerdown", (e) => {
+    if (!modal.classList.contains("open")) return;
+    e.preventDefault();
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+    imageLightboxState.pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    imageLightboxState.moved = false;
+    imageLightboxState.pointerStartedAt = Date.now();
+    stage.classList.add("dragging");
+
+    if (imageLightboxState.pointers.size === 1) {
+      imageLightboxState.dragStart = {x:e.clientX, y:e.clientY};
+      imageLightboxState.startTx = imageLightboxState.tx;
+      imageLightboxState.startTy = imageLightboxState.ty;
+    } else if (imageLightboxState.pointers.size >= 2) {
+      const d = getImageLightboxMidAndDist();
+      if (d) {
+        imageLightboxState.startDist = Math.max(1, d.dist);
+        imageLightboxState.startMid = d.mid;
+        imageLightboxState.startScale = imageLightboxState.scale;
+        imageLightboxState.startTx = imageLightboxState.tx;
+        imageLightboxState.startTy = imageLightboxState.ty;
+      }
+    }
+  });
+
+  stage.addEventListener("pointermove", (e) => {
+    if (!modal.classList.contains("open")) return;
+    if (!imageLightboxState.pointers.has(e.pointerId)) return;
+    e.preventDefault();
+    const prev = imageLightboxState.pointers.get(e.pointerId);
+    if (prev && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) > 2) imageLightboxState.moved = true;
+    imageLightboxState.pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if (imageLightboxState.pointers.size >= 2) {
+      const d = getImageLightboxMidAndDist();
+      if (!d) return;
+      const rawScale = imageLightboxState.startScale * (d.dist / Math.max(1, imageLightboxState.startDist));
+      imageLightboxState.scale = clampImageZoom(rawScale);
+      imageLightboxState.tx = imageLightboxState.startTx + (d.mid.x - imageLightboxState.startMid.x);
+      imageLightboxState.ty = imageLightboxState.startTy + (d.mid.y - imageLightboxState.startMid.y);
+      applyImageLightboxTransform();
+      return;
+    }
+
+    if (imageLightboxState.pointers.size === 1) {
+      const dx = e.clientX - imageLightboxState.dragStart.x;
+      const dy = e.clientY - imageLightboxState.dragStart.y;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) imageLightboxState.moved = true;
+      imageLightboxState.tx = imageLightboxState.startTx + dx;
+      imageLightboxState.ty = imageLightboxState.startTy + dy;
+      applyImageLightboxTransform();
+    }
+  });
+
+  function endPointer(e){
+    if (imageLightboxState.pointers.has(e.pointerId)) {
+      imageLightboxState.pointers.delete(e.pointerId);
+    }
+    try { stage.releasePointerCapture(e.pointerId); } catch {}
+    if (imageLightboxState.pointers.size === 0) {
+      stage.classList.remove("dragging");
+      if (imageLightboxState.scale <= 1.02) {
+        imageLightboxState.scale = 1;
+        imageLightboxState.tx = 0;
+        imageLightboxState.ty = 0;
+        applyImageLightboxTransform();
+      }
+    } else if (imageLightboxState.pointers.size === 1) {
+      const p = Array.from(imageLightboxState.pointers.values())[0];
+      imageLightboxState.dragStart = {x:p.x, y:p.y};
+      imageLightboxState.startTx = imageLightboxState.tx;
+      imageLightboxState.startTy = imageLightboxState.ty;
+    }
+  }
+  stage.addEventListener("pointerup", endPointer);
+  stage.addEventListener("pointercancel", endPointer);
+
+  stage.addEventListener("wheel", (e) => {
+    if (!modal.classList.contains("open")) return;
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.12 : 0.88;
+    imageLightboxState.scale = clampImageZoom(imageLightboxState.scale * factor);
+    if (imageLightboxState.scale <= 1.02) {
+      imageLightboxState.scale = 1;
+      imageLightboxState.tx = 0;
+      imageLightboxState.ty = 0;
+    }
+    applyImageLightboxTransform();
+  }, {passive:false});
+
+  zoomImg.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    if (imageLightboxState.scale < 2) {
+      imageLightboxState.scale = 2.6;
+    } else {
+      imageLightboxState.scale = 1;
+      imageLightboxState.tx = 0;
+      imageLightboxState.ty = 0;
+    }
+    applyImageLightboxTransform();
+  });
+
+  stage.addEventListener("touchmove", (e) => {
+    if (modal.classList.contains("open")) e.preventDefault();
+  }, {passive:false});
+}
+
 const debugOn = (()=>{ try{ return new URL(location.href).searchParams.get("debug")==="1"; }catch{ return false; }})();
 if(debugOn) $("debugBox").style.display = "block";
 function dbg(s){ if(debugOn) $("debugBox").textContent += s + "\n"; }
+
+/* ===========================
+   v7.0 三介面切換：整張卡片橫向滑動
+   - 點按上方切換鈕
+   - 左右滑動整個介面切換
+   - 雙擊螢幕左半/右半切換
+   =========================== */
+let currentWeatherPage = "current";
+const WEATHER_PAGES = ["current", "forecast", "observation"];
+
+function isInteractiveTarget(el){
+  return !!(el && el.closest && el.closest("button,input,textarea,select,label,a,.hourly-forecast,.daily-forecast,.obs-asset-img,.image-lightbox,.qpf-map-wrap,.qpf-map-toolbar,.leaflet-container"));
+}
+
+function syncObservationMirror(){
+  const pairs = [
+    ["locationName", "obsLocationName"],
+    ["altitudeLabel", "obsAltitudeLabel"],
+    ["coordLabel", "obsCoordLabel"],
+    ["cardTemp", "obsCardTemp"],
+    ["feelsLabel", "obsFeelsLabel"],
+    ["weatherIcon", "obsWeatherIcon"],
+    ["cardCondition", "obsCardCondition"]
+  ];
+  for (const [srcId, dstId] of pairs) {
+    const src = $(srcId);
+    const dst = $(dstId);
+    if (src && dst && dst.textContent !== src.textContent) dst.textContent = src.textContent;
+  }
+}
+
+function installObservationMirror(){
+  const sourceIds = ["locationName", "altitudeLabel", "coordLabel", "cardTemp", "feelsLabel", "weatherIcon", "cardCondition"];
+  sourceIds.forEach(id => {
+    const el = $(id);
+    if (!el || typeof MutationObserver === "undefined") return;
+    const mo = new MutationObserver(syncObservationMirror);
+    mo.observe(el, { childList:true, subtree:true, characterData:true });
+  });
+
+  const obsRefreshBtn = $("obsRefreshBtn");
+  if (obsRefreshBtn) {
+    obsRefreshBtn.addEventListener("click", () => {
+      const mainBtn = $("refreshBtn");
+      if (mainBtn) mainBtn.click();
+    });
+  }
+
+  syncObservationMirror();
+  setInterval(syncObservationMirror, 1200);
+}
+
+function setWeatherPage(page){
+  if (!WEATHER_PAGES.includes(page)) page = "current";
+  currentWeatherPage = page;
+  document.body.dataset.page = page;
+
+  const track = $("interfaceTrack");
+  if (track) {
+    const pageIndex = Math.max(0, WEATHER_PAGES.indexOf(page));
+    track.style.transform = `translateX(-${pageIndex * 100}%)`;
+  }
+
+  document.querySelectorAll("[data-page-target]").forEach(btn => {
+    btn.classList.toggle("on", btn.dataset.pageTarget === page);
+  });
+
+  syncObservationMirror();
+  if (page === "forecast") {
+    setTimeout(initQpfForecastMap, 80);
+  }
+}
+
+function switchWeatherPage(direction){
+  const idx = WEATHER_PAGES.indexOf(currentWeatherPage);
+  const nextIdx = direction > 0 ? Math.min(WEATHER_PAGES.length - 1, idx + 1) : Math.max(0, idx - 1);
+  setWeatherPage(WEATHER_PAGES[nextIdx]);
+}
+
+function installWeatherPageGestures(){
+  const viewport = $("interfaceViewport");
+  const track = $("interfaceTrack");
+  if (!viewport || !track) return;
+
+  document.querySelectorAll("[data-page-target]").forEach(btn => {
+    btn.addEventListener("click", () => setWeatherPage(btn.dataset.pageTarget));
+  });
+
+  let sx = 0, sy = 0, st = 0, moved = false;
+
+  viewport.addEventListener("touchstart", (e) => {
+    if (document.body.classList.contains("image-lightbox-open")) return;
+    if (!e.touches || !e.touches.length) return;
+    const t = e.touches[0];
+    sx = t.clientX;
+    sy = t.clientY;
+    st = Date.now();
+    moved = false;
+  }, { passive:true });
+
+  viewport.addEventListener("touchmove", (e) => {
+    if (document.body.classList.contains("image-lightbox-open")) return;
+    if (!e.touches || !e.touches.length) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) moved = true;
+  }, { passive:true });
+
+  viewport.addEventListener("touchend", (e) => {
+    if (document.body.classList.contains("image-lightbox-open")) return;
+    if (isInteractiveTarget(e.target)) return;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+    const dt = Date.now() - st;
+    if (dt <= 700 && Math.abs(dx) >= 58 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+      if (dx < 0) switchWeatherPage(1);
+      else switchWeatherPage(-1);
+    }
+  }, { passive:true });
+
+  let lastTapAt = 0;
+  let lastTapSide = "";
+  document.addEventListener("pointerup", (e) => {
+    if (document.body.classList.contains("image-lightbox-open")) return;
+    if (isInteractiveTarget(e.target)) return;
+    if (moved) return;
+    const now = Date.now();
+    const side = e.clientX >= window.innerWidth / 2 ? "right" : "left";
+    if (now - lastTapAt <= 320 && side === lastTapSide) {
+      if (side === "right") switchWeatherPage(1);
+      else switchWeatherPage(-1);
+      lastTapAt = 0;
+      lastTapSide = "";
+      return;
+    }
+    lastTapAt = now;
+    lastTapSide = side;
+  }, { passive:true });
+
+  setWeatherPage(currentWeatherPage);
+}
+
 
 let forecastMode = "10m"; // 10m | 1h
 let weeklyMode = "temp";  // temp | feel
@@ -822,12 +2051,13 @@ function installAutoRefreshActivityReset(){
 
 function setRefreshBusy(busy, label = "更新") {
   weatherRefreshBusy = !!busy;
-  const btn = $("refreshBtn");
-  if (!btn) return;
-  btn.disabled = weatherRefreshBusy;
-  btn.textContent = weatherRefreshBusy ? "更新中…" : label;
-  btn.style.opacity = weatherRefreshBusy ? "0.65" : "";
-  btn.style.cursor = weatherRefreshBusy ? "not-allowed" : "";
+  [$("refreshBtn"), $("obsRefreshBtn")].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = weatherRefreshBusy;
+    btn.textContent = weatherRefreshBusy ? "更新中…" : label;
+    btn.style.opacity = weatherRefreshBusy ? "0.65" : "";
+    btn.style.cursor = weatherRefreshBusy ? "not-allowed" : "";
+  });
 }
 
 // 降雨查詢版本序號：換地點/更新時遞增，避免上一個地點的雷達結果回寫到新地點
@@ -861,7 +2091,13 @@ function setSourceOpen(open){
   $("sourcePanel").style.display = sourceOpen ? "block" : "none";
   $("toggleSourceBtn").classList.toggle("on", sourceOpen);
 }
-$("toggleSourceBtn").onclick = ()=>setSourceOpen(!sourceOpen);
+const toggleSourceBtn = $("toggleSourceBtn");
+if (toggleSourceBtn) toggleSourceBtn.onclick = ()=>setSourceOpen(!sourceOpen);
+installWeatherPageGestures();
+installObservationMirror();
+installObsAssetControls();
+installQpfForecastMap();
+installImageLightbox();
 
 /* ===========================
    台澎金馬概略範圍
@@ -2513,7 +3749,7 @@ function renderObservedRainPills(realtime){
 }
 
 /* ===========================
-   v6.4.1：CWA 雨量站近場校正
+   v7.0：CWA 雨量站近場校正
    修正：10km 內測站太多、很多 0 時，純 IDW 會把局部強雨抹平。
    規則：
    1) 10km 內才使用
@@ -2710,6 +3946,18 @@ async function loadObservedRainGaugeCorrection(lat, lon){
       formatRainGaugeDebug(rain10, "10分鐘雨量近場校正"),
       formatRainGaugeDebug(rain1h, "1小時雨量近場校正")
     ].join("<br/>")
+  };
+}
+
+function correctionLabelNoOverride(correction, rain10Kept, rain1hKept){
+  if (!correction) return correction;
+  const note = [];
+  if (rain10Kept) note.push("10分鐘雨量採用後端值，近場校正僅供參考");
+  if (rain1hKept) note.push("1小時雨量採用後端值，近場校正僅供參考");
+  if (!note.length) return correction;
+  return {
+    ...correction,
+    debugHtml: `${correction.debugHtml || ""}<br/>${note.join("；")}`
   };
 }
 
@@ -3149,14 +4397,22 @@ if (!labelHint || !labelHint.trim()) {
     }
   }
 
-  // v6.4.1：不完全相信後端 /full 的雨量 IDW。
-  // 重新用前端 CWA 雨量站做「最近5站 + p=2.5~3.2 + nearest snap」校正，
-  // 避免 10km 內大量 0 測站把永和/中和這種局部強雨拉低。
+  // v7.0 修正：10分鐘雨量欄以 /full 後端回傳值為主。
+  // 之前這裡會用前端「雨量站近場校正」直接覆蓋後端值，導致後端 rain10min=0 時，
+  // 前端可能另外算出 25mm，並以等效 150mm/h 被畫成紫色。
+  // 現在校正只在後端/目前流程沒有有效雨量值時才補值；若後端給 0，也視為有效值，不覆蓋。
   try {
     const rainCorrection = await loadObservedRainGaugeCorrection(lat, lon);
     if (rainCorrection) {
-      if (rainCorrection.rain10?.ok) observedRain10ForPill = rainCorrection.rain10.value;
-      if (rainCorrection.rain1h?.ok) observedRain1hForPill = rainCorrection.rain1h.value;
+      const hasObservedRain10 = Number.isFinite(observedRain10ForPill);
+      const hasObservedRain1h = Number.isFinite(observedRain1hForPill);
+
+      if (!hasObservedRain10 && rainCorrection.rain10?.ok) {
+        observedRain10ForPill = rainCorrection.rain10.value;
+      }
+      if (!hasObservedRain1h && rainCorrection.rain1h?.ok) {
+        observedRain1hForPill = rainCorrection.rain1h.value;
+      }
 
       renderObservedRainPills({
         rain10min: observedRain10ForPill,
@@ -3169,7 +4425,7 @@ if (!labelHint || !labelHint.trim()) {
         Number.isFinite(realtimeRain) ? realtimeRain : 0
       );
 
-      appendObservedRainGaugeHint(rainCorrection);
+      appendObservedRainGaugeHint(correctionLabelNoOverride(rainCorrection, hasObservedRain10, hasObservedRain1h));
     }
   } catch (e) {
     dbg("[rain gauge correction] fail " + e);
