@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v7.0</title>
+  <title>天氣網站v7.0.1</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -829,6 +829,12 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       line-height:1.45;
       color:rgba(255,255,255,.64);
     }
+    .qpf-update-time{
+      margin-top:3px;
+      color:rgba(255,255,255,.78);
+      font-weight:800;
+      font-variant-numeric:tabular-nums;
+    }
     .qpf-map-error{
       position:absolute;
       left:12px;
@@ -1059,7 +1065,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 
     /* ===========================
        v7.0 三介面整張橫向滑動覆蓋
-       第 1 頁：即時溫度｜第 2 頁：預報圖資｜第 3 頁：觀測資料
+       第 1 頁：即時溫度｜第 2 頁：預報資料｜第 3 頁：觀測資料
        =========================== */
     body[data-page="current"] .interface-track{transform:translateX(0);}
     body[data-page="forecast"] .interface-track{transform:translateX(-100%);}
@@ -1085,6 +1091,87 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
     @media (max-width:380px){
       .view-tab{font-size:10.5px;padding:8px 4px;letter-spacing:.1px;}
       .current-card .card-temp{font-size:72px;}
+    }
+
+    /* ===========================
+       v7.0.1 介面切換 / 捲動控制
+       1) 非目前頁面高度歸零，避免第 1 頁被第 3 頁高度撐出上下捲動
+       2) 第 1 頁即時溫度置中，且禁止上下滑動
+       3) 第 3 頁底部保留約 2–3cm，讓版本號停在畫面底部上方
+       =========================== */
+    body[data-page="current"] .interface-forecast,
+    body[data-page="current"] .interface-observation,
+    body[data-page="forecast"] .interface-current,
+    body[data-page="forecast"] .interface-observation,
+    body[data-page="observation"] .interface-current,
+    body[data-page="observation"] .interface-forecast{
+      height:0;
+      min-height:0;
+      overflow:hidden;
+      pointer-events:none;
+    }
+
+    body[data-page="current"]{
+      overflow-y:hidden;
+      align-items:center;
+    }
+    body:not([data-page="current"]){
+      overflow-y:auto;
+    }
+    body[data-page="current"] .app{
+      height:100vh;
+      height:100dvh;
+      min-height:100vh;
+      min-height:100dvh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    body[data-page="current"] .interface-viewport{
+      overflow:hidden;
+    }
+    body[data-page="current"] .current-card{
+      min-height:min(680px, calc(100dvh - 28px));
+      max-height:calc(100dvh - 28px);
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
+    body[data-page="current"] .current-hero{
+      flex:1 1 auto;
+      min-height:0;
+      margin-top:0;
+      padding:8px 8px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+    }
+    body[data-page="current"] .current-hero .temp-row{
+      width:100%;
+    }
+    body[data-page="current"] .view-switch,
+    body[data-page="current"] .page-hint,
+    body[data-page="current"] .version-badge,
+    body[data-page="current"] .card-top,
+    body[data-page="current"] .mode-selector,
+    body[data-page="current"] .mode-input{
+      flex:0 0 auto;
+    }
+    body[data-page="observation"] .interface-observation{
+      padding-bottom:92px;
+    }
+
+    @media (max-height:680px){
+      body[data-page="current"] .current-card{padding-top:16px;padding-bottom:14px;}
+      body[data-page="current"] .mode-selector{margin-top:10px;gap:6px;font-size:11px;}
+      body[data-page="current"] .mode-selector label{padding:5px 9px;}
+      body[data-page="current"] .current-card .card-temp{font-size:68px;}
+      body[data-page="current"] .current-hero-title{font-size:17px;}
+      body[data-page="current"] .condition-row{margin-top:-4px;}
+      body[data-page="current"] .view-switch{margin-top:10px;}
+      body[data-page="current"] .page-hint{margin-top:5px;}
+      body[data-page="current"] .version-badge{margin-top:6px;}
     }
 
     .version-badge{
@@ -1172,30 +1259,30 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 
             <div class="view-switch" aria-label="天氣頁面切換">
               <button class="view-tab on" type="button" data-page-target="current">即時溫度</button>
-              <button class="view-tab" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
               <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
             </div>
             <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
 
             <pre id="debugBox"></pre>
-            <div class="version-badge" id="versionLabel">v7.0</div>
+            <div class="version-badge" id="versionLabel">v7.0.1</div>
           </div>
         </section>
 
-        <!-- 第 2 頁：預報 + 預報圖資 -->
-        <section class="interface-page interface-forecast" aria-label="預報圖資主介面">
+        <!-- 第 2 頁：預報 + 預報資料 -->
+        <section class="interface-page interface-forecast" aria-label="預報資料主介面">
           <div class="card forecast-card">
             <div class="page-title-row top-page-title">
               <div>
                 <div class="page-kicker">FORECAST</div>
-                <div class="page-title">預報圖資</div>
+                <div class="page-title">預報資料</div>
               </div>
               <div class="page-index">2 / 3</div>
             </div>
 
             <div class="view-switch" aria-label="天氣頁面切換">
               <button class="view-tab" type="button" data-page-target="current">即時溫度</button>
-              <button class="view-tab on" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab on" type="button" data-page-target="forecast">預報資料</button>
               <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
             </div>
             <div class="page-hint">向左滑到觀測資料，向右滑回即時溫度</div>
@@ -1204,8 +1291,8 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
             <section class="weather-page forecast-page" id="forecastPage" aria-label="預報與圖資">
               <div class="wx-map-block">
                 <div class="wx-map-head">
-                  <div class="wx-map-title">雷達外推雨量預報(beta版)</div>
-                  <div class="wx-map-note">未來60分鐘雨量預估</div>
+                  <div class="wx-map-title">極短期降雨推估(beta版)</div>
+                  <div class="wx-map-note">未來60分鐘推估雨量</div>
                 </div>
                 <div class="qpf-map-panel">
                   <div class="qpf-map-toolbar" aria-label="雷達外推雨量圖層控制">
@@ -1221,7 +1308,8 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
                     <div id="qpfMapError" class="qpf-map-error">地圖載入失敗，請檢查 Leaflet 或網路連線。</div>
                   </div>
                   <div class="qpf-map-meta" id="qpfMapMeta">
-                    可雙指縮放、拖曳地圖
+                    <div id="qpfMapNotice">本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。</div>
+                    <div class="qpf-update-time" id="qpfUpdateTime">更新時間：尚未更新</div>
                   </div>
                 </div>
               </div>
@@ -1262,7 +1350,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0</div>
+            <div class="version-badge">v7.0.1</div>
           </div>
         </section>
 
@@ -1279,10 +1367,10 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
 
             <div class="view-switch" aria-label="天氣頁面切換">
               <button class="view-tab" type="button" data-page-target="current">即時溫度</button>
-              <button class="view-tab" type="button" data-page-target="forecast">預報圖資</button>
+              <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
               <button class="view-tab on" type="button" data-page-target="observation">觀測資料</button>
             </div>
-            <div class="page-hint">向右滑回預報圖資</div>
+            <div class="page-hint">向右滑回預報資料</div>
 
             <hr class="card-divider" />
             <section class="weather-page observation-page" id="observationPage" aria-label="觀測資料與圖資">
@@ -1349,7 +1437,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0</div>
+            <div class="version-badge">v7.0.1</div>
           </div>
         </section>
 
@@ -1376,7 +1464,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v7.0";
+const APP_VERSION = "v7.0.1";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -1536,14 +1624,35 @@ function qpfNoCache(url){
 }
 
 function setQpfMeta(text){
+  const notice = $("qpfMapNotice");
+  if (notice) {
+    notice.textContent = text;
+    return;
+  }
   const el = $("qpfMapMeta");
   if (el) el.textContent = text;
 }
 
+function formatManualUpdateTime(ts = Date.now()){
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${mm}/${dd} ${hh}:${mi}:${ss}`;
+}
+
+function setQpfUpdateTime(ts = Date.now()){
+  const el = $("qpfUpdateTime");
+  if (el) el.textContent = "更新時間：" + formatManualUpdateTime(ts);
+}
+
 function refreshQpfOverlay(){
+  setQpfUpdateTime();
   if (!qpfOverlay) return;
   qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
-  setQpfMeta("可雙指縮放、拖曳地圖");
+  setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
 }
 
 function fitQpfBounds(){
@@ -1614,7 +1723,7 @@ function initQpfForecastMap(){
 
   fitQpfBounds();
   setTimeout(()=>qpfMap.invalidateSize(), 120);
-  setQpfMeta("可雙指縮放、拖曳地圖");
+  setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
 }
 
 function installQpfForecastMap(){
@@ -1901,8 +2010,18 @@ function installObservationMirror(){
   setInterval(syncObservationMirror, 1200);
 }
 
+function scrollInterfaceToTop(){
+  // v7.0.1：每次左右切換介面後，回到目前頁面的最上層。
+  try { window.scrollTo({ top:0, left:0, behavior:"auto" }); } catch { window.scrollTo(0, 0); }
+  if (document.documentElement) document.documentElement.scrollTop = 0;
+  if (document.body) document.body.scrollTop = 0;
+  const viewport = $("interfaceViewport");
+  if (viewport) viewport.scrollTop = 0;
+}
+
 function setWeatherPage(page){
   if (!WEATHER_PAGES.includes(page)) page = "current";
+  const pageChanged = currentWeatherPage !== page;
   currentWeatherPage = page;
   document.body.dataset.page = page;
 
@@ -1916,9 +2035,18 @@ function setWeatherPage(page){
     btn.classList.toggle("on", btn.dataset.pageTarget === page);
   });
 
+  if (pageChanged) {
+    scrollInterfaceToTop();
+    requestAnimationFrame(scrollInterfaceToTop);
+    setTimeout(scrollInterfaceToTop, 80);
+  }
+
   syncObservationMirror();
   if (page === "forecast") {
-    setTimeout(initQpfForecastMap, 80);
+    setTimeout(() => {
+      initQpfForecastMap();
+      if (qpfMap) qpfMap.invalidateSize();
+    }, 100);
   }
 }
 
@@ -5088,6 +5216,7 @@ async function runCoordMode(){
    =========================== */
 async function runCurrentMode(options = {}){
   if (weatherRefreshBusy) return;
+  if (!options.fromAuto) setQpfUpdateTime();
   clearAutoRefresh();
   const mySeq = ++weatherRunSeq;
   setRefreshBusy(true);
