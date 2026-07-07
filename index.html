@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v7.0.3</title>
+  <title>天氣網站v7.1/title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -813,7 +813,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       touch-action:none;
       background:#f7f7f2;
     }
-    /* v7.0.3：QPF 地圖改成白底淡色風格，讓雨量圖層更像氣象署圖資 */
+    /* v7.1：QPF 地圖改成白底淡色風格，讓雨量圖層更像氣象署圖資 */
     #qpfMap .leaflet-tile{
       filter:grayscale(100%) brightness(1.18) contrast(.78) saturate(.25);
     }
@@ -834,6 +834,25 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       width:30px;
       height:30px;
       line-height:30px;
+    }
+
+    .qpf-location-tooltip{
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.94);
+      border:1px solid rgba(7,95,199,.20);
+      color:#075fc7;
+      font-size:10.5px;
+      font-weight:900;
+      box-shadow:0 4px 12px rgba(0,0,0,.16);
+    }
+    .qpf-location-pulse{
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      background:rgba(7,95,199,.22);
+      border:2px solid rgba(255,255,255,.95);
+      box-shadow:0 0 0 4px rgba(7,95,199,.18),0 6px 14px rgba(0,0,0,.22);
     }
     .qpf-map-meta{
       margin-top:8px;
@@ -1278,7 +1297,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
             <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
 
             <pre id="debugBox"></pre>
-            <div class="version-badge" id="versionLabel">v7.0.3</div>
+            <div class="version-badge" id="versionLabel">v7.1</div>
           </div>
         </section>
 
@@ -1363,7 +1382,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0.3</div>
+            <div class="version-badge">v7.1</div>
           </div>
         </section>
 
@@ -1450,7 +1469,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0.3</div>
+            <div class="version-badge">v7.1</div>
           </div>
         </section>
 
@@ -1477,7 +1496,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v7.0.3";
+const APP_VERSION = "v7.1";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -1591,6 +1610,7 @@ const QPF60_BOUNDS = [[18.0, 115.0], [29.0125, 126.5125]];
 let qpfMap = null;
 let qpfOverlay = null;
 let qpfBoundsBox = null;
+let qpfLocationMarker = null;
 let qpfMapInstalled = false;
 let leafletLoadPromise = null;
 
@@ -1661,61 +1681,60 @@ function setQpfUpdateTime(ts = Date.now()){
   if (el) el.textContent = "更新時間：" + formatManualUpdateTime(ts);
 }
 
-async function loadFlippedImageUrl(url){
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || img.width;
-        canvas.height = img.naturalHeight || img.height;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx || !canvas.width || !canvas.height) {
-          reject(new Error("QPF canvas unavailable"));
-          return;
-        }
-
-        // v7.0.3：前端修正雷達外推透明圖層 Y 軸上下顛倒。
-        // Leaflet 預設圖片上方是北方；若後端 PNG 上方實際是南方，就先在 canvas 上下翻轉後再貼圖。
-        ctx.translate(0, canvas.height);
-        ctx.scale(1, -1);
-        ctx.drawImage(img, 0, 0);
-
-        resolve(canvas.toDataURL("image/png"));
-      } catch (e) {
-        reject(e);
-      }
-    };
-
-    img.onerror = () => reject(new Error("QPF image load failed"));
-    img.src = url;
-  });
+function getQpfPositionLabel(){
+  const mode = document.querySelector('input[name="mode"]:checked')?.value || "";
+  const modeText = mode === "gps" ? "GPS位置" : (mode === "town" ? "輸入地點" : "輸入座標");
+  const name = ($("locationName")?.textContent || "").trim();
+  const coord = lastTarget && Number.isFinite(Number(lastTarget.lat)) && Number.isFinite(Number(lastTarget.lon))
+    ? `${Number(lastTarget.lat).toFixed(4)}, ${Number(lastTarget.lon).toFixed(4)}`
+    : "";
+  return [modeText, name && name !== "目前位置" ? name : "", coord].filter(Boolean).join("｜");
 }
 
-async function loadFlippedQpfImage(){
-  if (!qpfOverlay) return;
+function updateQpfLocationMarker(){
+  if (!qpfMap || typeof L === "undefined") return;
+  if (!lastTarget || !Number.isFinite(Number(lastTarget.lat)) || !Number.isFinite(Number(lastTarget.lon))) return;
 
-  const rawUrl = qpfNoCache(QPF60_URL);
-  try {
-    const flippedUrl = await loadFlippedImageUrl(rawUrl);
-    if (!qpfOverlay) return;
-    qpfOverlay.setUrl(flippedUrl);
-    setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
-  } catch (e) {
-    console.warn("[qpf flip failed]", e);
-    if (!qpfOverlay) return;
-    qpfOverlay.setUrl(rawUrl);
-    setQpfMeta("QPF 圖層前端上下翻轉失敗，暫時顯示原始圖層；若南北仍顛倒，請確認 API 是否允許跨來源圖片讀取。");
+  const lat = Number(lastTarget.lat);
+  const lon = Number(lastTarget.lon);
+  const label = getQpfPositionLabel() || "目前位置";
+
+  if (!qpfLocationMarker) {
+    qpfLocationMarker = L.circleMarker([lat, lon], {
+      radius:7,
+      color:"#075fc7",
+      weight:3,
+      fillColor:"#ffffff",
+      fillOpacity:1,
+      opacity:1,
+      interactive:true,
+      pane:"markerPane"
+    }).addTo(qpfMap);
+  } else {
+    qpfLocationMarker.setLatLng([lat, lon]);
   }
+
+  qpfLocationMarker.bindTooltip(label, {
+    permanent:true,
+    direction:"top",
+    offset:[0,-10],
+    className:"qpf-location-tooltip"
+  });
+  qpfLocationMarker.bindPopup(label);
+  try { qpfLocationMarker.bringToFront(); } catch {}
+}
+
+function loadQpfImage(){
+  if (!qpfOverlay) return;
+  qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
+  setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
+  setTimeout(updateQpfLocationMarker, 80);
 }
 
 function refreshQpfOverlay(){
   setQpfUpdateTime();
   if (!qpfOverlay) return;
-  loadFlippedQpfImage();
+  loadQpfImage();
 }
 
 function fitQpfBounds(){
@@ -1751,7 +1770,7 @@ function initQpfForecastMap(){
   if (errEl) errEl.style.display = "none";
 
   if (qpfMap) {
-    setTimeout(()=>qpfMap.invalidateSize(), 80);
+    setTimeout(()=>{ qpfMap.invalidateSize(); updateQpfLocationMarker(); }, 80);
     return;
   }
 
@@ -1777,7 +1796,8 @@ function initQpfForecastMap(){
     opacity:0.78,
     interactive:false
   }).addTo(qpfMap);
-  loadFlippedQpfImage();
+  loadQpfImage();
+  setTimeout(updateQpfLocationMarker, 150);
 
   qpfBoundsBox = L.rectangle(QPF60_BOUNDS, {
     weight:1,
@@ -2110,7 +2130,10 @@ function setWeatherPage(page){
   if (page === "forecast") {
     setTimeout(() => {
       initQpfForecastMap();
-      if (qpfMap) qpfMap.invalidateSize();
+      if (qpfMap) {
+        qpfMap.invalidateSize();
+        updateQpfLocationMarker();
+      }
     }, 100);
   }
 }
@@ -5299,6 +5322,7 @@ async function runCurrentMode(options = {}){
     if (mySeq === weatherRunSeq) {
       lastWeatherRefreshAt = Date.now();
       setRefreshBusy(false);
+      updateQpfLocationMarker();
       scheduleAutoRefresh();
     }
   }
