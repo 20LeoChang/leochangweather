@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v7.0.1</title>
+  <title>天氣網站v7.0.2</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1094,7 +1094,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
     }
 
     /* ===========================
-       v7.0.1 介面切換 / 捲動控制
+       v7.0.2 介面切換 / 捲動控制
        1) 非目前頁面高度歸零，避免第 1 頁被第 3 頁高度撐出上下捲動
        2) 第 1 頁即時溫度置中，且禁止上下滑動
        3) 第 3 頁底部保留約 2–3cm，讓版本號停在畫面底部上方
@@ -1265,7 +1265,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
             <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
 
             <pre id="debugBox"></pre>
-            <div class="version-badge" id="versionLabel">v7.0.1</div>
+            <div class="version-badge" id="versionLabel">v7.0.2</div>
           </div>
         </section>
 
@@ -1350,7 +1350,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0.1</div>
+            <div class="version-badge">v7.0.2</div>
           </div>
         </section>
 
@@ -1437,7 +1437,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.0.1</div>
+            <div class="version-badge">v7.0.2</div>
           </div>
         </section>
 
@@ -1464,7 +1464,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v7.0.1";
+const APP_VERSION = "v7.0.2";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -1648,11 +1648,61 @@ function setQpfUpdateTime(ts = Date.now()){
   if (el) el.textContent = "更新時間：" + formatManualUpdateTime(ts);
 }
 
+async function loadFlippedImageUrl(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx || !canvas.width || !canvas.height) {
+          reject(new Error("QPF canvas unavailable"));
+          return;
+        }
+
+        // v7.0.2：前端修正雷達外推透明圖層 Y 軸上下顛倒。
+        // Leaflet 預設圖片上方是北方；若後端 PNG 上方實際是南方，就先在 canvas 上下翻轉後再貼圖。
+        ctx.translate(0, canvas.height);
+        ctx.scale(1, -1);
+        ctx.drawImage(img, 0, 0);
+
+        resolve(canvas.toDataURL("image/png"));
+      } catch (e) {
+        reject(e);
+      }
+    };
+
+    img.onerror = () => reject(new Error("QPF image load failed"));
+    img.src = url;
+  });
+}
+
+async function loadFlippedQpfImage(){
+  if (!qpfOverlay) return;
+
+  const rawUrl = qpfNoCache(QPF60_URL);
+  try {
+    const flippedUrl = await loadFlippedImageUrl(rawUrl);
+    if (!qpfOverlay) return;
+    qpfOverlay.setUrl(flippedUrl);
+    setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
+  } catch (e) {
+    console.warn("[qpf flip failed]", e);
+    if (!qpfOverlay) return;
+    qpfOverlay.setUrl(rawUrl);
+    setQpfMeta("QPF 圖層前端上下翻轉失敗，暫時顯示原始圖層；若南北仍顛倒，請確認 API 是否允許跨來源圖片讀取。");
+  }
+}
+
 function refreshQpfOverlay(){
   setQpfUpdateTime();
   if (!qpfOverlay) return;
-  qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
-  setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
+  loadFlippedQpfImage();
 }
 
 function fitQpfBounds(){
@@ -1708,11 +1758,11 @@ function initQpfForecastMap(){
     attribution:"&copy; OpenStreetMap"
   }).addTo(qpfMap);
 
-  qpfOverlay = L.imageOverlay(qpfNoCache(QPF60_URL), QPF60_BOUNDS, {
+  qpfOverlay = L.imageOverlay("", QPF60_BOUNDS, {
     opacity:0.78,
-    interactive:false,
-    crossOrigin:false
+    interactive:false
   }).addTo(qpfMap);
+  loadFlippedQpfImage();
 
   qpfBoundsBox = L.rectangle(QPF60_BOUNDS, {
     weight:1,
@@ -2011,7 +2061,7 @@ function installObservationMirror(){
 }
 
 function scrollInterfaceToTop(){
-  // v7.0.1：每次左右切換介面後，回到目前頁面的最上層。
+  // v7.0.2：每次左右切換介面後，回到目前頁面的最上層。
   try { window.scrollTo({ top:0, left:0, behavior:"auto" }); } catch { window.scrollTo(0, 0); }
   if (document.documentElement) document.documentElement.scrollTop = 0;
   if (document.body) document.body.scrollTop = 0;
