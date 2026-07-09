@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v7.1</title>
+  <title>天氣網站v7.2</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1217,6 +1217,59 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
       user-select:none;
     }
 
+    /* QPF 色階說明與資料時間 */
+.qpf-color-legend{
+  margin-top:8px;
+  padding:8px 9px;
+  border-radius:13px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.08);
+  color:rgba(255,255,255,.78);
+  font-size:10.5px;
+  font-weight:750;
+  line-height:1.55;
+}
+.qpf-color-legend-title{
+  margin-bottom:5px;
+  color:rgba(255,255,255,.88);
+  font-weight:900;
+}
+.qpf-color-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+}
+.qpf-color-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 6px;
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+  border:1px solid rgba(255,255,255,.08);
+  white-space:nowrap;
+}
+.qpf-color-dot{
+  width:9px;
+  height:9px;
+  border-radius:999px;
+  display:inline-block;
+  box-shadow:0 0 0 1px rgba(255,255,255,.22);
+}
+.qpf-dot-none{background:rgba(255,255,255,.20);}
+.qpf-dot-blue{background:rgba(60,150,255,.95);}
+.qpf-dot-green{background:rgba(0,200,0,.95);}
+.qpf-dot-yellow{background:rgba(255,200,0,.95);}
+.qpf-dot-orange{background:rgba(255,140,0,.95);}
+.qpf-dot-red{background:rgba(255,0,0,.95);}
+.qpf-dot-purple{background:rgba(180,0,255,.95);}
+
+.qpf-data-time{
+  margin-top:3px;
+  color:rgba(255,255,255,.72);
+  font-weight:750;
+  font-variant-numeric:tabular-nums;
+}
   </style>
 </head>
 
@@ -1297,7 +1350,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
             <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
 
             <pre id="debugBox"></pre>
-            <div class="version-badge" id="versionLabel">v7.1</div>
+            <div class="version-badge" id="versionLabel">v7.2</div>
           </div>
         </section>
 
@@ -1340,9 +1393,24 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
                     <div id="qpfMapError" class="qpf-map-error">地圖載入失敗，請檢查 Leaflet 或網路連線。</div>
                   </div>
                   <div class="qpf-map-meta" id="qpfMapMeta">
-                    <div id="qpfMapNotice">本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。</div>
-                    <div class="qpf-update-time" id="qpfUpdateTime">更新時間：尚未更新</div>
-                  </div>
+  <div id="qpfMapNotice">本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。</div>
+
+  <div class="qpf-color-legend" id="qpfColorLegend">
+    <div class="qpf-color-legend-title">顏色說明：未來 60 分鐘累積雨量</div>
+    <div class="qpf-color-row">
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-none"></i>&lt;0.5 透明</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-blue"></i>0.5–5 藍</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-green"></i>5–15 綠</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-yellow"></i>15–35 黃</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-orange"></i>35–55 橘</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-red"></i>55–70 紅</span>
+      <span class="qpf-color-chip"><i class="qpf-color-dot qpf-dot-purple"></i>≥70 紫</span>
+    </div>
+  </div>
+
+  <div class="qpf-update-time" id="qpfUpdateTime">更新時間：尚未更新</div>
+  <div class="qpf-data-time" id="qpfDataTime">資料時間：尚未取得</div>
+</div>
                 </div>
               </div>
 
@@ -1382,7 +1450,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.1</div>
+            <div class="version-badge">v7.2</div>
           </div>
         </section>
 
@@ -1469,7 +1537,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
               </div>
             </section>
 
-            <div class="version-badge">v7.1</div>
+            <div class="version-badge">v7.2</div>
           </div>
         </section>
 
@@ -1496,7 +1564,7 @@ body{width:100%;min-width:0;min-height:100vh;min-height:100dvh;overflow-x:hidden
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v7.1";
+const APP_VERSION = "v7.2";
 
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
@@ -1681,6 +1749,52 @@ function setQpfUpdateTime(ts = Date.now()){
   if (el) el.textContent = "更新時間：" + formatManualUpdateTime(ts);
 }
 
+function getQpfMetaUrl(){
+  try{
+    const u = new URL(QPF60_URL, location.href);
+    return u.origin + "/api/qpf/meta?t=" + Date.now();
+  }catch{
+    return "/api/qpf/meta?t=" + Date.now();
+  }
+}
+
+function formatQpfApiTime(v){
+  const s = String(v || "").trim();
+  if (!s || s === "None" || s === "null" || s === "undefined") return "--";
+
+  const normalized = s.includes("T") ? s : s.replace(" ", "T");
+  const d = new Date(normalized);
+
+  if (!Number.isNaN(d.getTime())) {
+    return formatManualUpdateTime(d.getTime());
+  }
+
+  return s;
+}
+
+async function updateQpfDataTimeFromMeta(){
+  const el = $("qpfDataTime");
+  if (!el) return;
+
+  try{
+    const r = await fetch(getQpfMetaUrl(), { cache:"no-store" });
+    const data = await r.json();
+
+    if (!data || data.ok !== true) {
+      el.textContent = "資料時間：取得失敗";
+      return;
+    }
+
+    const baseText = formatQpfApiTime(data.base_time);
+    const builtText = formatQpfApiTime(data.built_time);
+
+    // 不顯示「圖層 X 倍」，只顯示雷達資料時間與建置時間
+    el.textContent = `資料時間：雷達 ${baseText}｜建置 ${builtText}`;
+  }catch(e){
+    el.textContent = "資料時間：取得失敗";
+  }
+}
+
 function getQpfPositionLabel(){
   const mode = document.querySelector('input[name="mode"]:checked')?.value || "";
   const modeText = mode === "gps" ? "GPS位置" : (mode === "town" ? "輸入地點" : "輸入座標");
@@ -1726,15 +1840,150 @@ function updateQpfLocationMarker(){
 
 function loadQpfImage(){
   if (!qpfOverlay) return;
+
+  setQpfUpdateTime();
+  updateQpfDataTimeFromMeta();
+
   qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
   setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");
   setTimeout(updateQpfLocationMarker, 80);
 }
 
-function refreshQpfOverlay(){
+function sleep(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getQpfApiUrl(path){
+  const u = new URL(QPF60_URL, location.href);
+  const sep = path.includes("?") ? "&" : "?";
+  return u.origin + path + sep + "t=" + Date.now();
+}
+
+async function fetchQpfJson(path){
+  const r = await fetch(getQpfApiUrl(path), { cache:"no-store" });
+  return await r.json();
+}
+
+function setQpfDataTimeText(text){
+  const el = $("qpfDataTime");
+  if (el) el.textContent = text;
+}
+
+function refreshAllVisualLayers(reason = "manual"){
+  // 主更新與 2 分鐘自動更新：重新載入所有前端圖層，但不強制後端重建 QPF。
+  // 真正要重建 QPF fullgrid，仍使用「更新圖層」按鈕。
+  try{
+    if (qpfOverlay) {
+      loadQpfImage();
+    } else {
+      initQpfForecastMap();
+    }
+  }catch(e){
+    console.warn("[refresh all layers] QPF failed", e);
+  }
+
+  try{
+    if (typeof setObsAsset === "function") {
+      setObsAsset(currentObsAssetKey || "radar_tw", true);
+    }
+  }catch(e){
+    console.warn("[refresh all layers] obs asset failed", e);
+  }
+
+  try{
+    if (qpfMap) qpfMap.invalidateSize(true);
+    updateQpfLocationMarker();
+  }catch(e){}
+}
+
+
+async function refreshQpfOverlay(){
   setQpfUpdateTime();
-  if (!qpfOverlay) return;
-  loadQpfImage();
+
+  const btn = $("qpfRefreshBtn");
+  const oldText = btn ? btn.textContent : "";
+
+  try{
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "重建中…";
+    }
+
+    setQpfDataTimeText("資料時間：正在重新建置預測圖層…");
+
+    let oldBuiltTime = "";
+    try{
+      const oldMeta = await fetchQpfJson("/api/qpf/meta");
+      oldBuiltTime = String(oldMeta?.built_time || "");
+    }catch{}
+
+    // 1. 強制啟動後端 fullgrid 重建
+    const start = await fetchQpfJson("/api/rain/build_cache?force=1");
+
+    if (!start || start.ok !== true) {
+      throw new Error(start?.error || "啟動重建失敗");
+    }
+
+    // 2. 等後端建完，最多等 3 分鐘
+    let latestMeta = null;
+
+    for (let i = 0; i < 90; i++){
+      await sleep(2000);
+
+      let status = null;
+      try{
+        status = await fetchQpfJson("/api/rain/cache_status");
+      }catch{}
+
+      try{
+        latestMeta = await fetchQpfJson("/api/qpf/meta");
+      }catch{}
+
+      const progress = status?.progress || latestMeta?.progress || {};
+      const building = progress?.building === true;
+      const done = progress?.done_members ?? progress?.minute ?? "";
+      const total = progress?.total_members ?? progress?.minutes ?? "";
+
+      if (building) {
+        setQpfDataTimeText(`資料時間：重新建置中 ${done}/${total}`);
+      } else {
+        setQpfDataTimeText("資料時間：重建完成，正在更新圖層…");
+      }
+
+      const newBuiltTime = String(latestMeta?.built_time || "");
+
+      if (!building && newBuiltTime && newBuiltTime !== oldBuiltTime) {
+        break;
+      }
+    }
+
+    // 3. 重新載入圖片圖層
+    if (qpfOverlay) {
+      loadQpfImage();
+    }
+
+    if (typeof updateQpfDataTimeFromMeta === "function") {
+      updateQpfDataTimeFromMeta();
+    }
+
+    setQpfUpdateTime();
+
+  }catch(e){
+    console.warn("[QPF rebuild failed]", e);
+    setQpfDataTimeText("資料時間：重建失敗，改為重新載入既有圖層");
+
+    if (qpfOverlay) {
+      loadQpfImage();
+    }
+
+  }finally{
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || "更新圖層";
+    }
+
+    setTimeout(updateQpfLocationMarker, 120);
+  }
 }
 
 function fitQpfBounds(){
@@ -1774,25 +2023,25 @@ function initQpfForecastMap(){
     return;
   }
 
-  qpfMap = L.map("qpfMap", {
-    center:[23.5, 120.8],
-    zoom:6,
-    minZoom:4,
-    maxZoom:12,
-    zoomControl:true,
-    attributionControl:true,
-    preferCanvas:true,
-    tap:true
-  });
+qpfMap = L.map("qpfMap", {
+  center:[23.5, 120.8],
+  zoom:6,
+  minZoom:4,
+  maxZoom:12,
+  zoomControl:true,
+  attributionControl:true,
+  preferCanvas:true,
+  tap:true
+});
 
   // v7.0.3：改用白底、無標籤的淡色底圖，避免一般 OSM 道路/地名干擾 QPF 雨量色階。
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-    subdomains:"abcd",
-    maxZoom:20,
-    attribution:"&copy; OpenStreetMap &copy; CARTO"
-  }).addTo(qpfMap);
-
-  qpfOverlay = L.imageOverlay("", QPF60_BOUNDS, {
+  // v7.1.1：修復電腦和安卓手機看不到地圖問題
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom:19,
+  detectRetina:false,
+  attribution:"&copy; OpenStreetMap"
+}).addTo(qpfMap);
+qpfOverlay = L.imageOverlay("", QPF60_BOUNDS, {
     opacity:0.78,
     interactive:false
   }).addTo(qpfMap);
@@ -3701,6 +3950,8 @@ async function fetchCwaFull(lat, lon, alt = "auto", extra = {}){
   u.searchParams.set("lat", String(lat));
   u.searchParams.set("lon", String(lon));
   u.searchParams.set("alt", normalizeAltForCwaFull(alt));
+  // v7.2：請求後端同時回傳預報資料；後端尚未支援時，前端會自動保留舊版前端預報 fallback。
+  u.searchParams.set("forecast", "1");
   if (extra.county) u.searchParams.set("county", extra.county);
   if (extra.district) u.searchParams.set("district", extra.district);
   if (extra.label) u.searchParams.set("label", extra.label);
@@ -4227,6 +4478,124 @@ function visibilityTextToKm(v){
   return Number(nums[0]);
 }
 
+
+/* ===========================
+   v7.2：後端預報資料轉換
+   目的：後端 /full?forecast=1 若已回傳 forecast，就直接使用後端預報；
+   若後端尚未支援，仍保留原本前端 CWA / Open-Meteo fallback。
+   =========================== */
+function parseBackendForecastTs(v, fallbackDateOnly = false){
+  // 後端有些欄位會同時給 ts:number 與 time:string。
+  // 不能把數字 timestamp 丟進 Date.parse("1783608000000")，那會變 NaN，導致 hourly10m/hourly1h 被整批濾掉。
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+
+  const s = String(v ?? "").trim();
+  if (!s) return NaN;
+
+  if (/^\d{10,}$/.test(s)) {
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
+  }
+
+  let text = s;
+  if (fallbackDateOnly && /^\d{4}-\d{2}-\d{2}$/.test(text)) text += "T12:00:00";
+
+  const ts = Date.parse(text);
+  return Number.isFinite(ts) ? ts : NaN;
+}
+
+function normalizeBackendForecastHourlyItem(item){
+  const ts = parseBackendForecastTs(
+    item?.ts ?? item?.time ?? item?.datetime ?? item?.startTime ?? item?.start_time ?? item?.valid_time
+  );
+  const temp = backendNumber(item?.temp ?? item?.temperature ?? item?.temperature_2m);
+  const at = backendNumber(item?.at ?? item?.feels ?? item?.feels_like ?? item?.apparent_temperature);
+  const pop = backendNumber(item?.pop ?? item?.precip_probability ?? item?.precipitation_probability);
+  const wx = String(item?.wx ?? item?.condition ?? item?.weather ?? item?.weather_text ?? "").trim();
+  const icon = String(item?.icon ?? item?._icon ?? "").trim();
+  const codeRaw = item?.code ?? item?.weather_code ?? item?._code;
+  const code = Number(codeRaw);
+  return {
+    ts,
+    temp,
+    at,
+    wx,
+    pop: Number.isFinite(pop) ? pop : NaN,
+    _icon: icon || "",
+    _code: Number.isFinite(code) ? code : null
+  };
+}
+
+function normalizeBackendForecastDailyItem(item){
+  const dateKey = String(item?.dateKey ?? item?.date ?? item?.time ?? "").slice(0, 10);
+  const ts = parseBackendForecastTs(dateKey || item?.ts || item?.time, true);
+  const dd = Number.isFinite(ts) ? new Date(ts) : null;
+  const pop = backendNumber(item?.pop ?? item?.precip_probability ?? item?.precipitation_probability);
+  const wx = String(item?.wx ?? item?.condition ?? item?.weather ?? item?.weather_text ?? "").trim();
+  const icon = String(item?.icon ?? item?._icon ?? "").trim();
+  const codeRaw = item?.code ?? item?.weather_code ?? item?._code;
+  const code = Number(codeRaw);
+  return {
+    dateKey: dateKey || "",
+    dow: String(item?.dow ?? item?.weekday ?? (dd ? WEEK[dd.getDay()] : "--")),
+    wx,
+    _icon: icon || "",
+    _code: Number.isFinite(code) ? code : null,
+    pop: Number.isFinite(pop) ? pop : NaN,
+    minT: backendNumber(item?.minT ?? item?.min_temp ?? item?.temperature_2m_min),
+    maxT: backendNumber(item?.maxT ?? item?.max_temp ?? item?.temperature_2m_max),
+    minAT: backendNumber(item?.minAT ?? item?.min_feels ?? item?.apparent_temperature_min),
+    maxAT: backendNumber(item?.maxAT ?? item?.max_feels ?? item?.apparent_temperature_max)
+  };
+}
+
+function getBackendForecastBlock(data){
+  return data?.forecast || data?.forecastData || data?.forecast_backend || null;
+}
+
+function renderBackendForecastIfAvailable(data){
+  const fc = getBackendForecastBlock(data);
+  if (!fc || fc.ok === false) return false;
+
+  const h10Raw = fc.hourly10m || fc.hourly_10m || fc.hourly_10min || fc.tenMinute || fc.ten_minute || [];
+  const h1Raw  = fc.hourly1h || fc.hourly_1h || fc.hourly || [];
+  const d7Raw  = fc.daily7 || fc.daily_7 || fc.daily || [];
+
+  const h10 = Array.isArray(h10Raw) ? h10Raw.map(normalizeBackendForecastHourlyItem).filter(x => Number.isFinite(x.ts)) : [];
+  const h1  = Array.isArray(h1Raw)  ? h1Raw.map(normalizeBackendForecastHourlyItem).filter(x => Number.isFinite(x.ts)) : [];
+  const d7  = Array.isArray(d7Raw)  ? d7Raw.map(normalizeBackendForecastDailyItem).filter(x => x.dateKey || x.dow) : [];
+
+  if (!h10.length && !h1.length && !d7.length) return false;
+
+  hourly10m = h10;
+  hourly1h = h1;
+  daily7 = d7;
+
+  if (!hourly10m.length && hourly1h.length) hourly10m = hourly1h.slice();
+  if (!hourly1h.length && hourly10m.length) hourly1h = hourly10m.filter((_, i) => i % 6 === 0).slice(0, 24);
+
+  const sourceText = fc.sourceText || fc.source_text || fc.source || fc.provider || "後端預報";
+  const titleText = fc.title || "未來 24 小時預報";
+  if ($("fcTitle")) $("fcTitle").textContent = titleText;
+
+  renderHourlyForecast(true);
+  renderDailyForecast(true);
+
+  const hint = `預報：<b>${sourceText}</b>（後端）`;
+  const hb = $("hintBar");
+  if (hb) {
+    const old = hb.innerHTML || "";
+    hb.innerHTML = old ? `${old}<br/>${hint}` : hint;
+  }
+
+  const footer = $("footerLabel");
+  if (footer && !String(footer.innerHTML || "").includes("預報：後端")) {
+    footer.innerHTML = `${footer.innerHTML || ""}<br/>預報：後端統一分流 CWA / Open-Meteo`;
+  }
+
+  return true;
+}
+
 /* ===========================
    核心：一次更新「即時 + 預報」
    adminOverride：使用者輸入的 鄉/鎮/市/區（若有）
@@ -4691,6 +5060,11 @@ renderAtmosphereEffects({
 if (realtimeCondText) $("weatherIcon").textContent = mapWeatherToIcon(realtimeCondText, iconNight);
 if (isFinite(realtimeT)) applyTemperatureTint(realtimeT);
 
+  // v7.2：後端若已回傳 forecast，直接使用後端預報，跳過前端 CWA / Open-Meteo 預報邏輯。
+  if (renderBackendForecastIfAvailable(cwaFullData)) {
+    return;
+  }
+
   // ===== 預報：台灣 30km 內有 CWA 預報點 -> 用 CWA，否則用 Open-Meteo =====
   let useCwaForecast = false;
   let selectedForecastIndex = [];
@@ -5133,7 +5507,9 @@ function renderHourlyForecast(isOpenMeteo=false){
 
     const rowHour = hourFloatFromTs(p.ts);
     const rowNight = isNightHour(rowHour, currentSunriseHour, currentSunsetHour);
-    const icon = (isOpenMeteo && p._icon) ? omCodeToTextIcon(p._code ?? null, rowNight).icon : wxIconText(p.wx || "", rowNight);
+    const icon = p._icon
+      ? p._icon
+      : ((isOpenMeteo && Number.isFinite(Number(p._code))) ? omCodeToTextIcon(p._code, rowNight).icon : wxIconText(p.wx || "", rowNight));
     const tempStr = formatHourlyValue(p.temp, forecastMode);
     const atStr = formatHourlyValue(p.at, forecastMode);
 
@@ -5170,7 +5546,9 @@ function renderDailyForecast(isOpenMeteo=false){
     const minStr = isFinite(min) ? (Math.round(min) + "°") : "--";
     const maxStr = isFinite(max) ? (Math.round(max) + "°") : "--";
 
-    const icon = (isOpenMeteo && d._icon) ? d._icon : wxIconText(d.wx || "", false);
+    const icon = d._icon
+      ? d._icon
+      : ((isOpenMeteo && Number.isFinite(Number(d._code))) ? omCodeToTextIcon(d._code, false).icon : wxIconText(d.wx || "", false));
 
     const row = document.createElement("div");
     row.className = "daily-row";
@@ -5322,13 +5700,73 @@ async function runCurrentMode(options = {}){
     if (mySeq === weatherRunSeq) {
       lastWeatherRefreshAt = Date.now();
       setRefreshBusy(false);
-      updateQpfLocationMarker();
+
+      // 每次主更新 / Enter 更新 / 2 分鐘自動更新完成後，同步重新載入所有圖層
+      refreshAllVisualLayers(options.fromAuto ? "auto" : "manual");
+
       scheduleAutoRefresh();
     }
   }
 }
 
 $("refreshBtn").onclick = runCurrentMode;
+
+function validateCoordInputsBeforeSubmit(){
+  const latStr = ($("manualLat")?.value || "").trim();
+  const lonStr = ($("manualLon")?.value || "").trim();
+
+  if (!latStr || !lonStr) {
+    $("stationLabel").textContent = "請先輸入緯度與經度。";
+    return false;
+  }
+
+  const lat = Number(latStr);
+  const lon = Number(lonStr);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    $("stationLabel").textContent = "緯度與經度必須是數字。";
+    return false;
+  }
+
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    $("stationLabel").textContent = "座標範圍錯誤：緯度需在 -90～90，經度需在 -180～180。";
+    return false;
+  }
+
+  return true;
+}
+
+function validateTownInputBeforeSubmit(){
+  const name = ($("townName")?.value || "").trim();
+  if (!name) {
+    $("stationLabel").textContent = "請先輸入地點名稱。";
+    return false;
+  }
+  return true;
+}
+
+function submitUpdateByEnter(e){
+  if (e.key !== "Enter") return;
+  if (e.isComposing) return;
+
+  const target = e.target;
+  if (!target || !target.matches("#townName,#manualLat,#manualLon,#manualAlt")) return;
+
+  e.preventDefault();
+
+  const mode = document.querySelector('input[name="mode"]:checked')?.value || "gps";
+
+  if (mode === "town" && !validateTownInputBeforeSubmit()) return;
+  if (mode === "coord" && !validateCoordInputsBeforeSubmit()) return;
+
+  $("refreshBtn")?.click();
+}
+
+["townName", "manualLat", "manualLon", "manualAlt"].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener("keydown", submitUpdateByEnter);
+});
+
 
 // 自動更新由 scheduleAutoRefresh() 控制：使用者閒置 2 分鐘後才刷新。
 
