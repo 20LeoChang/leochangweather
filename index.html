@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>天氣網站v7.4</title>
+  <title>天氣網站v7.4.1</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -651,7 +651,7 @@
             </div>
             <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
             <pre id="debugBox"></pre>
-            <div class="version-badge" id="versionLabel">v7.4</div>
+            <div class="version-badge" id="versionLabel">v7.4.1</div>
           </div>
         </section>
 
@@ -668,7 +668,7 @@
 
             <section class="weather-page forecast-page" id="forecastPage" aria-label="預報與圖資">
               <div class="wx-map-block">
-                <div class="wx-map-head"><div class="wx-map-title">極短期降雨推估(beta版)</div><div class="wx-map-note">未來60分鐘推估雨量</div></div>
+                <div class="wx-map-head"><div class="wx-map-title">極短期降雨推估</div><div class="wx-map-note">未來60分鐘推估雨量</div></div>
                 <div class="qpf-map-panel">
                   <div class="qpf-map-toolbar" aria-label="雷達外推雨量圖層控制">
                     <button class="qpf-map-btn" id="qpfFitBtn" type="button">回到全域</button>
@@ -710,7 +710,7 @@
               <div class="forecast-header" style="margin-top:10px;"><div class="forecast-title">未來 7 天天氣預報</div><button id="toggle7dTempMode" class="mini-toggle-btn">顯示體感</button></div>
               <div class="daily-forecast" id="dailyForecast"><div class="forecast-empty">尚無預報資料</div></div>
             </section>
-            <div class="version-badge">v7.4</div>
+            <div class="version-badge">v7.4.1</div>
           </div>
         </section>
 
@@ -766,7 +766,7 @@
                 </div>
               </div>
             </section>
-            <div class="version-badge">v7.4</div>
+            <div class="version-badge">v7.4.1</div>
           </div>
         </section>
       </div>
@@ -784,7 +784,7 @@
    設定
    =========================== */
 const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-const APP_VERSION = "v7.4";
+const APP_VERSION = "v7.4.1";
 const CWA_OBS_10M_S3 = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
 const CWA_OBS_1H_S3  = "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
 const WORKER_ORIGIN = (()=>{ try{ return new URL(PROXY_BASE).origin; }catch{ return ""; }})();
@@ -847,7 +847,10 @@ function installObsAssetControls(){
 }
 
 const QPF60_URL = "https://api.leochangrainapi.com/api/qpf60.png";
-const QPF60_BOUNDS = [[18.0,115.0],[29.0125,126.5125]];
+let QPF60_BOUNDS = [
+  [17.99375, 114.99375],
+  [29.00625, 126.50625]
+];
 let qpfMap=null,qpfOverlay=null,qpfBoundsBox=null,qpfLocationMarker=null,qpfMapInstalled=false,leafletLoadPromise=null;
 function loadLeafletScriptFrom(url){
   return new Promise((resolve,reject)=>{
@@ -883,8 +886,49 @@ function formatQpfApiTime(v){
   const d=new Date(s.includes("T")?s:s.replace(" ","T"));return Number.isNaN(d.getTime())?s:formatManualUpdateTime(d.getTime());
 }
 async function updateQpfDataTimeFromMeta(){
-  const el=$("qpfDataTime");if(!el)return;
-  try{const r=await fetch(getQpfMetaUrl(),{cache:"no-store"});const data=await r.json();if(!data||data.ok!==true){el.textContent="資料時間：取得失敗";return;}el.textContent=`資料時間：雷達 ${formatQpfApiTime(data.base_time)}｜建置 ${formatQpfApiTime(data.built_time)}`;}catch{el.textContent="資料時間：取得失敗";}
+  const el = $("qpfDataTime");
+  if (!el) return;
+
+  try {
+    const r = await fetch(
+      getQpfMetaUrl(),
+      { cache: "no-store" }
+    );
+
+    const data = await r.json();
+
+    if (!data || data.ok !== true) {
+      el.textContent = "資料時間：取得失敗";
+      return;
+    }
+
+    // 從後端取得真正的雷達圖片邊界
+    if (
+      Array.isArray(data.leaflet_bounds) &&
+      data.leaflet_bounds.length === 2
+    ) {
+      QPF60_BOUNDS = data.leaflet_bounds;
+
+      if (qpfOverlay) {
+        qpfOverlay.setBounds(
+          QPF60_BOUNDS
+        );
+      }
+
+      if (qpfBoundsBox) {
+        qpfBoundsBox.setBounds(
+          QPF60_BOUNDS
+        );
+      }
+    }
+
+    el.textContent =
+      `資料時間：雷達 ${formatQpfApiTime(data.base_time)}` +
+      `｜建置 ${formatQpfApiTime(data.built_time)}`;
+
+  } catch {
+    el.textContent = "資料時間：取得失敗";
+  }
 }
 function updateQpfLocationMarker(){
   if(!qpfMap||typeof L==="undefined"||!lastTarget)return;
