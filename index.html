@@ -2,12 +2,9 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta
-  name="viewport"
-  content="width=device-width, initial-scale=1, viewport-fit=cover"
-/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v7.4.3</title>
+    <title>天氣網站v7.5</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -176,79 +173,329 @@
       }
 
       .realtime-metrics-wrap {
-        margin-top: 10px;
+        margin-top: 12px;
       }
-      .realtime-metrics-top {
+      .environment-panel {
+        padding: 13px;
+        border-radius: 20px;
+        background: var(--section-bg);
+        border: 1px solid var(--section-border);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+      .environment-head {
         display: flex;
         align-items: center;
-        justify-content: flex-start;
-        gap: 8px;
+        justify-content: space-between;
+        gap: 12px;
       }
-      .realtime-metrics-title {
-        font-size: 12px;
-        opacity: 1;
-        letter-spacing: 0.5px;
-        font-weight: 700;
-        color: rgba(255, 255, 255, 0.96);
+      .environment-head-main {
+        min-width: 0;
+        flex: 1 1 auto;
       }
-      .realtime-metrics {
-        margin-top: 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .metric-pill {
+      .environment-head-actions {
+        flex: 0 0 auto;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 11px;
-        font-weight: 600;
-        opacity: 1;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .environment-title {
+        font-size: 14px;
+        font-weight: 850;
+        letter-spacing: 0.3px;
+        color: rgba(255, 255, 255, 0.98);
+      }
+      .environment-subtitle {
+        margin-top: 2px;
+        font-size: 11.5px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.62);
+      }
+      .environment-toggle,
+      .environment-customize-btn {
+        flex: 0 0 auto;
+        min-height: 34px;
+        padding: 7px 12px;
         border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-      }
-      .metric-pill b {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        font-size: 12px;
         font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        white-space: nowrap;
+        transition: transform 0.16s ease, background 0.18s ease, border-color 0.18s ease;
       }
-
-      .metric-wind {
-        background: #1f4f95;
-        color: #ffffff;
+      .environment-toggle:active,
+      .environment-customize-btn:active {
+        transform: scale(0.98);
       }
-      .metric-hum {
-        background: #147a63;
-        color: #ffffff;
+      .environment-customize-btn {
+        background: rgba(255, 255, 255, 0.07);
       }
-      .metric-pres {
-        background: #46515c;
-        color: #ffffff;
+      .environment-customize-btn.is-open {
+        background: rgba(110, 181, 255, 0.18);
+        border-color: rgba(110, 181, 255, 0.34);
       }
-      .metric-sun {
-        background: #c89200;
-        color: #ffffff;
+      .environment-toggle-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        font-size: 12px;
+        transition: transform 0.25s ease;
       }
-      .metric-vis {
-        background: #bfc9d4;
-        color: #1e2a36;
+      .environment-panel.is-open .environment-toggle-icon {
+        transform: rotate(180deg);
       }
-      .metric-air {
-        background: #d9e1e8;
-        color: #1e2a36;
+      .environment-summary {
+        margin-top: 11px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
-      .metric-uv {
-        background: #d9e1e8;
-        color: #1e2a36;
+      .environment-summary-item {
+        min-width: 0;
+        min-height: 66px;
+        padding: 9px 10px;
+        border-radius: 15px;
+        background: rgba(255, 255, 255, 0.085);
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        display: grid;
+        grid-template-columns: 25px minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
       }
-      .metric-rainobs {
-        background: rgba(0, 0, 0, 0.18);
-        color: #ffffff;
+      .environment-summary-item.is-alert {
+        border-color: color-mix(in srgb, var(--summary-accent, #6eb5ff) 58%, transparent);
+        box-shadow:
+          inset 3px 0 0 var(--summary-accent, #6eb5ff),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
       }
-      .metric-rainobs b {
+      .environment-summary-icon {
+        font-size: 19px;
+        line-height: 1;
+        text-align: center;
+      }
+      .environment-summary-label {
+        font-size: 11px;
+        font-weight: 750;
+        color: rgba(255, 255, 255, 0.64);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .environment-summary-value {
+        margin-top: 2px;
+        font-size: 13px;
+        line-height: 1.3;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.98);
+        overflow-wrap: anywhere;
+      }
+      .environment-customize-shell,
+      .environment-details-shell {
+        display: grid;
+        grid-template-rows: 0fr;
+        opacity: 0;
+        transition:
+          grid-template-rows 0.3s cubic-bezier(0.22, 0.72, 0.16, 1),
+          opacity 0.22s ease,
+          margin-top 0.3s ease;
+        margin-top: 0;
+      }
+      .environment-panel.is-customizing .environment-customize-shell,
+      .environment-panel.is-open .environment-details-shell {
+        grid-template-rows: 1fr;
+        opacity: 1;
+        margin-top: 12px;
+      }
+      .environment-details-inner,
+      .environment-customize-inner {
+        min-height: 0;
+        overflow: hidden;
+      }
+      .environment-customize-card {
+        padding: 11px;
+        border-radius: 16px;
+        background: rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .environment-customize-title {
+        font-size: 12px;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.95);
+      }
+      .environment-customize-note {
+        margin-top: 4px;
+        font-size: 11px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.64);
+      }
+      .environment-customize-grid {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .environment-customize-item {
+        position: relative;
+        min-height: 42px;
+        padding: 10px 12px 10px 36px;
+        border-radius: 13px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 12px;
+        font-weight: 800;
+        text-align: left;
+        cursor: pointer;
+        transition: transform 0.16s ease, background 0.18s ease, border-color 0.18s ease;
+      }
+      .environment-customize-item:active {
+        transform: scale(0.985);
+      }
+      .environment-customize-item.is-selected {
+        background: rgba(110, 181, 255, 0.16);
+        border-color: rgba(110, 181, 255, 0.34);
+      }
+      .environment-customize-order {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .environment-customize-item.is-selected .environment-customize-order {
+        background: rgba(110, 181, 255, 0.95);
+        color: #0a1730;
+      }
+      .environment-customize-actions {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .environment-customize-action {
+        min-height: 34px;
+        padding: 7px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .environment-customize-action.is-primary {
+        background: rgba(110, 181, 255, 0.18);
+        border-color: rgba(110, 181, 255, 0.34);
+      }
+      .environment-details {
+        display: grid;
+        gap: 10px;
+      }
+      .environment-section {
+        padding: 9px;
+        border-radius: 15px;
+        background: rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .environment-section-title {
+        padding: 0 2px 6px;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.8px;
+        color: rgba(255, 255, 255, 0.58);
+      }
+      .environment-row {
+        --metric-accent: rgba(110, 181, 255, 0.95);
+        min-height: 42px;
+        padding: 9px 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.055);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.72);
         font-variant-numeric: tabular-nums;
+      }
+      .environment-row-main {
+        min-width: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .environment-row + .environment-row {
+        margin-top: 6px;
+      }
+      .environment-row b {
+        min-width: 0;
+        text-align: right;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.98);
+        overflow-wrap: anywhere;
+      }
+      .environment-row.is-highlight {
+        border-color: color-mix(in srgb, var(--metric-accent) 56%, transparent);
+        box-shadow: inset 3px 0 0 var(--metric-accent);
+      }
+      #mPres {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .pressure-inline-toggle {
+        flex: 0 0 auto;
+        min-height: 24px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.09);
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 10px;
+        font-weight: 850;
+        cursor: pointer;
+        line-height: 1;
+      }
+      @media (max-width: 360px) {
+        .environment-head {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .environment-head-actions {
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .environment-summary,
+        .environment-customize-grid {
+          grid-template-columns: 1fr;
+        }
+        .environment-summary-item {
+          min-height: 58px;
+        }
       }
 
       .card-subtitle {
@@ -1248,16 +1495,27 @@
         overflow: hidden;
         position: relative;
         z-index: 2;
-        touch-action: pan-y;
+        touch-action: pan-y pinch-zoom;
+        overscroll-behavior-x: contain;
+      }
+      html.page-zoomed .interface-viewport {
+        touch-action: auto;
       }
       .interface-track {
         display: flex;
         align-items: flex-start;
         width: 100%;
         min-width: 0;
-        transform: translateX(0);
-        transition: transform 0.38s cubic-bezier(0.22, 0.72, 0.16, 1);
+        transform: translate3d(0, 0, 0);
+        transition: transform 0.42s cubic-bezier(0.22, 0.72, 0.16, 1);
         will-change: transform;
+        backface-visibility: hidden;
+      }
+      .interface-track.is-dragging {
+        transition: none !important;
+      }
+      .interface-viewport.is-swiping {
+        cursor: grabbing;
       }
       .interface-page {
         flex: 0 0 100%;
@@ -1308,9 +1566,10 @@
       .page-hint {
         margin-top: 7px;
         text-align: center;
-        font-size: 10.5px;
+        font-size: 11.5px;
+        line-height: 1.45;
         font-weight: 650;
-        color: rgba(255, 255, 255, 0.62);
+        color: rgba(255, 255, 255, 0.68);
         letter-spacing: 0.3px;
         user-select: none;
       }
@@ -2039,26 +2298,7 @@
         font-variant-numeric: tabular-nums;
       }
 
-      /* 完整測站與氣壓切換新增樣式 */
-      #mPres {
-        cursor: pointer;
-        user-select: none;
-        -webkit-user-select: none;
-        transition:
-          transform 0.15s ease,
-          filter 0.15s ease,
-          background 0.18s ease;
-      }
-      #mPres:hover {
-        filter: brightness(1.08);
-      }
-      #mPres:active {
-        transform: scale(0.97);
-      }
-      #mPres:focus-visible {
-        outline: 2px solid rgba(255, 255, 255, 0.92);
-        outline-offset: 2px;
-      }
+      /* 完整測站與氣壓切換樣式已整合至目前環境面板 */
       .source-provider-summary {
         font-size: 11px;
         font-weight: 850;
@@ -2104,6 +2344,14 @@
         color: rgba(255, 255, 255, 0.6);
         line-height: 1.45;
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .interface-track,
+        .environment-details-shell,
+        .environment-toggle-icon {
+          transition-duration: 0.01ms !important;
+        }
+      }
     </style>
   </head>
 
@@ -2143,7 +2391,7 @@
               </div>
 
               <div class="mode-input" id="mode-town" style="display: none">
-                <input id="townName" type="text" placeholder="例如：北京、天安門廣場、秀林鄉" />
+                <input id="townName" type="text" placeholder="例如：台北、自由廣場、秀林鄉" />
                 <small>台灣鄉鎮市區：以公所座標；其他：以城市/景點座標。</small>
               </div>
 
@@ -2176,9 +2424,9 @@
                 <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">左右滑動整張介面，或雙擊螢幕左側／右側切換</div>
+              <div class="page-hint">單指左右滑動切換；雙指可縮放，放大後單指拖曳</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v7.4.3</div>
+              <div class="version-badge" id="versionLabel">v7.5</div>
             </div>
           </section>
 
@@ -2196,7 +2444,7 @@
                 <button class="view-tab on" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">向左滑到觀測資料，向右滑回即時溫度</div>
+              <div class="page-hint">單指左右滑動切換頁面；地圖區可獨立拖曳與縮放</div>
               <hr class="card-divider" />
 
               <section class="weather-page forecast-page" id="forecastPage" aria-label="預報與圖資">
@@ -2300,7 +2548,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v7.4.3</div>
+              <div class="version-badge">v7.5</div>
             </div>
           </section>
 
@@ -2318,7 +2566,7 @@
                 <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab on" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">向右滑回預報資料</div>
+              <div class="page-hint">向右滑回預報；點擊圖資可放大並雙指縮放</div>
               <hr class="card-divider" />
 
               <section class="weather-page observation-page" id="observationPage" aria-label="觀測資料與圖資">
@@ -2360,29 +2608,98 @@
                 </div>
 
                 <div class="realtime-metrics-wrap">
-                  <div class="realtime-metrics-top">
-                    <div class="realtime-metrics-title">
-                      更多天氣資料(點擊氣壓欄位可切換所在地氣壓和海平面氣壓)
+                  <div class="environment-panel" id="environmentPanel">
+                    <div class="environment-head">
+                      <div class="environment-head-main">
+                        <div class="environment-title">目前環境</div>
+                        <div class="environment-subtitle">摘要四格可自訂，設定會保留在此裝置</div>
+                      </div>
+                      <div class="environment-head-actions">
+                        <button
+                          id="environmentCustomizeBtn"
+                          class="environment-customize-btn"
+                          type="button"
+                          aria-expanded="false"
+                          aria-controls="environmentCustomizeShell"
+                        >
+                          摘要設定
+                        </button>
+                        <button
+                          id="environmentToggleBtn"
+                          class="environment-toggle"
+                          type="button"
+                          aria-expanded="false"
+                          aria-controls="environmentDetailsShell"
+                        >
+                          <span class="environment-toggle-text">全部資料</span>
+                          <span class="environment-toggle-icon" aria-hidden="true">▾</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div class="realtime-metrics" id="realtimeMetrics">
-                    <span class="metric-pill metric-wind" id="mWind">風 <b>--</b></span>
-                    <span class="metric-pill metric-hum" id="mHum">濕度 <b>--</b></span>
-                    <span
-                      class="metric-pill metric-pres"
-                      id="mPres"
-                      role="button"
-                      tabindex="0"
-                      aria-label="切換所在地氣壓與海平面氣壓"
-                      title="點擊切換所在地氣壓／海平面氣壓"
-                      >所在地氣壓 <b>--</b></span
-                    >
-                    <span class="metric-pill metric-sun" id="mSun">日照 <b>--</b></span>
-                    <span class="metric-pill metric-vis" id="mVis">能見度 <b>--</b></span>
-                    <span class="metric-pill metric-rainobs" id="mRain10">10分鐘雨量 <b>--</b></span>
-                    <span class="metric-pill metric-rainobs" id="mRain1h">1小時雨量 <b>--</b></span>
-                    <span class="metric-pill metric-air" id="mAir">空氣品質 <b>--</b></span>
-                    <span class="metric-pill metric-uv" id="mUv">紫外線指數 <b>--</b></span>
+
+                    <div class="environment-summary" id="environmentSummary" aria-live="polite"></div>
+
+                    <div class="environment-customize-shell" id="environmentCustomizeShell">
+                      <div class="environment-customize-inner">
+                        <div class="environment-customize-card">
+                          <div class="environment-customize-title">摘要四格設定</div>
+                          <div class="environment-customize-note" id="environmentCustomizeNote">
+                            點選可選擇或取消，順序就是前四格顯示順序。
+                          </div>
+                          <div class="environment-customize-grid" id="environmentCustomizeGrid"></div>
+                          <div class="environment-customize-actions">
+                            <button id="environmentCustomizeAutoBtn" class="environment-customize-action" type="button">
+                              恢復自動
+                            </button>
+                            <button id="environmentCustomizeDoneBtn" class="environment-customize-action is-primary" type="button">
+                              完成
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="environment-details-shell" id="environmentDetailsShell">
+                      <div class="environment-details-inner">
+                        <div class="environment-details" id="environmentDetails">
+                          <section class="environment-section" aria-label="降雨資料">
+                            <div class="environment-section-title">降雨</div>
+                            <div class="environment-row" id="mRain10">過去10分鐘 <b>--</b></div>
+                            <div class="environment-row" id="mRain1h">過去1小時 <b>--</b></div>
+                          </section>
+
+                          <section class="environment-section" aria-label="大氣資料">
+                            <div class="environment-section-title">大氣</div>
+                            <div class="environment-row" id="mWind">風 <b>--</b></div>
+                            <div class="environment-row" id="mHum">相對濕度 <b>--</b></div>
+                            <div class="environment-row" id="mPres">
+                              <div class="environment-row-main">
+                                <span class="environment-row-label-text">所在地氣壓</span>
+                                <button
+                                  id="mPresToggle"
+                                  class="pressure-inline-toggle"
+                                  type="button"
+                                  aria-label="切換所在地氣壓與海平面氣壓"
+                                  aria-pressed="false"
+                                  title="點擊切換所在地氣壓／海平面氣壓"
+                                >
+                                  切換
+                                </button>
+                              </div>
+                              <b>--</b>
+                            </div>
+                            <div class="environment-row" id="mSun">日照 <b>--</b></div>
+                            <div class="environment-row" id="mVis">能見度 <b>--</b></div>
+                          </section>
+
+                          <section class="environment-section" aria-label="健康資料">
+                            <div class="environment-section-title">健康</div>
+                            <div class="environment-row" id="mAir">空氣品質 <b>--</b></div>
+                            <div class="environment-row" id="mUv">紫外線指數 <b>--</b></div>
+                          </section>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2407,7 +2724,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v7.4.3</div>
+              <div class="version-badge">v7.5</div>
             </div>
           </section>
         </div>
@@ -2441,7 +2758,7 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v7.4.3";
+      const APP_VERSION = "v7.5";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -3026,7 +3343,7 @@
           el &&
           el.closest &&
           el.closest(
-            "button,input,textarea,select,label,a,.hourly-forecast,.daily-forecast,.obs-asset-img,.image-lightbox,.qpf-map-wrap,.qpf-map-toolbar,.leaflet-container",
+            "button,input,textarea,select,label,a,[role=\"button\"],.hourly-forecast,.daily-forecast,.obs-asset-img,.image-lightbox,.qpf-map-wrap,.qpf-map-toolbar,.leaflet-container",
           )
         );
       }
@@ -3039,17 +3356,42 @@
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
       }
-      function setWeatherPage(page) {
+      function getPageZoomScale() {
+        return Number(window.visualViewport?.scale) || 1;
+      }
+      function isPageZoomed() {
+        return getPageZoomScale() > 1.02;
+      }
+      function getInterfacePageWidth() {
+        return Math.max(1, $("interfaceViewport")?.clientWidth || window.innerWidth || 1);
+      }
+      function setTrackPosition(index, dragOffsetPx = 0, animate = true) {
+        const track = $("interfaceTrack");
+        if (!track) return;
+        track.classList.toggle("is-dragging", !animate);
+        const x = -index * getInterfacePageWidth() + dragOffsetPx;
+        track.style.transform = `translate3d(${x}px, 0, 0)`;
+      }
+      function updatePageZoomState() {
+        const zoomed = isPageZoomed();
+        document.documentElement.classList.toggle("page-zoomed", zoomed);
+        if (zoomed) {
+          $("interfaceViewport")?.classList.remove("is-swiping");
+          setTrackPosition(WEATHER_PAGES.indexOf(currentWeatherPage), 0, false);
+        }
+      }
+      function setWeatherPage(page, options = {}) {
         if (!WEATHER_PAGES.includes(page)) page = "current";
-        const changed = currentWeatherPage !== page;
+        const animate = options.animate !== false,
+          shouldScrollTop = options.scrollTop !== false,
+          changed = currentWeatherPage !== page;
         currentWeatherPage = page;
         document.body.dataset.page = page;
-        if ($("interfaceTrack"))
-          $("interfaceTrack").style.transform = `translateX(-${WEATHER_PAGES.indexOf(page) * 100}%)`;
+        setTrackPosition(WEATHER_PAGES.indexOf(page), 0, animate);
         document
           .querySelectorAll("[data-page-target]")
           .forEach((btn) => btn.classList.toggle("on", btn.dataset.pageTarget === page));
-        if (changed) {
+        if (changed && shouldScrollTop) {
           scrollInterfaceToTop();
           requestAnimationFrame(scrollInterfaceToTop);
           setTimeout(scrollInterfaceToTop, 80);
@@ -3065,73 +3407,185 @@
       }
       function switchWeatherPage(direction) {
         const i = WEATHER_PAGES.indexOf(currentWeatherPage),
-          n = direction > 0 ? Math.min(2, i + 1) : Math.max(0, i - 1);
+          n = direction > 0 ? Math.min(WEATHER_PAGES.length - 1, i + 1) : Math.max(0, i - 1);
         setWeatherPage(WEATHER_PAGES[n]);
       }
       function installWeatherPageGestures() {
         const viewport = $("interfaceViewport");
         if (!viewport) return;
-        document
-          .querySelectorAll("[data-page-target]")
-          .forEach((btn) => btn.addEventListener("click", () => setWeatherPage(btn.dataset.pageTarget)));
-        let sx = 0,
-          sy = 0,
-          st = 0,
-          moved = false;
+
+        document.querySelectorAll("[data-page-target]").forEach((btn) => {
+          btn.addEventListener("click", () => setWeatherPage(btn.dataset.pageTarget));
+        });
+
+        const state = {
+          startX: 0,
+          startY: 0,
+          startTime: 0,
+          lastX: 0,
+          lastMoveTime: 0,
+          velocityX: 0,
+          pageIndex: 0,
+          dragX: 0,
+          active: false,
+          horizontal: false,
+          vertical: false,
+          blocked: false,
+          multiTouch: false,
+        };
+
+        function resetState() {
+          state.startX = 0;
+          state.startY = 0;
+          state.startTime = 0;
+          state.lastX = 0;
+          state.lastMoveTime = 0;
+          state.velocityX = 0;
+          state.dragX = 0;
+          state.active = false;
+          state.horizontal = false;
+          state.vertical = false;
+          state.blocked = false;
+          state.multiTouch = false;
+          viewport.classList.remove("is-swiping");
+        }
+
+        function snapToCurrentPage(animate = true) {
+          setTrackPosition(WEATHER_PAGES.indexOf(currentWeatherPage), 0, animate);
+          resetState();
+        }
+
         viewport.addEventListener(
           "touchstart",
-          (e) => {
-            if (!e.touches?.length) return;
-            const t = e.touches[0];
-            sx = t.clientX;
-            sy = t.clientY;
-            st = Date.now();
-            moved = false;
+          (event) => {
+            if (event.touches.length !== 1) {
+              state.multiTouch = true;
+              snapToCurrentPage(false);
+              return;
+            }
+            if (isPageZoomed() || isInteractiveTarget(event.target)) {
+              state.blocked = true;
+              return;
+            }
+            const touch = event.touches[0],
+              now = performance.now();
+            state.startX = touch.clientX;
+            state.startY = touch.clientY;
+            state.lastX = touch.clientX;
+            state.startTime = now;
+            state.lastMoveTime = now;
+            state.velocityX = 0;
+            state.pageIndex = WEATHER_PAGES.indexOf(currentWeatherPage);
+            state.dragX = 0;
+            state.active = true;
+            state.horizontal = false;
+            state.vertical = false;
+            state.blocked = false;
+            state.multiTouch = false;
           },
           { passive: true },
         );
+
         viewport.addEventListener(
           "touchmove",
-          (e) => {
-            if (!e.touches?.length) return;
-            const t = e.touches[0];
-            if (Math.abs(t.clientX - sx) > 12 || Math.abs(t.clientY - sy) > 12) moved = true;
+          (event) => {
+            if (event.touches.length !== 1) {
+              state.multiTouch = true;
+              snapToCurrentPage(false);
+              return;
+            }
+            if (!state.active || state.blocked || state.multiTouch || isPageZoomed()) return;
+
+            const touch = event.touches[0],
+              dx = touch.clientX - state.startX,
+              dy = touch.clientY - state.startY;
+
+            if (!state.horizontal && !state.vertical) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) < 9) return;
+              if (Math.abs(dy) >= Math.abs(dx)) {
+                state.vertical = true;
+                state.active = false;
+                return;
+              }
+              state.horizontal = true;
+              viewport.classList.add("is-swiping");
+            }
+
+            if (!state.horizontal) return;
+            event.preventDefault();
+
+            let resistedDx = dx;
+            const lastIndex = WEATHER_PAGES.length - 1;
+            if ((state.pageIndex === 0 && dx > 0) || (state.pageIndex === lastIndex && dx < 0)) {
+              resistedDx = dx * 0.28;
+            }
+
+            state.dragX = resistedDx;
+            const moveNow = performance.now(),
+              moveDt = Math.max(1, moveNow - state.lastMoveTime);
+            state.velocityX = (touch.clientX - state.lastX) / moveDt;
+            state.lastX = touch.clientX;
+            state.lastMoveTime = moveNow;
+            setTrackPosition(state.pageIndex, resistedDx, false);
           },
-          { passive: true },
+          { passive: false },
         );
+
         viewport.addEventListener(
           "touchend",
-          (e) => {
-            if (isInteractiveTarget(e.target)) return;
-            const t = e.changedTouches?.[0];
-            if (!t) return;
-            const dx = t.clientX - sx,
-              dy = t.clientY - sy;
-            if (Date.now() - st <= 700 && Math.abs(dx) >= 58 && Math.abs(dx) > Math.abs(dy) * 1.15)
-              switchWeatherPage(dx < 0 ? 1 : -1);
-          },
-          { passive: true },
-        );
-        let lastTap = 0,
-          lastSide = "";
-        document.addEventListener(
-          "pointerup",
-          (e) => {
-            if (isInteractiveTarget(e.target) || moved) return;
-            const now = Date.now(),
-              side = e.clientX >= innerWidth / 2 ? "right" : "left";
-            if (now - lastTap <= 320 && side === lastSide) {
-              switchWeatherPage(side === "right" ? 1 : -1);
-              lastTap = 0;
-              lastSide = "";
-            } else {
-              lastTap = now;
-              lastSide = side;
+          (event) => {
+            if (!state.active || !state.horizontal || state.blocked || state.multiTouch || isPageZoomed()) {
+              snapToCurrentPage(true);
+              return;
             }
+
+            const touch = event.changedTouches?.[0];
+            if (!touch) {
+              snapToCurrentPage(true);
+              return;
+            }
+
+            const rawDx = touch.clientX - state.startX,
+              velocity = state.velocityX,
+              width = getInterfacePageWidth(),
+              distanceThreshold = Math.min(96, Math.max(66, width * 0.2)),
+              quickFlick = Math.abs(velocity) >= 0.42 && Math.abs(rawDx) >= 28,
+              farEnough = Math.abs(rawDx) >= distanceThreshold,
+              direction = rawDx < 0 ? 1 : -1;
+
+            let targetIndex = state.pageIndex;
+            if (farEnough || quickFlick) {
+              targetIndex = Math.max(0, Math.min(WEATHER_PAGES.length - 1, state.pageIndex + direction));
+            }
+
+            const originalIndex = state.pageIndex;
+            resetState();
+            setWeatherPage(WEATHER_PAGES[targetIndex], {
+              animate: true,
+              scrollTop: targetIndex !== originalIndex,
+            });
           },
           { passive: true },
         );
-        setWeatherPage(currentWeatherPage);
+
+        viewport.addEventListener("touchcancel", () => snapToCurrentPage(true), { passive: true });
+
+        const viewportEvents = window.visualViewport;
+        if (viewportEvents) {
+          viewportEvents.addEventListener("resize", updatePageZoomState, { passive: true });
+          viewportEvents.addEventListener("scroll", updatePageZoomState, { passive: true });
+        }
+        window.addEventListener(
+          "resize",
+          () => {
+            updatePageZoomState();
+            setTrackPosition(WEATHER_PAGES.indexOf(currentWeatherPage), 0, false);
+          },
+          { passive: true },
+        );
+
+        updatePageZoomState();
+        setWeatherPage(currentWeatherPage, { animate: false, scrollTop: false });
       }
 
       let forecastMode = "10m",
@@ -3463,6 +3917,242 @@
         else buildPrecip("", 0);
       }
 
+      const ENVIRONMENT_METRICS = [
+        { id: "mWind", label: "風", icon: "💨", base: 40 },
+        { id: "mHum", label: "濕度", icon: "💧", base: 39 },
+        { id: "mRain10", label: "10分鐘雨量", icon: "🌧️", base: 38 },
+        { id: "mAir", label: "空氣品質", icon: "🌿", base: 37 },
+        { id: "mRain1h", label: "1小時雨量", icon: "☔", base: 20 },
+        { id: "mUv", label: "紫外線", icon: "☀️", base: 18 },
+        { id: "mVis", label: "能見度", icon: "👁️", base: 16 },
+        { id: "mPres", label: "氣壓", icon: "◉", base: 14 },
+        { id: "mSun", label: "日照", icon: "🌤️", base: 12 },
+      ];
+      const ENVIRONMENT_SUMMARY_STORAGE_KEY = "weather_environment_summary_v1";
+      const environmentSummaryState = { mode: "auto", customIds: [] };
+      let environmentSummaryFrame = 0;
+      function readLocalJson(key, fallback = null) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch {
+          return fallback;
+        }
+      }
+      function writeLocalJson(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify(value));
+        } catch {}
+      }
+      function loadEnvironmentSummaryPrefs() {
+        const saved = readLocalJson(ENVIRONMENT_SUMMARY_STORAGE_KEY, null),
+          validIds = new Set(ENVIRONMENT_METRICS.map((metric) => metric.id));
+        if (!saved || typeof saved !== "object") return;
+        if (saved.mode === "custom") {
+          environmentSummaryState.mode = "custom";
+          environmentSummaryState.customIds = Array.isArray(saved.customIds)
+            ? Array.from(new Set(saved.customIds.map(String))).filter((id) => validIds.has(id)).slice(0, 4)
+            : [];
+        }
+      }
+      function saveEnvironmentSummaryPrefs() {
+        writeLocalJson(ENVIRONMENT_SUMMARY_STORAGE_KEY, {
+          mode: environmentSummaryState.mode,
+          customIds: environmentSummaryState.customIds.slice(0, 4),
+        });
+      }
+      function metricValueText(id) {
+        const el = $(id),
+          bold = el?.querySelector("b");
+        return String(bold?.textContent || "--").trim() || "--";
+      }
+      function firstMetricNumber(text) {
+        const m = String(text || "").replaceAll(",", "").match(/-?\d+(?:\.\d+)?/);
+        return m ? Number(m[0]) : NaN;
+      }
+      function environmentMetricScore(metric) {
+        const value = metricValueText(metric.id),
+          number = firstMetricNumber(value);
+        let score = metric.base;
+        if (metric.id === "mRain10" && Number.isFinite(number) && number > 0) score = 140 + Math.min(number, 40);
+        if (metric.id === "mRain1h" && Number.isFinite(number) && number > 0) score = 132 + Math.min(number, 40);
+        if (metric.id === "mAir" && Number.isFinite(number)) {
+          if (number >= 101) score = 150 + Math.min(number, 300) / 10;
+          else if (number >= 51) score = 86 + number / 20;
+        }
+        if (metric.id === "mUv" && Number.isFinite(number)) {
+          if (number >= 8) score = 145 + number;
+          else if (number >= 6) score = 118 + number;
+          else if (number >= 3) score = 58 + number;
+        }
+        if (metric.id === "mWind" && Number.isFinite(number)) {
+          if (number >= 10) score = 138 + number;
+          else if (number >= 6) score = 82 + number;
+        }
+        if (metric.id === "mHum" && Number.isFinite(number) && (number >= 85 || number <= 35)) score = 76;
+        if (metric.id === "mVis" && Number.isFinite(number) && number < 5) score = 125 - number;
+        if (value === "--") score -= 100;
+        return score;
+      }
+      function collectEnvironmentMetrics() {
+        return ENVIRONMENT_METRICS.map((metric, order) => ({
+          ...metric,
+          order,
+          value: metricValueText(metric.id),
+          score: environmentMetricScore(metric),
+          source: $(metric.id),
+        }));
+      }
+      function getEnvironmentSummaryChosenMetrics() {
+        const metrics = collectEnvironmentMetrics(),
+          byId = new Map(metrics.map((metric) => [metric.id, metric])),
+          autoSorted = [...metrics].sort((a, b) => b.score - a.score || a.order - b.order);
+        if (environmentSummaryState.mode !== "custom") return autoSorted.slice(0, 4);
+        const custom = environmentSummaryState.customIds.map((id) => byId.get(id)).filter(Boolean),
+          used = new Set(custom.map((metric) => metric.id));
+        const fill = autoSorted.filter((metric) => !used.has(metric.id)).slice(0, Math.max(0, 4 - custom.length));
+        return [...custom, ...fill].slice(0, 4);
+      }
+      function updateEnvironmentCustomizeNote() {
+        const note = $("environmentCustomizeNote");
+        if (!note) return;
+        const count = environmentSummaryState.customIds.length;
+        note.textContent =
+          environmentSummaryState.mode === "custom"
+            ? `已選 ${count}/4 項；點選可取消，順序就是前四格顯示順序。`
+            : "目前為自動排序；點選項目可改成自訂前四格。";
+      }
+      function renderEnvironmentCustomizeGrid() {
+        const grid = $("environmentCustomizeGrid");
+        if (!grid) return;
+        grid.replaceChildren();
+        const orderMap = new Map(environmentSummaryState.customIds.map((id, index) => [id, index + 1]));
+        for (const metric of ENVIRONMENT_METRICS) {
+          const button = document.createElement("button"),
+            order = document.createElement("span");
+          button.type = "button";
+          button.className = "environment-customize-item";
+          order.className = "environment-customize-order";
+          if (orderMap.has(metric.id)) {
+            button.classList.add("is-selected");
+            order.textContent = String(orderMap.get(metric.id));
+          } else {
+            order.textContent = "+";
+          }
+          button.append(order, document.createTextNode(`${metric.icon} ${metric.label}`));
+          button.addEventListener("click", () => {
+            const ids = [...environmentSummaryState.customIds],
+              existing = ids.indexOf(metric.id);
+            if (existing >= 0) {
+              ids.splice(existing, 1);
+            } else {
+              if (ids.length >= 4) return;
+              ids.push(metric.id);
+            }
+            environmentSummaryState.mode = ids.length ? "custom" : "auto";
+            environmentSummaryState.customIds = ids;
+            saveEnvironmentSummaryPrefs();
+            updateEnvironmentCustomizeNote();
+            renderEnvironmentCustomizeGrid();
+            renderEnvironmentSummary();
+          });
+          grid.appendChild(button);
+        }
+        updateEnvironmentCustomizeNote();
+      }
+      function renderEnvironmentSummary() {
+        environmentSummaryFrame = 0;
+        const box = $("environmentSummary");
+        if (!box) return;
+        const chosen = getEnvironmentSummaryChosenMetrics();
+
+        box.replaceChildren();
+        for (const metric of chosen) {
+          const item = document.createElement("div"),
+            icon = document.createElement("div"),
+            body = document.createElement("div"),
+            label = document.createElement("div"),
+            value = document.createElement("div");
+          item.className = "environment-summary-item";
+          if (metric.source?.classList.contains("is-highlight")) {
+            item.classList.add("is-alert");
+            const accent = metric.source.style.getPropertyValue("--metric-accent");
+            if (accent) item.style.setProperty("--summary-accent", accent);
+          }
+          icon.className = "environment-summary-icon";
+          icon.textContent = metric.icon;
+          label.className = "environment-summary-label";
+          label.textContent = metric.label;
+          value.className = "environment-summary-value";
+          value.textContent = metric.value;
+          body.append(label, value);
+          item.append(icon, body);
+          box.appendChild(item);
+        }
+      }
+      function queueEnvironmentSummaryRender() {
+        if (environmentSummaryFrame) return;
+        environmentSummaryFrame = requestAnimationFrame(renderEnvironmentSummary);
+      }
+      function setMetricHighlight(el, active, accent = "#6eb5ff") {
+        if (!el) return;
+        el.classList.toggle("is-highlight", !!active);
+        if (active) el.style.setProperty("--metric-accent", accent);
+        else el.style.removeProperty("--metric-accent");
+        queueEnvironmentSummaryRender();
+      }
+      function installEnvironmentPanel() {
+        const panel = $("environmentPanel"),
+          button = $("environmentToggleBtn"),
+          customizeBtn = $("environmentCustomizeBtn"),
+          autoBtn = $("environmentCustomizeAutoBtn"),
+          doneBtn = $("environmentCustomizeDoneBtn"),
+          details = $("environmentDetails");
+        if (!panel || !button || !details) return;
+        const syncButtons = () => {
+          const open = panel.classList.contains("is-open"),
+            customizing = panel.classList.contains("is-customizing");
+          button.setAttribute("aria-expanded", open ? "true" : "false");
+          if (customizeBtn) {
+            customizeBtn.setAttribute("aria-expanded", customizing ? "true" : "false");
+            customizeBtn.classList.toggle("is-open", customizing);
+          }
+          const text = button.querySelector(".environment-toggle-text");
+          if (text) text.textContent = open ? "收起資料" : "全部資料";
+        };
+        button.addEventListener("click", () => {
+          panel.classList.toggle("is-open", !panel.classList.contains("is-open"));
+          syncButtons();
+        });
+        customizeBtn?.addEventListener("click", () => {
+          panel.classList.toggle("is-customizing", !panel.classList.contains("is-customizing"));
+          syncButtons();
+        });
+        autoBtn?.addEventListener("click", () => {
+          environmentSummaryState.mode = "auto";
+          environmentSummaryState.customIds = [];
+          saveEnvironmentSummaryPrefs();
+          renderEnvironmentCustomizeGrid();
+          renderEnvironmentSummary();
+        });
+        doneBtn?.addEventListener("click", () => {
+          panel.classList.remove("is-customizing");
+          syncButtons();
+        });
+        const observer = new MutationObserver(queueEnvironmentSummaryRender);
+        observer.observe(details, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+          attributes: true,
+          attributeFilter: ["class", "style"],
+        });
+        loadEnvironmentSummaryPrefs();
+        renderEnvironmentCustomizeGrid();
+        renderEnvironmentSummary();
+        syncButtons();
+      }
+
       function seaLevelPressureFromStation(p, h) {
         const x = 1 - 2.25577e-5 * h;
         return x > 0 ? p * Math.pow(x, -5.25588) : NaN;
@@ -3473,13 +4163,23 @@
       }
       const pressureState = { mode: "local", localHpa: NaN, seaLevelHpa: NaN, altitudeM: NaN };
       function renderPressurePill() {
-        const el = $("mPres");
+        const el = $("mPres"),
+          toggleBtn = $("mPresToggle");
         if (!el) return;
         const sea = pressureState.mode === "sea",
-          value = sea ? pressureState.seaLevelHpa : pressureState.localHpa;
-        el.innerHTML = `${sea ? "海平面氣壓" : "所在地氣壓"} <b>${Number.isFinite(value) ? value.toFixed(1) + " hPa" : "--"}</b>`;
-        el.title = sea ? "目前：海平面氣壓｜點擊切換成所在地氣壓" : "目前：所在地氣壓｜點擊切換成海平面氣壓";
-        el.setAttribute("aria-pressed", sea ? "true" : "false");
+          value = sea ? pressureState.seaLevelHpa : pressureState.localHpa,
+          label = sea ? "海平面氣壓" : "所在地氣壓";
+        const labelEl = el.querySelector(".environment-row-label-text"),
+          valueEl = el.querySelector("b");
+        if (labelEl) labelEl.textContent = label;
+        if (valueEl) valueEl.textContent = Number.isFinite(value) ? value.toFixed(1) + " hPa" : "--";
+        const title = sea ? "目前：海平面氣壓｜點擊切換成所在地氣壓" : "目前：所在地氣壓｜點擊切換成海平面氣壓";
+        el.title = title;
+        if (toggleBtn) {
+          toggleBtn.title = title;
+          toggleBtn.setAttribute("aria-pressed", sea ? "true" : "false");
+        }
+        queueEnvironmentSummaryRender();
       }
       function setPressureValues(local, sea, alt) {
         local = Number(local);
@@ -3495,14 +4195,14 @@
         renderPressurePill();
       }
       function installPressureToggle() {
-        const el = $("mPres");
-        if (!el) return;
+        const button = $("mPresToggle");
+        if (!button) return;
         const toggle = () => {
           pressureState.mode = pressureState.mode === "local" ? "sea" : "local";
           renderPressurePill();
         };
-        el.addEventListener("click", toggle);
-        el.addEventListener("keydown", (e) => {
+        button.addEventListener("click", toggle);
+        button.addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             toggle();
@@ -3595,33 +4295,34 @@
           b = parseInt(h.slice(5, 7), 16);
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#1E2A36" : "#fff";
       }
-      function applyMetricPillColor(el, color) {
+      function applyMetricPillColor(el, color, active = false) {
         if (!el) return;
-        const hex = normalizeHexColor(color);
-        el.style.background = hex;
-        el.style.color = readableTextColorForBg(hex);
+        const hex = normalizeHexColor(color, "#6eb5ff");
+        setMetricHighlight(el, active, hex);
       }
       function renderAirQualityPill(air) {
         const el = $("mAir"),
           aqi = backendNumber(air?.aqi);
         if (!Number.isFinite(aqi)) {
           el.innerHTML = "空氣品質 <b>--</b>";
-          applyMetricPillColor(el, "#D9E1E8");
+          applyMetricPillColor(el, "#6eb5ff", false);
           return;
         }
-        el.innerHTML = `空氣品質 <b>AQI ${Math.round(aqi)}｜${air?.text || air?.status || "--"}</b>`;
-        applyMetricPillColor(el, air?.color || "#D9E1E8");
+        const text = escapeHtml(air?.text || air?.status || "--");
+        el.innerHTML = `空氣品質 <b>AQI ${Math.round(aqi)}｜${text}</b>`;
+        applyMetricPillColor(el, air?.color || "#6eb5ff", aqi >= 101);
       }
       function renderUvIndexPill(uv) {
         const el = $("mUv"),
           v = backendNumber(uv?.index);
         if (!Number.isFinite(v)) {
           el.innerHTML = "紫外線指數 <b>--</b>";
-          applyMetricPillColor(el, "#D9E1E8");
+          applyMetricPillColor(el, "#6eb5ff", false);
           return;
         }
-        el.innerHTML = `紫外線指數 <b>${Number.isInteger(v) ? v : v.toFixed(1)}｜${uv?.text || "--"}</b>`;
-        applyMetricPillColor(el, uv?.color || "#D9E1E8");
+        const text = escapeHtml(uv?.text || "--");
+        el.innerHTML = `紫外線指數 <b>${Number.isInteger(v) ? v : v.toFixed(1)}｜${text}</b>`;
+        applyMetricPillColor(el, uv?.color || "#6eb5ff", v >= 6);
       }
       function rainColorFromRate(rate) {
         if (rate < 0.5) return "none";
@@ -3647,10 +4348,17 @@
       function setObservedRainPill(el, label, value, rate) {
         if (!el) return;
         const valid = Number.isFinite(Number(value)),
-          color = valid ? rainColorFromRate(rate) : "none";
-        el.style.background = getRainBg(color);
-        el.style.color = color === "yellow" ? "#2d2608" : "#fff";
+          color = valid ? rainColorFromRate(rate) : "none",
+          accent = {
+            blue: "#5aa9ff",
+            green: "#4dce74",
+            yellow: "#f5ca48",
+            orange: "#ff9d42",
+            red: "#ff5757",
+            purple: "#c26dff",
+          }[color] || "#6eb5ff";
         el.innerHTML = `${label} <b>${valid ? Number(value).toFixed(1) + " mm" : "--"}</b>`;
+        setMetricHighlight(el, color !== "none", accent);
       }
       function renderObservedRainPills(r) {
         const r10 = backendNumber(r?.rain10min),
@@ -3903,7 +4611,10 @@
         $("hintBar").textContent = "讀取預報中…";
         ["mWind", "mHum", "mSun", "mVis", "mRain10", "mRain1h", "mAir", "mUv"].forEach((id) => {
           const el = $(id);
-          if (el) el.querySelector("b").textContent = "--";
+          if (el) {
+            el.querySelector("b").textContent = "--";
+            setMetricHighlight(el, false);
+          }
         });
         setPressureValues(NaN, NaN, NaN);
         hourly1h = [];
@@ -3954,12 +4665,17 @@
         $("feelsLabel").textContent = Number.isFinite(feels) ? `體感 ${feels.toFixed(1)}°` : "體感 --.-°";
         $("cardCondition").textContent = r.condition || "--";
         $("weatherIcon").textContent = r.icon || mapWeatherToIcon(r.condition, false);
-        $("mWind").innerHTML = `風 <b>${r.windText || "--"}</b>`;
-        const hum = backendNumber(r.humidity);
-        $("mHum").innerHTML = `濕度 <b>${Number.isFinite(hum) ? Math.round(hum) + "%" : "--"}</b>`;
+        $("mWind").innerHTML = `風 <b>${escapeHtml(r.windText || "--")}</b>`;
+        const hum = backendNumber(r.humidity),
+          windSpeed = backendNumber(r.windSpeed),
+          visibilityKm = visibilityToKm(r.visibility);
+        $("mHum").innerHTML = `相對濕度 <b>${Number.isFinite(hum) ? Math.round(hum) + "%" : "--"}</b>`;
         $("mSun").innerHTML =
           `日照 <b>${Number.isFinite(backendNumber(r.sunshine)) ? backendNumber(r.sunshine).toFixed(1) + "h" : "--"}</b>`;
-        $("mVis").innerHTML = `能見度 <b>${formatVisibilityForUi(r.visibility)}</b>`;
+        $("mVis").innerHTML = `能見度 <b>${escapeHtml(formatVisibilityForUi(r.visibility))}</b>`;
+        setMetricHighlight($("mWind"), Number.isFinite(windSpeed) && windSpeed >= 10, "#ff9d42");
+        setMetricHighlight($("mHum"), Number.isFinite(hum) && (hum >= 85 || hum <= 35), "#5aa9ff");
+        setMetricHighlight($("mVis"), Number.isFinite(visibilityKm) && visibilityKm < 5, "#f5ca48");
         renderObservedRainPills(r);
         renderAirQualityPill(r.air);
         renderUvIndexPill(r.uv);
@@ -4007,11 +4723,14 @@
           rh = backendNumber(c.relative_humidity_2m);
         $("mWind").innerHTML =
           `風 <b>${Number.isFinite(wind) ? wind.toFixed(1) + " m/s " + degToDir16(dir) : "--"}</b>`;
-        $("mHum").innerHTML = `濕度 <b>${Number.isFinite(rh) ? Math.round(rh) + "%" : "--"}</b>`;
+        $("mHum").innerHTML = `相對濕度 <b>${Number.isFinite(rh) ? Math.round(rh) + "%" : "--"}</b>`;
         $("mSun").innerHTML = "日照 <b>--</b>";
         const vis = backendNumber(om?.hourly?.visibility?.[0]),
           visKm = Number.isFinite(vis) ? (vis > 200 ? vis / 1000 : vis) : NaN;
         $("mVis").innerHTML = `能見度 <b>${Number.isFinite(visKm) ? visKm.toFixed(1) + " km" : "--"}</b>`;
+        setMetricHighlight($("mWind"), Number.isFinite(wind) && wind >= 10, "#ff9d42");
+        setMetricHighlight($("mHum"), Number.isFinite(rh) && (rh >= 85 || rh <= 35), "#5aa9ff");
+        setMetricHighlight($("mVis"), Number.isFinite(visKm) && visKm < 5, "#f5ca48");
         renderObservedRainPills(null);
         renderAirQualityPill(null);
         renderUvIndexPill(null);
@@ -4385,6 +5104,7 @@
       installObsAssetControls();
       installQpfForecastMap();
       installImageLightbox();
+      installEnvironmentPanel();
       installPressureToggle();
       installAutoRefreshActivityReset();
       updateModeUI();
