@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v7.5</title>
+    <title>天氣網站v7.6</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -655,6 +655,414 @@
       .forecast-empty {
         font-size: 11px;
         opacity: 0.8;
+      }
+
+      .forecast-tap-hint {
+        margin-top: 7px;
+        padding: 0 2px;
+        font-size: 10.5px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.58);
+      }
+      .forecast-item {
+        appearance: none;
+        -webkit-appearance: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        position: relative;
+      }
+      .forecast-item::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 4px;
+        width: 14px;
+        height: 2px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.28);
+        transform: translateX(-50%);
+        opacity: 0;
+        transition: opacity 0.16s ease, width 0.16s ease;
+      }
+      .forecast-item:hover {
+        background: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      .forecast-item:active {
+        transform: scale(0.97);
+      }
+      .forecast-item:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.92);
+        outline-offset: 2px;
+      }
+      .forecast-item.is-selected {
+        background: linear-gradient(180deg, rgba(30, 132, 255, 0.5), rgba(14, 83, 181, 0.26));
+        border-color: rgba(255, 255, 255, 0.32);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.14),
+          0 10px 24px rgba(0, 66, 156, 0.25);
+      }
+      .forecast-item.is-selected::after {
+        width: 24px;
+        opacity: 1;
+      }
+
+      body.hourly-detail-open {
+        overflow: hidden;
+      }
+      .hourly-detail-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 5000;
+        display: grid;
+        align-items: end;
+        justify-items: center;
+        padding: 0;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s ease;
+      }
+      .hourly-detail-modal.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .hourly-detail-backdrop {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        padding: 0;
+        background: rgba(4, 14, 30, 0.56);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        cursor: default;
+      }
+      .hourly-detail-sheet {
+        --detail-bg1: #5aaeff;
+        --detail-bg2: #bfe3ff;
+        --detail-glow: rgba(255, 245, 190, 0.28);
+        --detail-wash-top: rgba(7, 25, 49, 0.18);
+        --detail-wash-bottom: rgba(7, 25, 49, 0.42);
+        position: relative;
+        z-index: 1;
+        width: min(100%, 520px);
+        max-height: min(86vh, 760px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 0;
+        border-radius: 28px 28px 0 0;
+        background:
+          linear-gradient(180deg, var(--detail-wash-top), var(--detail-wash-bottom)),
+          radial-gradient(circle at 78% 7%, var(--detail-glow), transparent 31%),
+          linear-gradient(180deg, var(--detail-bg1) 0%, var(--detail-bg2) 100%);
+        color: #fff;
+        text-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.32);
+        transform: translateY(105%);
+        transition:
+          transform 0.3s cubic-bezier(0.2, 0.78, 0.18, 1),
+          background 0.42s ease,
+          border-color 0.42s ease;
+      }
+      .hourly-detail-sheet[data-detail-scene="clear-day"] {
+        --detail-bg1: #5aaeff;
+        --detail-bg2: #bfe3ff;
+        --detail-glow: rgba(255, 245, 190, 0.3);
+      }
+      .hourly-detail-sheet[data-detail-scene="partly-day"] {
+        --detail-bg1: #7dbcf0;
+        --detail-bg2: #d7ebf8;
+        --detail-glow: rgba(255, 255, 255, 0.22);
+      }
+      .hourly-detail-sheet[data-detail-scene="overcast-day"] {
+        --detail-bg1: #89a8c3;
+        --detail-bg2: #d5e2ec;
+        --detail-glow: rgba(255, 255, 255, 0.14);
+        --detail-wash-top: rgba(34, 50, 67, 0.22);
+        --detail-wash-bottom: rgba(34, 50, 67, 0.46);
+      }
+      .hourly-detail-sheet[data-detail-scene="rain-day"] {
+        --detail-bg1: #6f98bc;
+        --detail-bg2: #c3d8e8;
+        --detail-glow: rgba(181, 220, 255, 0.18);
+        --detail-wash-top: rgba(25, 43, 62, 0.28);
+        --detail-wash-bottom: rgba(25, 43, 62, 0.52);
+      }
+      .hourly-detail-sheet[data-detail-scene="storm-day"] {
+        --detail-bg1: #5f7e9c;
+        --detail-bg2: #a9bfd1;
+        --detail-glow: rgba(202, 216, 255, 0.15);
+        --detail-wash-top: rgba(22, 31, 47, 0.34);
+        --detail-wash-bottom: rgba(22, 31, 47, 0.58);
+      }
+      .hourly-detail-sheet[data-detail-scene="clear-night"] {
+        --detail-bg1: #0d2149;
+        --detail-bg2: #203764;
+        --detail-glow: rgba(180, 205, 255, 0.18);
+        --detail-wash-top: rgba(3, 10, 25, 0.08);
+        --detail-wash-bottom: rgba(3, 10, 25, 0.24);
+      }
+      .hourly-detail-sheet[data-detail-scene="cloudy-night"] {
+        --detail-bg1: #1b2a44;
+        --detail-bg2: #3d5270;
+        --detail-glow: rgba(202, 219, 255, 0.12);
+        --detail-wash-top: rgba(3, 10, 20, 0.12);
+        --detail-wash-bottom: rgba(3, 10, 20, 0.3);
+      }
+      .hourly-detail-sheet[data-detail-scene="rain-night"] {
+        --detail-bg1: #172336;
+        --detail-bg2: #334960;
+        --detail-glow: rgba(137, 190, 255, 0.13);
+        --detail-wash-top: rgba(2, 7, 14, 0.17);
+        --detail-wash-bottom: rgba(2, 7, 14, 0.36);
+      }
+      .hourly-detail-sheet[data-detail-scene="fog-day"] {
+        --detail-bg1: #8da0ad;
+        --detail-bg2: #d2dbe2;
+        --detail-glow: rgba(255, 255, 255, 0.18);
+        --detail-wash-top: rgba(42, 52, 61, 0.24);
+        --detail-wash-bottom: rgba(42, 52, 61, 0.48);
+      }
+      .hourly-detail-sheet[data-detail-scene="fog-night"] {
+        --detail-bg1: #283544;
+        --detail-bg2: #4f6377;
+        --detail-glow: rgba(219, 231, 255, 0.13);
+        --detail-wash-top: rgba(7, 14, 23, 0.12);
+        --detail-wash-bottom: rgba(7, 14, 23, 0.32);
+      }
+      .hourly-detail-sheet[data-detail-scene="sunrise"],
+      .hourly-detail-sheet[data-detail-scene="sunset"] {
+        --detail-bg1: #6e7fd6;
+        --detail-bg2: #f3b37f;
+        --detail-glow: rgba(255, 224, 173, 0.32);
+        --detail-wash-top: rgba(42, 37, 86, 0.2);
+        --detail-wash-bottom: rgba(42, 37, 86, 0.46);
+      }
+      .hourly-detail-modal.open .hourly-detail-sheet {
+        transform: translateY(0);
+      }
+      .hourly-detail-handle {
+        width: 42px;
+        height: 5px;
+        margin: 0 auto 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.34);
+      }
+      .hourly-detail-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 36px;
+        height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .hourly-detail-close:active {
+        transform: scale(0.95);
+      }
+      .hourly-detail-head {
+        padding-right: 46px;
+      }
+      .hourly-detail-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.2px;
+        color: rgba(255, 255, 255, 0.56);
+      }
+      .hourly-detail-time {
+        margin-top: 3px;
+        font-size: 26px;
+        line-height: 1.1;
+        font-weight: 850;
+        font-variant-numeric: tabular-nums;
+      }
+      .hourly-detail-date {
+        margin-top: 4px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .hourly-detail-source {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 8px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.11);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 10.5px;
+        font-weight: 750;
+        color: rgba(255, 255, 255, 0.82);
+      }
+      .hourly-detail-hero {
+        margin-top: 15px;
+        padding: 14px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+      }
+      .hourly-detail-icon {
+        font-size: 40px;
+        line-height: 1;
+      }
+      .hourly-detail-weather {
+        min-width: 0;
+        font-size: 17px;
+        font-weight: 800;
+        overflow-wrap: anywhere;
+      }
+      .hourly-detail-comfort {
+        margin-top: 3px;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.66);
+      }
+      .hourly-detail-temp {
+        text-align: right;
+        font-size: 38px;
+        font-weight: 850;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .hourly-detail-feels {
+        margin-top: 4px;
+        text-align: right;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.7);
+        white-space: nowrap;
+      }
+      .hourly-detail-grid {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .hourly-detail-metric {
+        min-width: 0;
+        padding: 11px 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.085);
+        border: 1px solid rgba(255, 255, 255, 0.075);
+      }
+      .hourly-detail-label {
+        font-size: 10.5px;
+        font-weight: 750;
+        color: rgba(255, 255, 255, 0.58);
+      }
+      .hourly-detail-value {
+        margin-top: 4px;
+        font-size: 15px;
+        line-height: 1.35;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.97);
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+      .hourly-detail-description-wrap {
+        margin-top: 12px;
+        padding: 0;
+        border-radius: 17px;
+        background: rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        overflow: hidden;
+      }
+      .hourly-detail-description-summary {
+        min-height: 42px;
+        padding: 10px 13px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+      .hourly-detail-description-summary::-webkit-details-marker {
+        display: none;
+      }
+      .hourly-detail-description-title {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.35px;
+        color: rgba(255, 255, 255, 0.72);
+      }
+      .hourly-detail-description-action {
+        flex: 0 0 auto;
+        font-size: 10.5px;
+        font-weight: 800;
+        color: rgba(255, 255, 255, 0.55);
+      }
+      .hourly-detail-description-wrap[open] .hourly-detail-description-action::before {
+        content: "收合";
+      }
+      .hourly-detail-description-wrap[open] .hourly-detail-description-action {
+        font-size: 0;
+      }
+      .hourly-detail-description-wrap[open] .hourly-detail-description-action::before {
+        font-size: 10.5px;
+      }
+      .hourly-detail-description {
+        margin: 0 13px 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+        font-size: 12px;
+        line-height: 1.65;
+        color: rgba(255, 255, 255, 0.86);
+      }
+      .hourly-detail-note {
+        margin-top: 10px;
+        font-size: 10px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      @media (max-width: 350px) {
+        .hourly-detail-grid {
+          grid-template-columns: 1fr;
+        }
+        .hourly-detail-hero {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+        .hourly-detail-temp-wrap {
+          grid-column: 1 / -1;
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+        }
+        .hourly-detail-feels {
+          margin: 0;
+        }
+      }
+      @media (min-width: 700px) {
+        .hourly-detail-modal {
+          align-items: stretch;
+          justify-items: end;
+          padding: 22px;
+        }
+        .hourly-detail-sheet {
+          width: 430px;
+          max-height: none;
+          height: calc(100vh - 44px);
+          border: 1px solid rgba(255, 255, 255, 0.16);
+          border-radius: 28px;
+          padding-bottom: 22px;
+          transform: translateX(112%);
+        }
+        .hourly-detail-modal.open .hourly-detail-sheet {
+          transform: translateX(0);
+        }
+        .hourly-detail-handle {
+          display: none;
+        }
       }
 
       .source-wrap {
@@ -2426,7 +2834,7 @@
               </div>
               <div class="page-hint">單指左右滑動切換；雙指可縮放，放大後單指拖曳</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v7.5</div>
+              <div class="version-badge" id="versionLabel">v7.6</div>
             </div>
           </section>
 
@@ -2535,6 +2943,7 @@
                       ><button class="forecast-mode-btn" data-forecast-mode="1h">1 小時</button>
                     </div>
                   </div>
+                  <div class="forecast-tap-hint">點任一時段查看溫度、濕度、露點、風與官方描述</div>
                   <div class="hourly-forecast" id="hourlyForecast">
                     <div class="forecast-empty">尚無預報資料</div>
                   </div>
@@ -2548,7 +2957,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v7.5</div>
+              <div class="version-badge">v7.6</div>
             </div>
           </section>
 
@@ -2724,7 +3133,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v7.5</div>
+              <div class="version-badge">v7.6</div>
             </div>
           </section>
         </div>
@@ -2753,12 +3162,77 @@
       <div class="image-lightbox-bottom">雙指縮放｜單指拖曳｜點空白處或按 × 關閉｜雙擊圖片快速放大/還原</div>
     </div>
 
+    <div
+      id="hourlyDetailModal"
+      class="hourly-detail-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="hourlyDetailTime"
+      aria-hidden="true"
+    >
+      <button class="hourly-detail-backdrop" type="button" data-hourly-detail-close aria-label="關閉逐時詳細預報"></button>
+      <section class="hourly-detail-sheet" tabindex="-1">
+        <div class="hourly-detail-handle" aria-hidden="true"></div>
+        <button id="hourlyDetailClose" class="hourly-detail-close" type="button" aria-label="關閉">×</button>
+
+        <div class="hourly-detail-head">
+          <div class="hourly-detail-kicker">HOURLY FORECAST</div>
+          <div class="hourly-detail-time" id="hourlyDetailTime">--:--</div>
+          <div class="hourly-detail-date" id="hourlyDetailDate">--</div>
+          <div class="hourly-detail-source" id="hourlyDetailSource">預報地點</div>
+        </div>
+
+        <div class="hourly-detail-hero">
+          <div class="hourly-detail-icon" id="hourlyDetailIcon">--</div>
+          <div>
+            <div class="hourly-detail-weather" id="hourlyDetailWeather">--</div>
+            <div class="hourly-detail-comfort" id="hourlyDetailComfort">舒適度 --</div>
+          </div>
+          <div class="hourly-detail-temp-wrap">
+            <div class="hourly-detail-temp" id="hourlyDetailTemp">--°</div>
+            <div class="hourly-detail-feels" id="hourlyDetailFeels">體感 --°</div>
+          </div>
+        </div>
+
+        <div class="hourly-detail-grid">
+          <div class="hourly-detail-metric">
+            <div class="hourly-detail-label">相對濕度</div>
+            <div class="hourly-detail-value" id="hourlyDetailHumidity">--</div>
+          </div>
+          <div class="hourly-detail-metric">
+            <div class="hourly-detail-label">露點溫度</div>
+            <div class="hourly-detail-value" id="hourlyDetailDewPoint">--</div>
+          </div>
+          <div class="hourly-detail-metric">
+            <div class="hourly-detail-label">平均風</div>
+            <div class="hourly-detail-value" id="hourlyDetailWind">--</div>
+          </div>
+          <div class="hourly-detail-metric">
+            <div class="hourly-detail-label">降雨機率</div>
+            <div class="hourly-detail-value" id="hourlyDetailPop">--</div>
+          </div>
+        </div>
+
+        <details class="hourly-detail-description-wrap" id="hourlyDetailDescriptionBox">
+          <summary class="hourly-detail-description-summary">
+            <span class="hourly-detail-description-title" id="hourlyDetailDescriptionTitle">氣象署官方描述</span>
+            <span class="hourly-detail-description-action" aria-hidden="true">查看</span>
+          </summary>
+          <div class="hourly-detail-description" id="hourlyDetailDescription">尚無詳細描述</div>
+        </details>
+
+        <div class="hourly-detail-note" id="hourlyDetailNote">
+          數值為所在地附近預報點整合結果。
+        </div>
+      </section>
+    </div>
+
     <script>
       /* ===========================
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v7.5";
+      const APP_VERSION = "v7.6";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4377,10 +4851,36 @@
         return Number.isFinite(ts) ? ts : NaN;
       }
       function normalizeBackendForecastHourlyItem(i) {
+        const windDirection = backendNumber(
+            i?.windDirection ?? i?.wind_direction ?? i?.wind_direction_10m,
+          ),
+          windDirectionText = String(
+            i?.windDirectionText ??
+              i?.wind_direction_text ??
+              (Number.isFinite(windDirection) ? degToDir16(windDirection) : ""),
+          ).trim(),
+          windSpeed = backendNumber(i?.windSpeed ?? i?.wind_speed ?? i?.wind_speed_10m);
         return {
           ts: parseBackendForecastTs(i?.ts ?? i?.time ?? i?.datetime ?? i?.startTime ?? i?.valid_time),
           temp: backendNumber(i?.temp ?? i?.temperature ?? i?.temperature_2m),
           at: backendNumber(i?.at ?? i?.feels ?? i?.apparent_temperature),
+          dewPoint: backendNumber(i?.dewPoint ?? i?.dew_point ?? i?.dew_point_2m),
+          humidity: backendNumber(i?.humidity ?? i?.rh ?? i?.relative_humidity_2m),
+          windSpeed,
+          windDirection,
+          windDirectionText,
+          windText: String(
+            i?.windText ??
+              i?.wind_text ??
+              (Number.isFinite(windSpeed)
+                ? `${windDirectionText || "--"} ${windSpeed.toFixed(1)} m/s`
+                : ""),
+          ).trim(),
+          comfort: String(i?.comfort ?? i?.ci ?? i?.comfortIndex ?? "").trim(),
+          weatherDescription: String(
+            i?.weatherDescription ?? i?.weather_description ?? i?.description ?? "",
+          ).trim(),
+          primaryPoint: String(i?.primaryPoint ?? i?.primary_point ?? i?.forecastPoint ?? "").trim(),
           pop: backendNumber(i?.pop ?? i?.precipitation_probability),
           wx: String(i?.wx ?? i?.condition ?? i?.weather ?? "").trim(),
           _icon: String(i?.icon ?? i?._icon ?? "").trim(),
@@ -4419,6 +4919,127 @@
         const d = new Date(ts);
         return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
       }
+      let selectedHourlyDetailTs = null,
+        hourlyDetailReturnFocus = null;
+
+      function formatHourlyDetailDate(ts) {
+        const d = new Date(ts);
+        return new Intl.DateTimeFormat("zh-TW", {
+          month: "long",
+          day: "numeric",
+          weekday: "long",
+        }).format(d);
+      }
+      function formatDetailNumber(v, digits = 1, suffix = "") {
+        return Number.isFinite(v) ? `${Number(v).toFixed(digits)}${suffix}` : "--";
+      }
+      function openHourlyDetail(p, mode = forecastMode, trigger = null) {
+        const modal = $("hourlyDetailModal");
+        if (!modal || !p || !Number.isFinite(p.ts)) return;
+
+        hourlyDetailReturnFocus = trigger || document.activeElement;
+        selectedHourlyDetailTs = p.ts;
+
+        const d = new Date(p.ts),
+          detailHour = d.getHours() + d.getMinutes() / 60,
+          rowNight = isNightHour(detailHour),
+          detailScene = getScene({
+            weatherText: p.wx || p.weatherDescription || "",
+            hour: detailHour,
+            rain: 0,
+            cloud: String(p.wx || "").includes("陰")
+              ? 90
+              : String(p.wx || "").includes("多雲")
+                ? 60
+                : 15,
+            visibility: 20,
+          }),
+          icon =
+            p._icon ||
+            (Number.isFinite(p._code)
+              ? omCodeToTextIcon(p._code, rowNight).icon
+              : mapWeatherToIcon(p.wx, rowNight)),
+          windText =
+            p.windText ||
+            (Number.isFinite(p.windSpeed)
+              ? `${p.windDirectionText || (Number.isFinite(p.windDirection) ? degToDir16(p.windDirection) : "--")} ${p.windSpeed.toFixed(1)} m/s`
+              : "--");
+
+        const detailSheet = modal.querySelector(".hourly-detail-sheet");
+        if (detailSheet) detailSheet.dataset.detailScene = detailScene;
+
+        $("hourlyDetailTime").textContent = fmtHHMM(p.ts);
+        $("hourlyDetailDate").textContent = formatHourlyDetailDate(p.ts);
+        $("hourlyDetailSource").textContent = p.primaryPoint
+          ? p.primaryPoint
+          : mode === "10m"
+            ? "10分鐘預報"
+            : "逐小時預報";
+        $("hourlyDetailIcon").textContent = icon || "--";
+        $("hourlyDetailWeather").textContent = p.wx || "--";
+        $("hourlyDetailComfort").textContent = p.comfort ? `舒適度 ${p.comfort}` : "舒適度 --";
+        $("hourlyDetailTemp").textContent = Number.isFinite(p.temp) ? `${p.temp.toFixed(1)}°` : "--°";
+        $("hourlyDetailFeels").textContent = Number.isFinite(p.at) ? `體感 ${p.at.toFixed(1)}°` : "體感 --°";
+        $("hourlyDetailHumidity").textContent = Number.isFinite(p.humidity)
+          ? `${Math.round(p.humidity)}%`
+          : "--";
+        $("hourlyDetailDewPoint").textContent = formatDetailNumber(p.dewPoint, 1, "°C");
+        $("hourlyDetailWind").textContent = windText;
+        $("hourlyDetailPop").textContent = Number.isFinite(p.pop) ? `${Math.round(p.pop)}%` : "--";
+        const descriptionBox = $("hourlyDetailDescriptionBox"),
+          hasDescription = Boolean(String(p.weatherDescription || "").trim());
+        $("hourlyDetailDescriptionTitle").textContent =
+          p.primaryPoint && p.primaryPoint !== "Open-Meteo"
+            ? "氣象署官方描述"
+            : "預報說明";
+        $("hourlyDetailDescription").textContent = hasDescription
+          ? p.weatherDescription
+          : "尚無詳細描述";
+        if (descriptionBox) {
+          descriptionBox.hidden = !hasDescription;
+          descriptionBox.open = false;
+        }
+        $("hourlyDetailNote").textContent =
+          mode === "10m"
+            ? "10分鐘數值由逐時預報平滑內插；天氣現象與降雨機率沿用所屬時段資料。"
+            : "數值為所在地附近預報點整合結果。";
+
+        document.querySelectorAll(".forecast-item.is-selected").forEach((el) =>
+          el.classList.remove("is-selected"),
+        );
+        trigger?.classList.add("is-selected");
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+        document.body.classList.add("hourly-detail-open");
+        requestAnimationFrame(() => modal.querySelector(".hourly-detail-sheet")?.focus());
+      }
+      function closeHourlyDetail({ restoreFocus = true } = {}) {
+        const modal = $("hourlyDetailModal");
+        if (!modal || !modal.classList.contains("open")) return;
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("hourly-detail-open");
+        selectedHourlyDetailTs = null;
+        document.querySelectorAll(".forecast-item.is-selected").forEach((el) =>
+          el.classList.remove("is-selected"),
+        );
+        if (restoreFocus && hourlyDetailReturnFocus?.focus) {
+          setTimeout(() => hourlyDetailReturnFocus.focus(), 0);
+        }
+        hourlyDetailReturnFocus = null;
+      }
+      function installHourlyDetail() {
+        const modal = $("hourlyDetailModal");
+        if (!modal) return;
+        modal.querySelectorAll("[data-hourly-detail-close]").forEach((el) =>
+          el.addEventListener("click", () => closeHourlyDetail()),
+        );
+        $("hourlyDetailClose")?.addEventListener("click", () => closeHourlyDetail());
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && modal.classList.contains("open")) closeHourlyDetail();
+        });
+      }
+
       function renderHourlyForecast() {
         const box = $("hourlyForecast"),
           data = forecastMode === "10m" ? hourly10m : hourly1h;
@@ -4434,9 +5055,17 @@
               (Number.isFinite(p._code)
                 ? omCodeToTextIcon(p._code, rowNight).icon
                 : mapWeatherToIcon(p.wx, rowNight)),
-            item = document.createElement("div");
-          item.className = `forecast-item ${i === 0 ? "is-now" : ""}`;
+            item = document.createElement("button");
+          item.type = "button";
+          item.className = `forecast-item ${i === 0 ? "is-now" : ""} ${
+            selectedHourlyDetailTs === p.ts ? "is-selected" : ""
+          }`;
+          item.setAttribute(
+            "aria-label",
+            `${i === 0 ? "現在" : fmtHHMM(p.ts)}，${p.wx || "天氣預報"}，${Number.isFinite(p.temp) ? p.temp.toFixed(1) + "度" : "溫度無資料"}，點擊查看詳細資料`,
+          );
           item.innerHTML = `<div class="fi-time">${i === 0 ? "現在" : fmtHHMM(p.ts)}</div><div class="fi-icon">${icon}</div><div class="fi-temp">${Number.isFinite(p.temp) ? (forecastMode === "10m" ? p.temp.toFixed(1) : Math.round(p.temp)) : "--"}°</div><div class="fi-sub">體感 ${Number.isFinite(p.at) ? (forecastMode === "10m" ? p.at.toFixed(1) : Math.round(p.at)) : "--"}°</div>${Number.isFinite(p.pop) ? `<div class="fi-pop">${Math.round(p.pop)}%</div>` : ""}`;
+          item.addEventListener("click", () => openHourlyDetail(p, forecastMode, item));
           box.appendChild(item);
         });
       }
@@ -4487,7 +5116,7 @@
           daily:
             "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_mean,sunrise,sunset",
           hourly:
-            "temperature_2m,apparent_temperature,precipitation_probability,weather_code,cloud_cover,visibility",
+            "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover,visibility",
           current:
             "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m",
           timezone: "auto",
@@ -4528,10 +5157,23 @@
           all = [];
         for (let i = start; i < Math.min(start + 25, times.length); i++) {
           const wx = omCodeToTextIcon(h.weather_code?.[i]);
+          const windSpeed = backendNumber(h.wind_speed_10m?.[i]),
+            windDirection = backendNumber(h.wind_direction_10m?.[i]);
           all.push({
             ts: times[i],
             temp: backendNumber(h.temperature_2m?.[i]) - LR_STD * dh,
             at: backendNumber(h.apparent_temperature?.[i]) - LR_STD * dh,
+            dewPoint: backendNumber(h.dew_point_2m?.[i]) - 0.002 * dh,
+            humidity: backendNumber(h.relative_humidity_2m?.[i]),
+            windSpeed,
+            windDirection,
+            windDirectionText: Number.isFinite(windDirection) ? degToDir16(windDirection) : "",
+            windText: Number.isFinite(windSpeed)
+              ? `${Number.isFinite(windDirection) ? degToDir16(windDirection) : "--"} ${windSpeed.toFixed(1)} m/s`
+              : "",
+            comfort: "",
+            weatherDescription: "",
+            primaryPoint: "Open-Meteo",
             pop: backendNumber(h.precipitation_probability?.[i]),
             wx: wx.text,
             _icon: wx.icon,
@@ -4549,11 +5191,56 @@
             b = all[Math.min(j + 1, all.length - 1)] || a;
           if (!a) break;
           const f = b.ts !== a.ts ? clamp((ts - a.ts) / (b.ts - a.ts), 0, 1) : 0;
+          const temp =
+              Number.isFinite(a.temp) && Number.isFinite(b.temp) ? a.temp + (b.temp - a.temp) * f : a.temp,
+            at = Number.isFinite(a.at) && Number.isFinite(b.at) ? a.at + (b.at - a.at) * f : a.at,
+            dewPoint =
+              Number.isFinite(a.dewPoint) && Number.isFinite(b.dewPoint)
+                ? a.dewPoint + (b.dewPoint - a.dewPoint) * f
+                : a.dewPoint,
+            humidity =
+              Number.isFinite(a.humidity) && Number.isFinite(b.humidity)
+                ? a.humidity + (b.humidity - a.humidity) * f
+                : a.humidity,
+            speedA = a.windSpeed,
+            speedB = b.windSpeed,
+            dirA = a.windDirection,
+            dirB = b.windDirection;
+          let windSpeed = a.windSpeed,
+            windDirection = a.windDirection;
+          if (
+            Number.isFinite(speedA) &&
+            Number.isFinite(speedB) &&
+            Number.isFinite(dirA) &&
+            Number.isFinite(dirB)
+          ) {
+            const ra = (dirA * Math.PI) / 180,
+              rb = (dirB * Math.PI) / 180,
+              ua = -speedA * Math.sin(ra),
+              va = -speedA * Math.cos(ra),
+              ub = -speedB * Math.sin(rb),
+              vb = -speedB * Math.cos(rb),
+              u = ua + (ub - ua) * f,
+              v = va + (vb - va) * f;
+            windSpeed = Math.hypot(u, v);
+            windDirection = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360;
+          }
+          const windDirectionText = Number.isFinite(windDirection) ? degToDir16(windDirection) : "";
           hourly10m.push({
             ts,
-            temp:
-              Number.isFinite(a.temp) && Number.isFinite(b.temp) ? a.temp + (b.temp - a.temp) * f : a.temp,
-            at: Number.isFinite(a.at) && Number.isFinite(b.at) ? a.at + (b.at - a.at) * f : a.at,
+            temp,
+            at,
+            dewPoint,
+            humidity,
+            windSpeed,
+            windDirection,
+            windDirectionText,
+            windText: Number.isFinite(windSpeed)
+              ? `${windDirectionText || "--"} ${windSpeed.toFixed(1)} m/s`
+              : "",
+            comfort: a.comfort,
+            weatherDescription: a.weatherDescription,
+            primaryPoint: a.primaryPoint,
             pop: a.pop,
             wx: a.wx,
             _icon: a._icon,
@@ -4748,6 +5435,7 @@
       }
 
       async function runAllForTarget(lat, lon, alt, labelHint, adminOverride = null) {
+        closeHourlyDetail({ restoreFocus: false });
         resetWeatherUi(lat, lon, labelHint);
         const rg = await reverseGeocodePlace(lat, lon),
           inTW = isInsideTaiwan(lat, lon);
@@ -4934,6 +5622,7 @@
           document.querySelectorAll(".forecast-mode-btn").forEach((b) => b.classList.remove("on"));
           btn.classList.add("on");
           forecastMode = btn.dataset.forecastMode;
+          closeHourlyDetail({ restoreFocus: false });
           renderHourlyForecast();
         }),
       );
@@ -5101,6 +5790,7 @@
       });
 
       installWeatherPageGestures();
+      installHourlyDetail();
       installObsAssetControls();
       installQpfForecastMap();
       installImageLightbox();
