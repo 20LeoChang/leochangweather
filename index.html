@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v7.6.1</title>
+    <title>天氣網站v8.0</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -2051,10 +2051,32 @@
         letter-spacing: 0.4px;
         color: rgba(255, 255, 255, 0.96);
       }
+      .wx-map-time {
+        margin-top: 3px;
+        color: rgba(255, 255, 255, 0.64);
+        font-size: 10px;
+        font-weight: 750;
+        line-height: 1.25;
+        font-variant-numeric: tabular-nums;
+      }
       .wx-map-note {
         font-size: 10px;
         font-weight: 750;
         color: rgba(255, 255, 255, 0.6);
+        white-space: nowrap;
+      }
+      .wx-map-summary {
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        align-items: flex-end;
+        text-align: right;
+      }
+      .wx-map-summary .qpf-data-time {
+        margin-top: 3px;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 9.5px;
+        line-height: 1.25;
         white-space: nowrap;
       }
       .wx-map-grid {
@@ -2198,6 +2220,260 @@
         width: 30px;
         height: 30px;
         line-height: 30px;
+      }
+      #wrfQpfMap {
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        background: #f7f7f2;
+      }
+      #wrfQpfMap .leaflet-tile {
+        filter: grayscale(100%) brightness(1.18) contrast(0.78) saturate(0.25);
+      }
+      #wrfQpfMap .leaflet-tile-pane {
+        opacity: 0.82;
+      }
+      #wrfQpfMap .leaflet-overlay-pane {
+        filter: none;
+      }
+      #wrfQpfMap .leaflet-image-layer,
+      #wrfQpfMap .wrf-qpf-sharp-canvas {
+        /* The canvas layer also disables smoothing in JavaScript. */
+        image-rendering: crisp-edges !important;
+        image-rendering: pixelated !important;
+        transition: opacity 90ms linear;
+      }
+      #wrfQpfMap .wrf-qpf-sharp-canvas {
+        position: absolute;
+        inset: 0 auto auto 0;
+        pointer-events: none;
+      }
+      #wrfQpfMap .leaflet-control-attribution {
+        font-size: 9px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+      #wrfQpfMap .leaflet-control-zoom a {
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+      }
+      .wrf-qpf-duration {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin-bottom: 9px;
+        padding: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.09);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .wrf-qpf-duration-btn {
+        min-width: 0;
+        border: 0;
+        border-radius: 999px;
+        padding: 7px 5px;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 11px;
+        font-weight: 850;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .wrf-qpf-duration-btn.on {
+        background: rgba(255, 255, 255, 0.94);
+        color: #075fc7;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
+      }
+      .wrf-qpf-timeline {
+        display: flex;
+        gap: 7px;
+        overflow-x: auto;
+        padding: 0 1px 9px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .wrf-qpf-timeline::-webkit-scrollbar {
+        display: none;
+      }
+      .wrf-qpf-time-btn {
+        flex: 0 0 auto;
+        min-width: 108px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 13px;
+        padding: 7px 9px;
+        background: rgba(255, 255, 255, 0.09);
+        color: rgba(255, 255, 255, 0.75);
+        text-align: left;
+        cursor: pointer;
+      }
+      .wrf-qpf-time-btn.on {
+        background: rgba(7, 95, 199, 0.72);
+        border-color: rgba(255, 255, 255, 0.22);
+        color: #fff;
+        box-shadow: 0 7px 16px rgba(0, 43, 103, 0.2);
+      }
+      .wrf-qpf-time-btn.is-loading {
+        cursor: progress;
+      }
+      .wrf-qpf-time-btn.is-loading::after {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin: 5px 0 0 5px;
+        border: 2px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #fff;
+        border-radius: 50%;
+        vertical-align: top;
+        animation: wrf-qpf-spin 0.65s linear infinite;
+      }
+      @keyframes wrf-qpf-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .wrf-qpf-time-main {
+        display: block;
+        font-size: 10.5px;
+        font-weight: 900;
+        white-space: nowrap;
+      }
+      .wrf-qpf-time-sub {
+        display: block;
+        margin-top: 2px;
+        font-size: 9.5px;
+        font-weight: 700;
+        opacity: 0.7;
+        white-space: nowrap;
+      }
+      .wrf-qpf-status {
+        margin-bottom: 8px;
+        min-height: 17px;
+        font-size: 10.5px;
+        font-weight: 800;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.78);
+      }
+      .wrf-qpf-legend {
+        margin-top: 8px;
+        padding: 9px 10px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.065);
+      }
+      .wrf-qpf-legend-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 7px;
+      }
+      .wrf-qpf-legend-title {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 10.5px;
+        font-weight: 900;
+        letter-spacing: 0.1px;
+      }
+      .wrf-qpf-legend-toggle {
+        appearance: none;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.66);
+        font: inherit;
+        font-size: 9.5px;
+        font-weight: 800;
+        cursor: pointer;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .wrf-qpf-legend-toggle::after {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: translateY(-2px) rotate(45deg);
+        transform-origin: 50% 50%;
+        transition: transform 0.18s ease;
+      }
+      .wrf-qpf-legend.is-expanded .wrf-qpf-legend-toggle::after {
+        transform: translateY(2px) rotate(225deg);
+      }
+      .wrf-qpf-legend-bar {
+        display: flex;
+        width: 100%;
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        box-shadow:
+          0 0 0 1px rgba(255, 255, 255, 0.17),
+          0 2px 6px rgba(0, 0, 0, 0.13);
+      }
+      .wrf-qpf-legend-segment {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+      .wrf-qpf-legend-ticks {
+        position: relative;
+        height: 15px;
+        margin-top: 3px;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 8.5px;
+        font-weight: 750;
+        font-variant-numeric: tabular-nums;
+      }
+      .wrf-qpf-legend-tick {
+        position: absolute;
+        top: 0;
+        transform: translateX(-50%);
+        white-space: nowrap;
+      }
+      .wrf-qpf-legend-tick:first-child {
+        transform: none;
+      }
+      .wrf-qpf-legend-tick:last-child {
+        transform: translateX(-100%);
+      }
+      .wrf-qpf-legend-details {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px 8px;
+        max-height: 0;
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(-3px);
+        transition:
+          max-height 0.24s ease,
+          margin-top 0.24s ease,
+          opacity 0.18s ease,
+          transform 0.24s ease;
+      }
+      .wrf-qpf-legend.is-expanded .wrf-qpf-legend-details {
+        max-height: 260px;
+        margin-top: 7px;
+        opacity: 1;
+        transform: none;
+      }
+      .wrf-qpf-legend-chip {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 9px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .wrf-qpf-legend-dot {
+        flex: 0 0 auto;
+        width: 13px;
+        height: 7px;
+        border-radius: 3px;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
       }
       .qpf-location-tooltip {
         padding: 4px 8px;
@@ -2652,9 +2928,14 @@
         line-height: 1.55;
       }
       .qpf-color-legend-title {
-        margin-bottom: 5px;
         color: rgba(255, 255, 255, 0.88);
         font-weight: 900;
+      }
+      .qpf-color-legend .qpf-data-time {
+        margin: 1px 0 6px;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 9.5px;
+        line-height: 1.35;
       }
       .qpf-color-row {
         display: flex;
@@ -2832,9 +3113,9 @@
                 <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">單指左右滑動切換；雙指可縮放，放大後單指拖曳</div>
+              <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v7.6.1</div>
+              <div class="version-badge" id="versionLabel">v8.0</div>
             </div>
           </section>
 
@@ -2852,19 +3133,25 @@
                 <button class="view-tab on" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">單指左右滑動切換頁面；地圖區可獨立拖曳與縮放</div>
+              <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；地圖區可獨立操作</div>
               <hr class="card-divider" />
 
               <section class="weather-page forecast-page" id="forecastPage" aria-label="預報與圖資">
                 <div class="wx-map-block">
                   <div class="wx-map-head">
-                    <div class="wx-map-title">極短期降雨推估</div>
-                    <div class="wx-map-note">未來60分鐘推估雨量</div>
+                    <div>
+                      <div class="wx-map-title">極短期降雨推估</div>
+                      <div class="wx-map-time" id="qpfForecastTime">預報時間：--:--～--:--</div>
+                    </div>
+                    <div class="wx-map-summary">
+                      <div class="wx-map-note">未來60分鐘推估雨量</div>
+                      <div class="qpf-data-time" id="qpfDataTime">資料時間：尚未取得</div>
+                    </div>
                   </div>
                   <div class="qpf-map-panel">
                     <div class="qpf-map-toolbar" aria-label="雷達外推雨量圖層控制">
                       <button class="qpf-map-btn" id="qpfFitBtn" type="button">回到全域</button>
-                      <button class="qpf-map-btn" id="qpfRefreshBtn" type="button">更新圖層</button>
+                      <button class="qpf-map-btn" id="qpfRefreshBtn" type="button">更新圖資</button>
                       <label class="qpf-opacity-control"
                         >透明度<input
                           id="qpfOpacity"
@@ -2911,8 +3198,62 @@
                           >
                         </div>
                       </div>
-                      <div class="qpf-update-time" id="qpfUpdateTime">更新時間：尚未更新</div>
-                      <div class="qpf-data-time" id="qpfDataTime">資料時間：尚未取得</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="wx-map-block">
+                  <div class="wx-map-head">
+                    <div class="wx-map-title">定量降水預報</div>
+                    <div class="wx-map-note"></div>
+                  </div>
+                  <div class="qpf-map-panel">
+                    <div class="wrf-qpf-duration" aria-label="累積雨量時距">
+                      <button class="wrf-qpf-duration-btn on" type="button" data-wrf-qpf-hours="6">
+                        6 小時
+                      </button>
+                      <button class="wrf-qpf-duration-btn" type="button" data-wrf-qpf-hours="12">
+                        12 小時
+                      </button>
+                      <button class="wrf-qpf-duration-btn" type="button" data-wrf-qpf-hours="24">
+                        24 小時
+                      </button>
+                    </div>
+                    <div
+                      class="wrf-qpf-timeline"
+                      id="wrfQpfTimeline"
+                      aria-label="數值預報有效時段"
+                    >
+                      <div class="forecast-empty">正在取得預報時段…</div>
+                    </div>
+                    <div class="qpf-map-toolbar" aria-label="數值降雨預報圖層控制">
+                      <button class="qpf-map-btn" id="wrfQpfFitBtn" type="button">回到全域</button>
+                      <button class="qpf-map-btn" id="wrfQpfRefreshBtn" type="button">更新資料</button>
+                      <label class="qpf-opacity-control"
+                        >透明度<input
+                          id="wrfQpfOpacity"
+                          type="range"
+                          min="0.25"
+                          max="1"
+                          step="0.05"
+                          value="0.78"
+                      /></label>
+                    </div>
+                    <div class="wrf-qpf-status" id="wrfQpfStatus">正在讀取最新模式資料…</div>
+                    <div class="qpf-map-wrap">
+                      <div id="wrfQpfMap" aria-label="WRF 6、12、24 小時累積雨量地圖"></div>
+                      <div id="wrfQpfMapError" class="qpf-map-error">
+                        數值降雨預報暫時無法載入。
+                      </div>
+                    </div>
+                    <div class="qpf-map-meta">
+                      <div id="wrfQpfValidTime">有效時間：尚未取得</div>
+                      <div class="qpf-update-time" id="wrfQpfCycleTime">模式起報：尚未取得</div>
+                      <div class="wrf-qpf-legend" id="wrfQpfLegend" aria-label="累積雨量顏色說明"></div>
+                      <div class="qpf-data-time" id="wrfQpfLoadedTime">載入時間：尚未更新</div>
+                      <div style="margin-top: 8px">
+                        本系統為根據中央氣象署數值預報製作而成，預報仍有誤差，請謹慎使用並依中央氣象署發布之資料為準。
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2957,7 +3298,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v7.6.1</div>
+              <div class="version-badge">v8.0</div>
             </div>
           </section>
 
@@ -2975,7 +3316,7 @@
                 <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab on" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">向右滑回預報；點擊圖資可放大並雙指縮放</div>
+              <div class="page-hint">向右滑回預報，或在左／右側連點兩下切換；點擊圖資可放大</div>
               <hr class="card-divider" />
 
               <section class="weather-page observation-page" id="observationPage" aria-label="觀測資料與圖資">
@@ -3133,7 +3474,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v7.6.1</div>
+              <div class="version-badge">v8.0</div>
             </div>
           </section>
         </div>
@@ -3232,7 +3573,7 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v7.6.1";
+      const APP_VERSION = "v8.0";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -3430,8 +3771,35 @@
         const d = new Date(ts);
         return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
       }
-      function setQpfUpdateTime(ts = Date.now()) {
-        if ($("qpfUpdateTime")) $("qpfUpdateTime").textContent = "更新時間：" + formatManualUpdateTime(ts);
+      function qpfDateFromApi(value) {
+        const s = String(value || "").trim();
+        if (!s || ["None", "null", "undefined"].includes(s)) return null;
+        const d = new Date(s.includes("T") ? s : s.replace(" ", "T"));
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      function formatQpfClock(value) {
+        const d = value instanceof Date ? value : qpfDateFromApi(value);
+        if (!d) return "--:--";
+        return new Intl.DateTimeFormat("zh-TW", {
+          timeZone: "Asia/Taipei",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(d);
+      }
+      function formatQpfDataTime(value) {
+        const d = value instanceof Date ? value : qpfDateFromApi(value);
+        if (!d) return "--";
+        const parts = new Intl.DateTimeFormat("zh-TW", {
+          timeZone: "Asia/Taipei",
+          month: "numeric",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).formatToParts(d);
+        const part = (type) => parts.find((item) => item.type === type)?.value || "--";
+        return `${part("month")}/${part("day")} ${part("hour")}:${part("minute")}`;
       }
       function getQpfMetaUrl() {
         try {
@@ -3448,8 +3816,9 @@
         return Number.isNaN(d.getTime()) ? s : formatManualUpdateTime(d.getTime());
       }
       async function updateQpfDataTimeFromMeta() {
-        const el = $("qpfDataTime");
-        if (!el) return;
+        const dataTimeEl = $("qpfDataTime"),
+          forecastTimeEl = $("qpfForecastTime");
+        if (!dataTimeEl && !forecastTimeEl) return;
 
         try {
           const r = await fetch(getQpfMetaUrl(), { cache: "no-store" });
@@ -3457,7 +3826,8 @@
           const data = await r.json();
 
           if (!data || data.ok !== true) {
-            el.textContent = "資料時間：取得失敗";
+            if (dataTimeEl) dataTimeEl.textContent = "資料時間：取得失敗";
+            if (forecastTimeEl) forecastTimeEl.textContent = "預報時間：--:--～--:--";
             return;
           }
 
@@ -3474,11 +3844,18 @@
             }
           }
 
-          el.textContent =
-            `資料時間：雷達 ${formatQpfApiTime(data.base_time)}` +
-            `｜建置 ${formatQpfApiTime(data.built_time)}`;
+          const forecastStart = qpfDateFromApi(data.forecast_start_time || data.base_time),
+            explicitEnd = qpfDateFromApi(data.forecast_end_time),
+            forecastEnd = explicitEnd ||
+              (forecastStart ? new Date(forecastStart.getTime() + 60 * 60 * 1000) : null);
+          if (dataTimeEl)
+            dataTimeEl.textContent = `資料時間：${formatQpfDataTime(data.base_time)}`;
+          if (forecastTimeEl)
+            forecastTimeEl.textContent =
+              `預報時間：${formatQpfClock(forecastStart)}～${formatQpfClock(forecastEnd)}`;
         } catch {
-          el.textContent = "資料時間：取得失敗";
+          if (dataTimeEl) dataTimeEl.textContent = "資料時間：取得失敗";
+          if (forecastTimeEl) forecastTimeEl.textContent = "預報時間：--:--～--:--";
         }
       }
       function updateQpfLocationMarker() {
@@ -3506,7 +3883,6 @@
       }
       function loadQpfImage() {
         if (!qpfOverlay) return;
-        setQpfUpdateTime();
         updateQpfDataTimeFromMeta();
         qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
         setQpfMeta(
@@ -3533,6 +3909,10 @@
           qpfOverlay ? loadQpfImage() : initQpfForecastMap();
         } catch {}
         try {
+          if (wrfQpfInstalled) loadWrfQpfManifest({ fit: false });
+          else initWrfQpfMap();
+        } catch {}
+        try {
           setObsAsset(currentObsAssetKey || "radar_tw");
         } catch {}
         try {
@@ -3540,54 +3920,25 @@
           updateQpfLocationMarker();
         } catch {}
       }
-      async function refreshQpfOverlay() {
-        setQpfUpdateTime();
+      function refreshQpfOverlay() {
         const btn = $("qpfRefreshBtn"),
           old = btn?.textContent || "";
         try {
           if (btn) {
             btn.disabled = true;
-            btn.textContent = "重建中…";
-          }
-          setQpfDataTimeText("資料時間：正在重新建置預測圖層…");
-          let oldBuilt = "";
-          try {
-            oldBuilt = String((await fetchQpfJson("/api/qpf/meta"))?.built_time || "");
-          } catch {}
-          const start = await fetchQpfJson("/api/rain/build_cache?force=1");
-          if (!start || start.ok !== true) throw new Error(start?.error || "啟動重建失敗");
-          for (let i = 0; i < 90; i++) {
-            await sleep(2000);
-            let status = null,
-              meta = null;
-            try {
-              status = await fetchQpfJson("/api/rain/cache_status");
-            } catch {}
-            try {
-              meta = await fetchQpfJson("/api/qpf/meta");
-            } catch {}
-            const p = status?.progress || meta?.progress || {},
-              building = p?.building === true,
-              done = p?.done_members ?? p?.minute ?? "",
-              total = p?.total_members ?? p?.minutes ?? "";
-            setQpfDataTimeText(
-              building ? `資料時間：重新建置中 ${done}/${total}` : "資料時間：重建完成，正在更新圖層…",
-            );
-            const newBuilt = String(meta?.built_time || "");
-            if (!building && newBuilt && newBuilt !== oldBuilt) break;
+            btn.textContent = "更新中…";
           }
           if (qpfOverlay) loadQpfImage();
-          updateQpfDataTimeFromMeta();
-          setQpfUpdateTime();
+          else initQpfForecastMap();
         } catch (e) {
           console.warn(e);
-          setQpfDataTimeText("資料時間：重建失敗，改為重新載入既有圖層");
-          if (qpfOverlay) loadQpfImage();
+          setQpfDataTimeText("資料時間：更新失敗");
         } finally {
-          if (btn) {
+          setTimeout(() => {
+            if (!btn) return;
             btn.disabled = false;
-            btn.textContent = old || "更新圖層";
-          }
+            btn.textContent = old || "更新圖資";
+          }, 500);
           setTimeout(updateQpfLocationMarker, 120);
         }
       }
@@ -3657,6 +4008,677 @@
             if (qpfOverlay) qpfOverlay.setOpacity(v);
           });
         initQpfForecastMap();
+      }
+
+      const WRF_QPF_ROOT = "https://qpf.leochangrainapi.com/qpf/";
+      const WRF_QPF_CURRENT_URL = WRF_QPF_ROOT + "current.json";
+      let wrfQpfMap = null,
+        wrfQpfOverlay = null,
+        wrfQpfPendingOverlay = null,
+        wrfQpfBoundsBox = null,
+        wrfQpfLocationMarker = null,
+        wrfQpfManifest = null,
+        wrfQpfHours = 6,
+        wrfQpfSelectedKey = "",
+        wrfQpfDisplayedKey = "",
+        wrfQpfDisplayedUrl = "",
+        wrfQpfInstalled = false,
+        wrfQpfLoadSeq = 0,
+        wrfQpfLayerLoadSeq = 0,
+        wrfQpfPreloadSeq = 0;
+      const WRF_QPF_IMAGE_CACHE_LIMIT = 3,
+        wrfQpfImageCache = new Map();
+
+      function wrfQpfLayerKey(layer) {
+        return `${Number(layer?.hours) || 0}:${layer?.start_lead_hours}:${layer?.end_lead_hours}`;
+      }
+      function wrfQpfLayersForHours(hours = wrfQpfHours) {
+        return (Array.isArray(wrfQpfManifest?.layers) ? wrfQpfManifest.layers : [])
+          .filter((layer) => Number(layer?.hours) === Number(hours))
+          .sort(
+            (a, b) =>
+              Number(a?.start_lead_hours || 0) - Number(b?.start_lead_hours || 0),
+          );
+      }
+      function formatWrfQpfTime(value, withDate = true) {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return "--";
+        return new Intl.DateTimeFormat("zh-TW", {
+          timeZone: "Asia/Taipei",
+          month: withDate ? "2-digit" : undefined,
+          day: withDate ? "2-digit" : undefined,
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(d);
+      }
+      function wrfQpfDefaultLayer(layers) {
+        if (!layers.length) return null;
+        const now = Date.now();
+        return (
+          layers.find((layer) => {
+            const from = Date.parse(layer?.valid_from),
+              to = Date.parse(layer?.valid_to);
+            return Number.isFinite(from) && Number.isFinite(to) && from <= now && now < to;
+          }) ||
+          layers.find((layer) => {
+            const to = Date.parse(layer?.valid_to);
+            return Number.isFinite(to) && to > now;
+          }) ||
+          layers[layers.length - 1]
+        );
+      }
+      function wrfQpfAbsoluteUrl(relativeUrl) {
+        try {
+          return new URL(String(relativeUrl || ""), WRF_QPF_ROOT).toString();
+        } catch {
+          return "";
+        }
+      }
+      function setWrfQpfLoadingUi(key = "", loading = false) {
+        document.querySelectorAll(".wrf-qpf-time-btn").forEach((btn) => {
+          btn.classList.toggle("is-loading", loading && btn.dataset.wrfQpfKey === key);
+          btn.setAttribute(
+            "aria-busy",
+            loading && btn.dataset.wrfQpfKey === key ? "true" : "false",
+          );
+        });
+      }
+      function trimWrfQpfImageCache(protectedUrl = "") {
+        const ready = [...wrfQpfImageCache.entries()]
+          .filter(([url, entry]) => url !== protectedUrl && entry.ready)
+          .sort((a, b) => a[1].lastUsed - b[1].lastUsed);
+        while (wrfQpfImageCache.size > WRF_QPF_IMAGE_CACHE_LIMIT && ready.length) {
+          const [url, entry] = ready.shift();
+          wrfQpfImageCache.delete(url);
+          try {
+            entry.image.onload = null;
+            entry.image.onerror = null;
+            entry.image.src = "";
+          } catch {}
+        }
+      }
+      function preloadWrfQpfImage(layer, priority = "low") {
+        const url = wrfQpfAbsoluteUrl(layer?.url);
+        if (!url) return Promise.reject(new Error("圖資網址無效"));
+        const cached = wrfQpfImageCache.get(url);
+        if (cached) {
+          cached.lastUsed = performance.now();
+          if (priority === "high") {
+            try {
+              cached.image.fetchPriority = "high";
+            } catch {}
+          }
+          return cached.promise;
+        }
+        const image = new Image(),
+          entry = {
+            image,
+            ready: false,
+            lastUsed: performance.now(),
+            promise: null,
+          };
+        image.decoding = "async";
+        image.loading = "eager";
+        try {
+          image.fetchPriority = priority;
+        } catch {}
+        entry.promise = new Promise((resolve, reject) => {
+          image.onload = async () => {
+            try {
+              if (typeof image.decode === "function") await image.decode();
+            } catch {}
+            if (!image.naturalWidth || !image.naturalHeight) {
+              reject(new Error("圖資解碼失敗"));
+              return;
+            }
+            entry.ready = true;
+            entry.lastUsed = performance.now();
+            trimWrfQpfImageCache(url);
+            resolve(url);
+          };
+          image.onerror = () => reject(new Error("圖資下載失敗"));
+          image.src = url;
+        }).catch((error) => {
+          if (wrfQpfImageCache.get(url) === entry) wrfQpfImageCache.delete(url);
+          throw error;
+        });
+        wrfQpfImageCache.set(url, entry);
+        return entry.promise;
+      }
+      function preloadWrfQpfNeighbours(layer) {
+        const layers = wrfQpfLayersForHours(Number(layer?.hours)),
+          index = layers.findIndex((item) => wrfQpfLayerKey(item) === wrfQpfLayerKey(layer)),
+          candidates = [layers[index + 1], layers[index - 1]].filter(Boolean),
+          seq = ++wrfQpfPreloadSeq,
+          run = async () => {
+            for (const candidate of candidates) {
+              if (seq !== wrfQpfPreloadSeq) return;
+              try {
+                await preloadWrfQpfImage(candidate, "low");
+              } catch {}
+            }
+          };
+        if (typeof requestIdleCallback === "function") {
+          requestIdleCallback(run, { timeout: 1200 });
+        } else {
+          setTimeout(run, 180);
+        }
+      }
+      function updateWrfQpfDurationButtons() {
+        document.querySelectorAll("[data-wrf-qpf-hours]").forEach((btn) => {
+          btn.classList.toggle("on", Number(btn.dataset.wrfQpfHours) === wrfQpfHours);
+        });
+      }
+      function renderWrfQpfLegend() {
+        const box = $("wrfQpfLegend"),
+          palette = Array.isArray(wrfQpfManifest?.palette) ? wrfQpfManifest.palette : [],
+          entries = palette.filter(
+            (entry) => Number(entry?.min_mm) > 0 && Array.isArray(entry?.rgba),
+          );
+        if (!box) return;
+        const wasExpanded = box.classList.contains("is-expanded");
+        box.replaceChildren();
+
+        if (!entries.length) {
+          box.hidden = true;
+          return;
+        }
+        box.hidden = false;
+        box.classList.toggle("is-expanded", wasExpanded);
+
+        const head = document.createElement("div"),
+          title = document.createElement("span"),
+          toggle = document.createElement("button"),
+          bar = document.createElement("div"),
+          ticks = document.createElement("div"),
+          details = document.createElement("div"),
+          detailsId = "wrfQpfLegendDetails";
+
+        head.className = "wrf-qpf-legend-head";
+        title.className = "wrf-qpf-legend-title";
+        title.textContent = "累積雨量（mm）";
+        toggle.className = "wrf-qpf-legend-toggle";
+        toggle.type = "button";
+        toggle.textContent = wasExpanded ? "收起" : "完整分級";
+        toggle.setAttribute("aria-expanded", String(wasExpanded));
+        toggle.setAttribute("aria-controls", detailsId);
+        head.append(title, toggle);
+
+        bar.className = "wrf-qpf-legend-bar";
+        bar.setAttribute("aria-hidden", "true");
+        entries.forEach((entry) => {
+          const segment = document.createElement("span"),
+            rgba = entry.rgba.map(Number);
+          segment.className = "wrf-qpf-legend-segment";
+          segment.style.background = `rgba(${rgba[0] || 0},${rgba[1] || 0},${rgba[2] || 0},${Number.isFinite(rgba[3]) ? rgba[3] / 255 : 1})`;
+          bar.appendChild(segment);
+        });
+
+        ticks.className = "wrf-qpf-legend-ticks";
+        const preferredTicks = [1, 10, 30, 50, 90, 150, 300];
+        preferredTicks.forEach((value) => {
+          const index = entries.findIndex((entry) => Number(entry.min_mm) === value);
+          if (index < 0) return;
+          const tick = document.createElement("span");
+          tick.className = "wrf-qpf-legend-tick";
+          tick.style.left = `${entries.length > 1 ? (index / (entries.length - 1)) * 100 : 0}%`;
+          tick.textContent = value === 300 ? "300+" : String(value);
+          ticks.appendChild(tick);
+        });
+
+        details.className = "wrf-qpf-legend-details";
+        details.id = detailsId;
+        entries.forEach((entry, index) => {
+            const chip = document.createElement("span"),
+              dot = document.createElement("i"),
+              rgba = entry.rgba.map(Number),
+              next = entries[index + 1],
+              min = Number(entry.min_mm),
+              max = Number(next?.min_mm);
+            chip.className = "wrf-qpf-legend-chip";
+            dot.className = "wrf-qpf-legend-dot";
+            dot.style.background = `rgba(${rgba[0] || 0},${rgba[1] || 0},${rgba[2] || 0},${Number.isFinite(rgba[3]) ? rgba[3] / 255 : 1})`;
+            chip.append(
+              dot,
+              document.createTextNode(
+                Number.isFinite(max) ? `${min}–${max} mm` : `≥${min} mm`,
+              ),
+            );
+            details.appendChild(chip);
+          });
+
+        toggle.addEventListener("click", () => {
+          const expanded = box.classList.toggle("is-expanded");
+          toggle.textContent = expanded ? "收起" : "完整分級";
+          toggle.setAttribute("aria-expanded", String(expanded));
+        });
+
+        box.append(head, bar, ticks, details);
+      }
+      function updateWrfQpfLocationMarker() {
+        if (!wrfQpfMap || typeof L === "undefined" || !lastTarget) return;
+        const lat = Number(lastTarget.lat),
+          lon = Number(lastTarget.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        if (!wrfQpfLocationMarker) {
+          wrfQpfLocationMarker = L.circleMarker([lat, lon], {
+            radius: 6,
+            color: "#075fc7",
+            weight: 3,
+            fillColor: "#fff",
+            fillOpacity: 1,
+            opacity: 1,
+            interactive: false,
+            pane: "markerPane",
+          }).addTo(wrfQpfMap);
+        } else {
+          wrfQpfLocationMarker.setLatLng([lat, lon]);
+        }
+        try {
+          wrfQpfLocationMarker.bringToFront();
+        } catch {}
+      }
+      function fitWrfQpfBounds() {
+        const bounds =
+          wrfQpfOverlay?.getBounds?.() ||
+          wrfQpfLayersForHours()[0]?.leaflet_bounds;
+        if (wrfQpfMap && Array.isArray(bounds)) {
+          wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
+        } else if (wrfQpfMap && bounds) {
+          wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
+        }
+      }
+
+      /*
+       * Chrome still smooths a normal <img> while it is being reduced by
+       * Leaflet.  Drawing the categorical QPF raster on a canvas with image
+       * smoothing explicitly disabled preserves the model-grid boundaries at
+       * both low and high zoom levels.
+       */
+      let WrfQpfSharpOverlayClass = null;
+      function createWrfQpfSharpOverlay(url, bounds, options = {}) {
+        if (!WrfQpfSharpOverlayClass) {
+          WrfQpfSharpOverlayClass = L.Layer.extend({
+            initialize(imageUrl, imageBounds, layerOptions = {}) {
+              L.setOptions(this, layerOptions);
+              this._url = imageUrl;
+              this._bounds = L.latLngBounds(imageBounds);
+              this._opacity = Number.isFinite(Number(layerOptions.opacity))
+                ? Number(layerOptions.opacity)
+                : 1;
+              this._loaded = false;
+              this._frame = 0;
+            },
+
+            onAdd(map) {
+              this._map = map;
+              this._canvas = L.DomUtil.create(
+                "canvas",
+                "leaflet-layer leaflet-image-layer wrf-qpf-sharp-canvas",
+              );
+              L.DomUtil.setOpacity(this._canvas, this._opacity);
+              map.getPane(this.options.pane || "overlayPane").appendChild(this._canvas);
+
+              this._image = new Image();
+              this._image.decoding = "async";
+              this._image.onload = () => {
+                this._loaded = true;
+                this._scheduleReset();
+                this.fire("load");
+              };
+              this._image.onerror = () => this.fire("error");
+
+              map.on("move zoom resize viewreset", this._scheduleReset, this);
+              this._image.src = this._url;
+              this._scheduleReset();
+              return this;
+            },
+
+            onRemove(map) {
+              map.off("move zoom resize viewreset", this._scheduleReset, this);
+              if (this._frame) cancelAnimationFrame(this._frame);
+              this._frame = 0;
+              this._image.onload = null;
+              this._image.onerror = null;
+              this._canvas?.remove();
+              this._map = null;
+              return this;
+            },
+
+            _scheduleReset() {
+              if (!this._map || this._frame) return;
+              this._frame = requestAnimationFrame(() => {
+                this._frame = 0;
+                this._reset();
+              });
+            },
+
+            _reset() {
+              if (!this._map || !this._canvas) return;
+              const map = this._map;
+              const canvas = this._canvas;
+              const size = map.getSize();
+              const ratio = Math.max(1, Number(window.devicePixelRatio) || 1);
+              const pixelWidth = Math.max(1, Math.round(size.x * ratio));
+              const pixelHeight = Math.max(1, Math.round(size.y * ratio));
+
+              if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+                canvas.width = pixelWidth;
+                canvas.height = pixelHeight;
+                canvas.style.width = `${size.x}px`;
+                canvas.style.height = `${size.y}px`;
+              }
+
+              L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint([0, 0]));
+
+              const context = canvas.getContext("2d", { alpha: true });
+              context.setTransform(ratio, 0, 0, ratio, 0, 0);
+              context.clearRect(0, 0, size.x, size.y);
+              context.imageSmoothingEnabled = false;
+              context.webkitImageSmoothingEnabled = false;
+              context.mozImageSmoothingEnabled = false;
+
+              if (!this._loaded || !this._image?.naturalWidth) return;
+              const northWest = map.latLngToContainerPoint(this._bounds.getNorthWest());
+              const southEast = map.latLngToContainerPoint(this._bounds.getSouthEast());
+              const left = Math.round(northWest.x);
+              const top = Math.round(northWest.y);
+              const width = Math.max(1, Math.round(southEast.x - northWest.x));
+              const height = Math.max(1, Math.round(southEast.y - northWest.y));
+              context.drawImage(this._image, left, top, width, height);
+            },
+
+            setOpacity(opacity) {
+              this._opacity = Math.max(0, Math.min(1, Number(opacity) || 0));
+              if (this._canvas) L.DomUtil.setOpacity(this._canvas, this._opacity);
+              return this;
+            },
+
+            getBounds() {
+              return this._bounds;
+            },
+
+            getElement() {
+              return this._canvas;
+            },
+          });
+        }
+        return new WrfQpfSharpOverlayClass(url, bounds, options);
+      }
+
+      async function setWrfQpfLayer(layer, { fit = false } = {}) {
+        if (!layer || !wrfQpfMap || typeof L === "undefined") return;
+        const bounds = layer.leaflet_bounds,
+          imageUrl = wrfQpfAbsoluteUrl(layer.url);
+        if (!Array.isArray(bounds) || bounds.length !== 2 || !imageUrl) return;
+        const key = wrfQpfLayerKey(layer),
+          seq = ++wrfQpfLayerLoadSeq;
+        wrfQpfPreloadSeq++;
+        wrfQpfSelectedKey = key;
+        const opacity = Math.max(
+          0.25,
+          Math.min(1, parseFloat($("wrfQpfOpacity")?.value) || 0.78),
+        );
+        document.querySelectorAll(".wrf-qpf-time-btn").forEach((btn) => {
+          btn.classList.toggle("on", btn.dataset.wrfQpfKey === key);
+        });
+        setWrfQpfLoadingUi("", false);
+        if (key === wrfQpfDisplayedKey && imageUrl === wrfQpfDisplayedUrl && wrfQpfOverlay) {
+          const maxMm = Number(layer.max_mm);
+          wrfQpfOverlay.setOpacity(opacity);
+          if ($("wrfQpfStatus"))
+            $("wrfQpfStatus").textContent = Number.isFinite(maxMm)
+              ? ``
+              : "高解析度圖資已載入";
+          if ($("wrfQpfValidTime"))
+            $("wrfQpfValidTime").textContent =
+              ``;
+          if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
+          preloadWrfQpfNeighbours(layer);
+          return;
+        }
+        setWrfQpfLoadingUi(key, true);
+        if ($("wrfQpfStatus")) $("wrfQpfStatus").textContent = "正在準備高解析度圖資…";
+        let candidate = null;
+        try {
+          await preloadWrfQpfImage(layer, "high");
+          if (seq !== wrfQpfLayerLoadSeq) return;
+          if (wrfQpfPendingOverlay) {
+            try {
+              wrfQpfMap.removeLayer(wrfQpfPendingOverlay);
+            } catch {}
+            wrfQpfPendingOverlay = null;
+          }
+          const previousOverlay = wrfQpfOverlay;
+          candidate = createWrfQpfSharpOverlay(imageUrl, bounds, {
+            opacity: 0,
+            interactive: false,
+          });
+          wrfQpfPendingOverlay = candidate;
+          await new Promise((resolve, reject) => {
+            let settled = false;
+            const finish = (ok) => {
+              if (settled) return;
+              settled = true;
+              ok ? resolve() : reject(new Error("圖層顯示失敗"));
+            };
+            candidate.once("load", () => finish(true));
+            candidate.once("error", () => finish(false));
+            candidate.addTo(wrfQpfMap);
+            requestAnimationFrame(() => {
+              const el = candidate.getElement?.();
+              if (el?.complete && el.naturalWidth) finish(true);
+            });
+          });
+          if (seq !== wrfQpfLayerLoadSeq) {
+            try {
+              wrfQpfMap.removeLayer(candidate);
+            } catch {}
+            if (wrfQpfPendingOverlay === candidate) wrfQpfPendingOverlay = null;
+            return;
+          }
+          wrfQpfOverlay = candidate;
+          wrfQpfDisplayedKey = key;
+          wrfQpfDisplayedUrl = imageUrl;
+          wrfQpfPendingOverlay = null;
+          requestAnimationFrame(() => candidate.setOpacity(opacity));
+          if (previousOverlay && previousOverlay !== candidate) {
+            setTimeout(() => {
+              try {
+                wrfQpfMap.removeLayer(previousOverlay);
+              } catch {}
+            }, 110);
+          }
+          if (!wrfQpfBoundsBox) {
+            wrfQpfBoundsBox = L.rectangle(bounds, {
+              weight: 1,
+              opacity: 0.4,
+              fill: false,
+              dashArray: "4 6",
+            }).addTo(wrfQpfMap);
+          } else {
+            wrfQpfBoundsBox.setBounds(bounds);
+          }
+          const maxMm = Number(layer.max_mm);
+          if ($("wrfQpfStatus"))
+            $("wrfQpfStatus").textContent = Number.isFinite(maxMm)
+              ? ``
+              : "高解析度圖資已載入";
+          if ($("wrfQpfValidTime"))
+            $("wrfQpfValidTime").textContent =
+              ``;
+          if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
+          setTimeout(updateWrfQpfLocationMarker, 60);
+          preloadWrfQpfNeighbours(layer);
+        } catch (error) {
+          if (seq !== wrfQpfLayerLoadSeq) return;
+          if (candidate) {
+            try {
+              wrfQpfMap.removeLayer(candidate);
+            } catch {}
+          }
+          if (wrfQpfPendingOverlay === candidate) wrfQpfPendingOverlay = null;
+          console.warn("[WRF QPF image]", error);
+          if ($("wrfQpfStatus"))
+            $("wrfQpfStatus").textContent = `圖資載入失敗：${error.message || error}`;
+        } finally {
+          if (seq === wrfQpfLayerLoadSeq) setWrfQpfLoadingUi(key, false);
+        }
+      }
+      function renderWrfQpfTimeline({ preserveSelection = true } = {}) {
+        const box = $("wrfQpfTimeline"),
+          layers = wrfQpfLayersForHours();
+        if (!box) return;
+        box.replaceChildren();
+        if (!layers.length) {
+          box.innerHTML = '<div class="forecast-empty">此累積時距沒有可用圖層</div>';
+          return;
+        }
+        const selected =
+          (preserveSelection
+            ? layers.find((layer) => wrfQpfLayerKey(layer) === wrfQpfSelectedKey)
+            : null) || wrfQpfDefaultLayer(layers);
+        layers.forEach((layer) => {
+          const btn = document.createElement("button"),
+            main = document.createElement("span"),
+            sub = document.createElement("span"),
+            key = wrfQpfLayerKey(layer);
+          btn.type = "button";
+          btn.className = "wrf-qpf-time-btn";
+          btn.dataset.wrfQpfKey = key;
+          main.className = "wrf-qpf-time-main";
+          sub.className = "wrf-qpf-time-sub";
+          main.textContent = `${formatWrfQpfTime(layer.valid_from)}–${formatWrfQpfTime(layer.valid_to, false)}`;
+          sub.textContent = `第${String(layer.start_lead_hours).padStart(2, "0")}～${String(layer.end_lead_hours).padStart(2, "0")} 小時`;
+          btn.append(main, sub);
+          btn.addEventListener("click", () => setWrfQpfLayer(layer));
+          box.appendChild(btn);
+        });
+        if (selected) setWrfQpfLayer(selected);
+        requestAnimationFrame(() =>
+          box.querySelector(".wrf-qpf-time-btn.on")?.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          }),
+        );
+      }
+      function initWrfQpfMap() {
+        const mapEl = $("wrfQpfMap"),
+          err = $("wrfQpfMapError");
+        if (!mapEl) return;
+        if (typeof L === "undefined") {
+          if (err) {
+            err.style.display = "block";
+            err.textContent = "地圖套件載入中…";
+          }
+          ensureLeafletReady().then((ok) => {
+            if (ok) initWrfQpfMap();
+            else if (err) err.textContent = "地圖套件載入失敗。";
+          });
+          return;
+        }
+        if (err) err.style.display = "none";
+        if (wrfQpfMap) {
+          setTimeout(() => {
+            wrfQpfMap.invalidateSize();
+            updateWrfQpfLocationMarker();
+          }, 80);
+          return;
+        }
+        wrfQpfMap = L.map("wrfQpfMap", {
+          center: [23.5, 120.8],
+          zoom: 6,
+          minZoom: 4,
+          maxZoom: 12,
+          zoomControl: true,
+          attributionControl: true,
+          preferCanvas: true,
+          zoomAnimation: false,
+          fadeAnimation: false,
+          tap: true,
+        });
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          detectRetina: false,
+          attribution: "&copy; OpenStreetMap",
+        }).addTo(wrfQpfMap);
+        if (wrfQpfManifest) renderWrfQpfTimeline({ preserveSelection: true });
+        setTimeout(() => wrfQpfMap.invalidateSize(), 120);
+      }
+      async function loadWrfQpfManifest({ fit = false } = {}) {
+        const seq = ++wrfQpfLoadSeq,
+          btn = $("wrfQpfRefreshBtn"),
+          err = $("wrfQpfMapError");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "讀取中…";
+        }
+        if ($("wrfQpfStatus")) $("wrfQpfStatus").textContent = "正在讀取最新模式資料…";
+        try {
+          const response = await fetch(
+            `${WRF_QPF_CURRENT_URL}?t=${Date.now()}`,
+            { cache: "no-store" },
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const manifest = await response.json();
+          if (seq !== wrfQpfLoadSeq) return;
+          if (!manifest || !Array.isArray(manifest.layers) || !manifest.layers.length)
+            throw new Error("current.json 沒有可用圖層");
+          wrfQpfManifest = manifest;
+          initWrfQpfMap();
+          updateWrfQpfDurationButtons();
+          renderWrfQpfLegend();
+          renderWrfQpfTimeline({ preserveSelection: true });
+          if ($("wrfQpfCycleTime"))
+            $("wrfQpfCycleTime").textContent =
+              `資料時間：${formatWrfQpfTime(manifest.cycle_time)}`;
+          if ($("wrfQpfLoadedTime"))
+            $("wrfQpfLoadedTime").textContent =
+              `載入時間：${formatManualUpdateTime(Date.now())}`;
+          if (fit) fitWrfQpfBounds();
+          if (err) err.style.display = "none";
+        } catch (error) {
+          if (seq !== wrfQpfLoadSeq) return;
+          console.warn("[WRF QPF]", error);
+          if ($("wrfQpfStatus"))
+            $("wrfQpfStatus").textContent = `數值降雨預報載入失敗：${error.message || error}`;
+          if (err) {
+            err.style.display = "block";
+            err.textContent = "數值降雨預報暫時無法載入，請確認 QPF 服務是否在線。";
+          }
+        } finally {
+          if (seq === wrfQpfLoadSeq && btn) {
+            btn.disabled = false;
+            btn.textContent = "更新資料";
+          }
+        }
+      }
+      function installWrfQpfForecastMap() {
+        if (wrfQpfInstalled) return;
+        wrfQpfInstalled = true;
+        document.querySelectorAll("[data-wrf-qpf-hours]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            wrfQpfHours = Number(btn.dataset.wrfQpfHours) || 6;
+            wrfQpfSelectedKey = "";
+            updateWrfQpfDurationButtons();
+            renderWrfQpfTimeline({ preserveSelection: false });
+          });
+        });
+        $("wrfQpfFitBtn")?.addEventListener("click", fitWrfQpfBounds);
+        $("wrfQpfRefreshBtn")?.addEventListener("click", () =>
+          loadWrfQpfManifest({ fit: false }),
+        );
+        $("wrfQpfOpacity")?.addEventListener("input", () => {
+          const opacity = Math.max(
+            0.25,
+            Math.min(1, parseFloat($("wrfQpfOpacity").value) || 0.78),
+          );
+          if (wrfQpfOverlay) wrfQpfOverlay.setOpacity(opacity);
+        });
+        initWrfQpfMap();
+        loadWrfQpfManifest({ fit: true });
       }
 
       const imageLightboxState = {
@@ -3873,9 +4895,14 @@
         if (page === "forecast")
           setTimeout(() => {
             initQpfForecastMap();
+            initWrfQpfMap();
             if (qpfMap) {
               qpfMap.invalidateSize();
               updateQpfLocationMarker();
+            }
+            if (wrfQpfMap) {
+              wrfQpfMap.invalidateSize();
+              updateWrfQpfLocationMarker();
             }
           }, 100);
       }
@@ -3928,6 +4955,15 @@
           setTrackPosition(WEATHER_PAGES.indexOf(currentWeatherPage), 0, animate);
           resetState();
         }
+
+        viewport.addEventListener("dblclick", (event) => {
+          if (isPageZoomed() || isInteractiveTarget(event.target)) return;
+          const rect = viewport.getBoundingClientRect();
+          if (!rect.width) return;
+          event.preventDefault();
+          const direction = event.clientX < rect.left + rect.width / 2 ? -1 : 1;
+          switchWeatherPage(direction);
+        });
 
         viewport.addEventListener(
           "touchstart",
@@ -5593,6 +6629,7 @@
         if (Number.isFinite(realtime?.temp)) applyTemperatureTint(realtime.temp);
         $("weatherIcon").textContent = mapWeatherToIcon(realtime?.condition || "", night);
         updateQpfLocationMarker();
+        updateWrfQpfLocationMarker();
       }
 
       function updateModeUI() {
@@ -5873,6 +6910,7 @@
       installHourlyDetail();
       installObsAssetControls();
       installQpfForecastMap();
+      installWrfQpfForecastMap();
       installImageLightbox();
       installEnvironmentPanel();
       installPressureToggle();
