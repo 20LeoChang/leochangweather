@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.0</title>
+    <title>天氣網站v8.1</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -952,6 +952,12 @@
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.085);
         border: 1px solid rgba(255, 255, 255, 0.075);
+      }
+      .hourly-detail-metric.is-wind-highlight {
+        border-color: color-mix(in srgb, var(--wind-accent, #6eb5ff) 58%, transparent);
+        box-shadow:
+          inset 3px 0 0 var(--wind-accent, #6eb5ff),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
       }
       .hourly-detail-label {
         font-size: 10.5px;
@@ -3033,6 +3039,63 @@
         color: rgba(255, 255, 255, 0.6);
         line-height: 1.45;
       }
+      .source-field-groups {
+        display: grid;
+        gap: 7px;
+      }
+      .source-field-group {
+        min-width: 0;
+        padding: 7px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.055);
+        border: 1px solid rgba(255, 255, 255, 0.055);
+      }
+      .source-field-group.is-model {
+        background: rgba(96, 165, 250, 0.10);
+        border-color: rgba(125, 190, 255, 0.18);
+      }
+      .source-field-group.is-missing {
+        background: rgba(255, 255, 255, 0.035);
+        border-color: rgba(255, 255, 255, 0.045);
+      }
+      .source-field-title {
+        font-size: 10.5px;
+        line-height: 1.35;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .source-field-group.is-model .source-field-title {
+        color: rgba(202, 229, 255, 0.98);
+      }
+      .source-field-group.is-missing .source-field-title {
+        color: rgba(255, 255, 255, 0.52);
+      }
+      .source-field-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .source-field-tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 20px;
+        padding: 3px 7px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.085);
+        border: 1px solid rgba(255, 255, 255, 0.065);
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 9.5px;
+        font-weight: 750;
+        line-height: 1.15;
+      }
+      .source-field-note {
+        margin-top: 6px;
+        font-size: 9.5px;
+        line-height: 1.45;
+        font-weight: 650;
+        color: rgba(255, 255, 255, 0.54);
+      }
 
       @media (prefers-reduced-motion: reduce) {
         .interface-track,
@@ -3115,7 +3178,7 @@
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.0</div>
+              <div class="version-badge" id="versionLabel">v8.1</div>
             </div>
           </section>
 
@@ -3298,7 +3361,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.0</div>
+              <div class="version-badge">v8.1</div>
             </div>
           </section>
 
@@ -3457,8 +3520,12 @@
                   <button id="toggleSourceBtn" class="source-toggle-btn" type="button">資料來源</button>
                   <div id="sourcePanel" class="source-panel" style="display: none">
                     <div class="source-row">
-                      <div class="source-key">即時觀測</div>
+                      <div class="source-key">即時來源</div>
                       <div class="source-value" id="stationLabel">選擇模式後按「更新」。</div>
+                    </div>
+                    <div class="source-row">
+                      <div class="source-key">欄位來源</div>
+                      <div class="source-value" id="fieldSourceLabel">--</div>
                     </div>
                     <div class="source-row">
                       <div class="source-key">資料時間</div>
@@ -3468,13 +3535,13 @@
                       <div class="source-key">預報來源</div>
                       <div class="source-value" id="hintBar">自動選用 CWA / Open-Meteo</div>
                     </div>
-                    <div class="source-note" id="footerLabel">
+                    <div class="source-note" id="footerLabel" style="display:none">
                       系統會依所在地自動選擇資料源；附近無測站或資料暫時不可用時，會切換備援來源。
                     </div>
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.0</div>
+              <div class="version-badge">v8.1</div>
             </div>
           </section>
         </div>
@@ -3573,7 +3640,7 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.0";
+      const APP_VERSION = "v8.1";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -5582,8 +5649,16 @@
           else if (number >= 3) score = 58 + number;
         }
         if (metric.id === "mWind" && Number.isFinite(number)) {
-          if (number >= 10) score = 138 + number;
-          else if (number >= 6) score = 82 + number;
+          if (number >= 41.5) score = 190 + number;
+          else if (number >= 32.7) score = 178 + number;
+          else if (number >= 28.5) score = 168 + number;
+          else if (number >= 24.5) score = 158 + number;
+          else if (number >= 20.8) score = 150 + number;
+          else if (number >= 17.2) score = 145 + number;
+          else if (number >= 13.9) score = 140 + number;
+          else if (number >= 10.8) score = 130 + number;
+          else if (number >= 8.0) score = 108 + number;
+          else if (number >= 5.5) score = 88 + number;
         }
         if (metric.id === "mHum" && Number.isFinite(number) && (number >= 85 || number <= 35)) score = 76;
         if (metric.id === "mVis" && Number.isFinite(number) && number < 5) score = 125 - number;
@@ -5872,14 +5947,122 @@
           .join("");
         return `<div class="source-provider-summary">${escapeHtml(provider)} · 本次使用 ${count} 個測站</div><div class="source-station-list">${rows}</div>`;
       }
+      function sourceTextMissing(v) {
+        const s = String(v ?? "").trim();
+        return !s || s === "--" || s === "目前天氣不明" || s === "無資料";
+      }
+      function openMeteoFieldSource(rt, keys) {
+        const fs = rt?.fieldSources && typeof rt.fieldSources === "object" ? rt.fieldSources : {};
+        for (const key of keys || []) {
+          const src = String(fs?.[key] || "").trim();
+          if (src) return src;
+        }
+        return "";
+      }
+      function sourceNameFromBackendCode(code) {
+        const s = String(code || "").toLowerCase();
+        if (s === "open-meteo-cams-model") return "Open-Meteo CAMS 模型";
+        if (s === "open-meteo-15min-model") return "Open-Meteo 15分鐘模型";
+        if (s === "open-meteo-hourly-model") return "Open-Meteo 小時模型";
+        if (s.startsWith("open-meteo")) return "Open-Meteo 模型";
+        return code || "";
+      }
+      function primaryFieldSourceName(data, field) {
+        const provider = data?.provider;
+        if (provider === "cwa-backend") {
+          if (field === "rain10" || field === "rain1h") return "CWA 雨量站 O-A0002";
+          if (field === "air") return "環境部空品測站";
+          if (field === "uv") return "CWA UV 測站";
+          if (field === "feels") return "CWA 測站資料推算";
+          return "CWA 自動氣象站 / IDW";
+        }
+        if (provider === "cma-backend") {
+          if (field === "feels") return "CMA 測站資料推算";
+          return "CMA 測站 / IDW";
+        }
+        if (provider === "open-meteo-backend") return "Open-Meteo 模型";
+        return backendProviderName(data);
+      }
+      function buildRealtimeFieldSourceHtml(data) {
+        const r = data?.realtime || {};
+        const localPressure = backendNumber(r.localPressure ?? r.pressureLocal ?? r.stationPressure ?? r.pressure);
+        const seaPressure = backendNumber(r.seaLevelPressure ?? r.pressureSeaLevel ?? r.mslPressure ?? r.pressureMsl);
+        const fields = [
+          { label: "溫度", field: "temp", keys: ["temp"], present: () => Number.isFinite(backendNumber(r.temp)) },
+          { label: "體感", field: "feels", keys: ["feels"], present: () => Number.isFinite(backendNumber(r.feels)) },
+          { label: "天氣狀況", field: "condition", keys: ["condition", "icon"], present: () => !sourceTextMissing(r.condition) },
+          { label: "風", field: "wind", keys: ["windText", "windSpeed", "windDirection"], present: () => !sourceTextMissing(r.windText) || Number.isFinite(backendNumber(r.windSpeed)) },
+          { label: "相對濕度", field: "humidity", keys: ["humidity"], present: () => Number.isFinite(backendNumber(r.humidity)) },
+          { label: "所在地氣壓", field: "pressure", keys: ["pressure", "pressureType"], present: () => Number.isFinite(localPressure) },
+          { label: "海平面氣壓", field: "seaPressure", keys: ["seaLevelPressure"], present: () => Number.isFinite(seaPressure) },
+          { label: "日照", field: "sunshine", keys: ["sunshine", "sunshineType"], present: () => Number.isFinite(backendNumber(r.sunshine)) },
+          { label: "能見度", field: "visibility", keys: ["visibility"], present: () => !sourceTextMissing(r.visibility) },
+          { label: "10分鐘雨量", field: "rain10", keys: ["rain10min"], present: () => Number.isFinite(backendNumber(r.rain10min)) },
+          { label: "1小時雨量", field: "rain1h", keys: ["rain1h", "rainMethod"], present: () => Number.isFinite(backendNumber(r.rain1h)) },
+          { label: "空氣品質", field: "air", keys: ["air"], present: () => Number.isFinite(backendNumber(r?.air?.aqi)) },
+          { label: "紫外線", field: "uv", keys: ["uv"], present: () => Number.isFinite(backendNumber(r?.uv?.index)) },
+        ];
+
+        const groups = new Map();
+        for (const item of fields) {
+          let source = openMeteoFieldSource(r, item.keys);
+          let sourceName = sourceNameFromBackendCode(source);
+          if (!item.present()) sourceName = "無資料";
+          else if (!sourceName) sourceName = primaryFieldSourceName(data, item.field);
+          if (!groups.has(sourceName)) groups.set(sourceName, []);
+          groups.get(sourceName).push(item.label);
+        }
+
+        const preferred = [
+          "CWA 自動氣象站 / IDW",
+          "CWA 測站資料推算",
+          "CWA 雨量站 O-A0002",
+          "CWA UV 測站",
+          "環境部空品測站",
+          "CMA 測站 / IDW",
+          "CMA 測站資料推算",
+          "Open-Meteo 模型",
+          "Open-Meteo 小時模型",
+          "Open-Meteo 15分鐘模型",
+          "Open-Meteo CAMS 模型",
+          "無資料",
+        ];
+        const entries = Array.from(groups.entries()).sort((a, b) => {
+          const ai = preferred.indexOf(a[0]);
+          const bi = preferred.indexOf(b[0]);
+          return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+        });
+
+        const html = entries
+          .map(([sourceName, labels]) => {
+            const model = sourceName.startsWith("Open-Meteo");
+            const missing = sourceName === "無資料";
+            const cls = model ? " is-model" : missing ? " is-missing" : "";
+            return `<div class="source-field-group${cls}"><div class="source-field-title">${escapeHtml(sourceName)}</div><div class="source-field-tags">${labels.map((x) => `<span class="source-field-tag">${escapeHtml(x)}</span>`).join("")}</div></div>`;
+          })
+          .join("");
+
+        const om = r?.openMeteoFallback || {};
+        const note = om?.used
+          ? `<div class="source-field-note">Open-Meteo 僅補主資料源缺少的欄位；標示為模型的資料不是地面測站實測。10分鐘雨量不使用 Open-Meteo 補值。</div>`
+          : data?.provider === "open-meteo-backend"
+            ? `<div class="source-field-note">目前即時資料為 Open-Meteo 模型資料，不是地面測站實測；10分鐘雨量維持無資料。</div>`
+            : "";
+        return `<div class="source-field-groups">${html}</div>${note}`;
+      }
       function renderSourceInfo(data, forecastSource = "自動選用 CWA / Open-Meteo") {
+        const sp = data?.sourcePanel || {};
         $("stationLabel").innerHTML = buildStationSourceHtml(data);
-        $("timeLabel").textContent = data?.realtime?.obsTime
-          ? formatObsTimeHHMM(data.realtime.obsTime)
-          : "--";
+        if ($("fieldSourceLabel")) $("fieldSourceLabel").innerHTML = buildRealtimeFieldSourceHtml(data);
+        // 資料時間只顯示 HH:MM；不顯示「觀測時間／模型時間／後端耗時」等其他文字。
+        const sourceDataTime = formatObsTimeHHMM(data?.realtime?.obsTime);
+        $("timeLabel").textContent = sourceDataTime || "--";
         $("hintBar").textContent = forecastSource;
-        $("footerLabel").textContent =
-          "系統會依所在地自動選擇資料源；附近無測站或資料暫時不可用時，會切換備援來源。";
+        // 不顯示底部重複的來源說明（即時補值／空品UV／預報等）。
+        if ($("footerLabel")) {
+          $("footerLabel").innerHTML = "";
+          $("footerLabel").style.display = "none";
+        }
       }
       function normalizeHexColor(color, fallback = "#D9E1E8") {
         return /^#[0-9a-f]{6}$/i.test(String(color || "")) ? color : fallback;
@@ -5920,6 +6103,40 @@
         el.innerHTML = `紫外線指數 <b>${Number.isInteger(v) ? v : v.toFixed(1)}｜${text}</b>`;
         applyMetricPillColor(el, uv?.color || "#6eb5ff", v >= 6);
       }
+      // CWA 平均風風力觀測圖配色（m/s）
+      // <5.5 m/s 對應蒲福 <4 級：維持一般樣式，不特別上色。
+      function windScaleStyle(speed) {
+        const v = Number(speed);
+        if (!Number.isFinite(v) || v < 5.5) {
+          return { active: false, level: v < 0.3 ? "0" : "<4", color: "#6eb5ff" };
+        }
+        if (v < 8.0)  return { active: true, level: "4",   color: "#7ed58c" };
+        if (v < 10.8) return { active: true, level: "5",   color: "#49adf5" };
+        if (v < 13.9) return { active: true, level: "6",   color: "#1868ee" };
+        if (v < 17.2) return { active: true, level: "7",   color: "#f1aa34" };
+        if (v < 20.8) return { active: true, level: "8",   color: "#d28a2c" };
+        if (v < 24.5) return { active: true, level: "9",   color: "#b87525" };
+        if (v < 28.5) return { active: true, level: "10",  color: "#dc4faa" };
+        if (v < 32.7) return { active: true, level: "11",  color: "#922f92" };
+        if (v < 41.5) return { active: true, level: "≥12", color: "#6741ad" };
+        return { active: true, level: "≥14", color: "#202968" };
+      }
+
+      function applyWindMetricColor(el, speed) {
+        const style = windScaleStyle(speed);
+        setMetricHighlight(el, style.active, style.color);
+      }
+
+      function applyHourlyWindColor(speed) {
+        const value = $("hourlyDetailWind");
+        const metric = value?.closest(".hourly-detail-metric");
+        if (!metric) return;
+        const style = windScaleStyle(speed);
+        metric.classList.toggle("is-wind-highlight", style.active);
+        if (style.active) metric.style.setProperty("--wind-accent", style.color);
+        else metric.style.removeProperty("--wind-accent");
+      }
+
       function rainColorFromRate(rate) {
         if (rate < 0.5) return "none";
         if (rate < 5) return "blue";
@@ -6104,6 +6321,7 @@
           : "--";
         $("hourlyDetailDewPoint").textContent = formatDetailNumber(p.dewPoint, 1, "°C");
         $("hourlyDetailWind").textContent = windText;
+        applyHourlyWindColor(p.windSpeed);
         $("hourlyDetailPop").textContent = Number.isFinite(p.pop) ? `${Math.round(p.pop)}%` : "--";
         const descriptionBox = $("hourlyDetailDescriptionBox"),
           hasDescription = Boolean(String(p.weatherDescription || "").trim());
@@ -6412,6 +6630,7 @@
         $("coordLabel").textContent = `座標：${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}`;
         $("altitudeLabel").textContent = "-- m";
         $("stationLabel").textContent = "讀取中…";
+        if ($("fieldSourceLabel")) $("fieldSourceLabel").textContent = "讀取中…";
         $("timeLabel").textContent = "--";
         $("hintBar").textContent = "讀取預報中…";
         ["mWind", "mHum", "mSun", "mVis", "mRain10", "mRain1h", "mAir", "mUv"].forEach((id) => {
@@ -6471,7 +6690,7 @@
         $("mSun").innerHTML =
           `日照 <b>${Number.isFinite(backendNumber(r.sunshine)) ? backendNumber(r.sunshine).toFixed(1) + "h" : "--"}</b>`;
         $("mVis").innerHTML = `能見度 <b>${escapeHtml(formatVisibilityForUi(r.visibility))}</b>`;
-        setMetricHighlight($("mWind"), Number.isFinite(windSpeed) && windSpeed >= 10, "#ff9d42");
+        applyWindMetricColor($("mWind"), windSpeed);
         setMetricHighlight($("mHum"), Number.isFinite(hum) && (hum >= 85 || hum <= 35), "#5aa9ff");
         setMetricHighlight($("mVis"), Number.isFinite(visibilityKm) && visibilityKm < 5, "#f5ca48");
         renderObservedRainPills(r);
@@ -6525,7 +6744,7 @@
         const vis = backendNumber(om?.hourly?.visibility?.[0]),
           visKm = Number.isFinite(vis) ? (vis > 200 ? vis / 1000 : vis) : NaN;
         $("mVis").innerHTML = `能見度 <b>${Number.isFinite(visKm) ? visKm.toFixed(1) + " km" : "--"}</b>`;
-        setMetricHighlight($("mWind"), Number.isFinite(wind) && wind >= 10, "#ff9d42");
+        applyWindMetricColor($("mWind"), wind);
         setMetricHighlight($("mHum"), Number.isFinite(rh) && (rh >= 85 || rh <= 35), "#5aa9ff");
         setMetricHighlight($("mVis"), Number.isFinite(visKm) && visKm < 5, "#f5ca48");
         renderObservedRainPills(null);
@@ -6538,7 +6757,28 @@
         );
         const fake = {
           provider: "open-meteo-backend",
-          realtime: { stationDebug: { stations: [] }, obsTime: c.time },
+          realtime: {
+            temp,
+            feels,
+            condition: wx.text,
+            humidity: Number.isFinite(rh) ? Math.round(rh) : null,
+            windText: Number.isFinite(wind) ? `${wind.toFixed(1)} m/s ${degToDir16(dir)}` : "--",
+            windSpeed: Number.isFinite(wind) ? wind : null,
+            windDirection: Number.isFinite(dir) ? dir : null,
+            pressure: Number.isFinite(local) ? local : null,
+            seaLevelPressure: Number.isFinite(local) ? seaLevelPressureFromStation(local, targetAlt) : null,
+            sunshine: null,
+            visibility: Number.isFinite(visKm) ? `${visKm.toFixed(1)} km` : "--",
+            rain10min: null,
+            rain1h: null,
+            air: null,
+            uv: null,
+            stationDebug: { stations: [], usedCount: 0 },
+            obsTime: c.time,
+          },
+          sourcePanel: {
+            footerLabel: "即時：Open-Meteo 前端備援（模型）<br/>預報：Open-Meteo<br/>10分鐘雨量：不使用模型補值",
+          },
         };
         renderSourceInfo(fake, "Open-Meteo（全球網格預報）");
         return { temp, feels, condition: wx.text, rain10: NaN, rain1h: NaN, visibility: visKm, targetAlt };
