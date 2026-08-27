@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.2</title>
+    <title>天氣網站v8.3</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3104,6 +3104,401 @@
           transition-duration: 0.01ms !important;
         }
       }
+
+      /* ===== v8.3 互動式觀測測站地圖 ===== */
+      .obs-live-map-block {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 20px;
+        background: var(--section-bg);
+        border: 1px solid var(--section-border);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 10px 24px rgba(0, 0, 0, 0.1);
+      }
+      .obs-live-map-heading {
+        margin: 2px 0 10px;
+        text-align: center;
+        font-size: 18px;
+        line-height: 1.2;
+        font-weight: 950;
+        letter-spacing: .6px;
+        color: rgba(255,255,255,.98);
+      }
+      .obs-live-map-toolbar {
+        position: relative;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        justify-content: center;
+        overflow: visible;
+        padding: 1px 1px 9px;
+      }
+      .obs-live-map-toolbar::-webkit-scrollbar { display: none; }
+      .obs-live-map-picker {
+        position: relative;
+        flex: 0 0 auto;
+        z-index: 1200;
+      }
+      .obs-live-map-select,
+      .obs-live-map-btn {
+        flex: 0 0 auto;
+        min-height: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.11);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 850;
+        outline: none;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      .obs-live-map-select {
+        min-width: 108px;
+        padding: 7px 11px 7px 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+      }
+      .obs-live-map-select-arrow {
+        font-size: 13px;
+        line-height: 1;
+        opacity: .72;
+        transition: transform .18s ease;
+      }
+      .obs-live-map-picker.is-open .obs-live-map-select-arrow {
+        transform: rotate(180deg);
+      }
+      .obs-live-map-menu {
+        position: absolute;
+        left: 50%;
+        top: calc(100% + 7px);
+        transform: translateX(-50%);
+        width: 152px;
+        padding: 6px;
+        border-radius: 15px;
+        background: rgba(246, 249, 252, .98);
+        border: 1px solid rgba(25, 45, 70, .12);
+        box-shadow: 0 14px 32px rgba(0,0,0,.22);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+      }
+      .obs-live-map-menu[hidden] {
+        display: none;
+      }
+      .obs-live-map-menu button {
+        width: 100%;
+        min-height: 34px;
+        padding: 7px 10px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: #203249;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 850;
+        cursor: pointer;
+      }
+      .obs-live-map-menu button:hover,
+      .obs-live-map-menu button.is-selected {
+        background: rgba(7, 95, 199, .10);
+        color: #075fc7;
+      }
+      .obs-live-map-btn {
+        padding: 7px 11px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .obs-live-map-btn:hover {
+        background: rgba(255,255,255,.17);
+      }
+      .obs-live-map-btn:disabled {
+        opacity: .55;
+        cursor: progress;
+      }
+      .obs-live-map-wrap {
+        position: relative;
+        height: min(61vh, 455px);
+        min-height: 350px;
+        overflow: hidden;
+        border-radius: 18px;
+        background: #eef2f4;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.12),
+          0 12px 26px rgba(0, 0, 0, 0.16);
+        touch-action: none;
+        overscroll-behavior: contain;
+      }
+      #obsLiveMap {
+        width: 100%;
+        height: 100%;
+        background: #eef2f4;
+        touch-action: none;
+      }
+      #obsLiveMap .leaflet-tile {
+        filter: grayscale(100%) brightness(1.12) contrast(.84) saturate(.28);
+      }
+      #obsLiveMap .leaflet-tile-pane { opacity: .88; }
+      #obsLiveMap .leaflet-control-attribution {
+        font-size: 8px;
+        background: rgba(255,255,255,.72);
+      }
+      #obsLiveMap .leaflet-control-zoom a {
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+      }
+      .obs-live-map-loading {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 700;
+        transform: translate(-50%, -50%);
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: rgba(20, 33, 48, 0.78);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 850;
+        box-shadow: 0 8px 22px rgba(0,0,0,.2);
+        pointer-events: none;
+      }
+      .obs-live-map-loading[hidden] { display: none; }
+      .obs-live-map-legend {
+        position: relative;
+        width: 100%;
+        margin: 8px auto 0;
+        padding: 9px 10px 10px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.075);
+        border: 1px solid rgba(255, 255, 255, 0.075);
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 9px;
+        font-weight: 800;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+        pointer-events: none;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .obs-live-map-legend::-webkit-scrollbar {
+        display: none;
+      }
+      .obs-live-map-legend-title {
+        margin-bottom: 7px;
+        font-size: 10px;
+        font-weight: 900;
+        text-align: left;
+      }
+      .obs-live-map-legend-scale {
+        min-width: 300px;
+      }
+      .obs-live-map-legend-bar {
+        display: grid;
+        width: 100%;
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        box-shadow:
+          inset 0 0 0 1px rgba(255,255,255,.18),
+          0 2px 8px rgba(0,0,0,.12);
+      }
+      .obs-live-map-legend-seg {
+        min-width: 0;
+      }
+      .obs-live-map-legend-values {
+        display: grid;
+        width: 100%;
+        margin-top: 5px;
+        color: rgba(255,255,255,.72);
+        font-size: 8px;
+        font-weight: 850;
+        font-variant-numeric: tabular-nums;
+      }
+      .obs-live-map-legend-value {
+        min-width: 0;
+        text-align: center;
+        white-space: nowrap;
+        line-height: 1;
+      }
+
+      .obs-live-map-detail {
+        position: absolute;
+        z-index: 850;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        width: auto;
+        max-height: min(52%, 250px);
+        margin: 0;
+        padding: 12px 38px 11px 12px;
+        overflow: auto;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, .96);
+        color: #172436;
+        border: 1px solid rgba(255,255,255,.86);
+        box-shadow: 0 14px 34px rgba(0,0,0,.24);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        opacity: 0;
+        transform: translateY(calc(100% + 26px));
+        pointer-events: none;
+        transition:
+          opacity .20s ease,
+          transform .32s cubic-bezier(.22,.72,.16,1);
+      }
+      .obs-live-map-detail.is-open {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .obs-live-map-detail-close {
+        position: absolute;
+        right: 9px;
+        top: 9px;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(20, 40, 65, .08);
+        color: #20324a;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .obs-live-map-detail-source {
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .8px;
+        color: #708095;
+      }
+      .obs-live-map-detail-name {
+        margin-top: 2px;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 900;
+      }
+      .obs-live-map-detail-value {
+        margin-top: 4px;
+        font-size: 30px;
+        line-height: 1.05;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+      }
+      .obs-live-map-detail-grid {
+        margin-top: 8px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px 10px;
+      }
+      .obs-live-map-detail-grid span {
+        min-width: 0;
+        font-size: 10px;
+        color: #6b788a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .obs-live-map-detail-grid b {
+        color: #1c2b3e;
+        font-weight: 900;
+      }
+      .obs-live-map-detail-time {
+        margin-top: 7px;
+        font-size: 9.5px;
+        color: #8290a1;
+        font-weight: 750;
+      }
+      .obs-live-map-meta {
+        min-height: 18px;
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255,255,255,.68);
+        font-size: 10px;
+        font-weight: 750;
+      }
+      .obs-live-map-meta span:first-child {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .obs-station-tooltip {
+        padding: 4px 7px;
+        border: 0;
+        border-radius: 8px;
+        background: rgba(255,255,255,.94);
+        color: #172436;
+        font-size: 10px;
+        font-weight: 900;
+        box-shadow: 0 4px 12px rgba(0,0,0,.14);
+      }
+      .obs-station-label {
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: #111 !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        line-height: 1.12 !important;
+        text-align: center !important;
+        text-shadow:
+          0 1px 1px rgba(255,255,255,.95),
+          1px 0 1px rgba(255,255,255,.95),
+          -1px 0 1px rgba(255,255,255,.95),
+          0 -1px 1px rgba(255,255,255,.95);
+        white-space: nowrap !important;
+        pointer-events: none !important;
+      }
+      .obs-station-label::before {
+        display: none !important;
+      }
+      .obs-station-label b {
+        font-size: 8px;
+        font-weight: 900;
+      }
+      .obs-wind-arrow-icon {
+        background: transparent !important;
+        border: 0 !important;
+      }
+      .obs-wind-arrow {
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        color: var(--wind-color, #4a90e2);
+        font-size: 20px;
+        line-height: 1;
+        font-weight: 900;
+        text-shadow:
+          0 1px 2px rgba(255,255,255,.9),
+          0 1px 4px rgba(0,0,0,.28);
+        box-shadow: none;
+        transform: rotate(var(--wind-dir, 0deg));
+        transform-origin: center;
+      }
+      @media (max-width: 360px) {
+        .obs-live-map-wrap { min-height: 330px; }
+        .obs-live-map-detail {
+          left: 8px;
+          right: 8px;
+          bottom: 8px;
+          max-height: 55%;
+        }
+        .obs-live-map-detail-grid { grid-template-columns: 1fr; gap: 4px; }
+        .obs-live-map-legend-bar { width: 180px; }
+      }
+
     </style>
   </head>
 
@@ -3178,7 +3573,7 @@
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.2</div>
+              <div class="version-badge" id="versionLabel">v8.3</div>
             </div>
           </section>
 
@@ -3361,7 +3756,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.2</div>
+              <div class="version-badge">v8.3</div>
             </div>
           </section>
 
@@ -3379,44 +3774,75 @@
                 <button class="view-tab" type="button" data-page-target="forecast">預報資料</button>
                 <button class="view-tab on" type="button" data-page-target="observation">觀測資料</button>
               </div>
-              <div class="page-hint">向右滑回預報，或在左／右側連點兩下切換；點擊圖資可放大</div>
+              <div class="page-hint">向右滑回預報，或在左／右側連點兩下切換；地圖區可獨立拖曳、縮放與點選測站</div>
               <hr class="card-divider" />
 
               <section class="weather-page observation-page" id="observationPage" aria-label="觀測資料與圖資">
-                <div class="obs-asset-block">
-                  <div class="wx-map-head">
-                    <div>
-                      <div class="wx-map-title">觀測圖資</div>
-                      <div class="wx-map-note" style="margin-top: 3px; white-space: normal">
-                        雷達、衛星、雨量皆為即時觀測資料
-                      </div>
-                    </div>
-                  </div>
-                  <div class="obs-asset-tabs" id="obsAssetTabs" aria-label="觀測圖資切換">
-                    <button class="obs-asset-tab on" type="button" data-obs-asset="radar_tw">雷達台灣</button>
-                    <button class="obs-asset-tab" type="button" data-obs-asset="radar_wide">
-                      雷達大範圍
-                    </button>
-                    <button class="obs-asset-tab" type="button" data-obs-asset="rain">雨量</button>
-                    <button class="obs-asset-tab" type="button" data-obs-asset="sat_tw">衛星台灣</button>
-                    <button class="obs-asset-tab" type="button" data-obs-asset="sat_east_asia">
-                      衛星東亞
-                    </button>
-                  </div>
-                  <div class="obs-asset-viewer">
-                    <img id="obsAssetImg" class="obs-asset-img" alt="觀測圖資" loading="lazy" />
-                    <div class="obs-asset-info">
-                      <div>
-                        <div class="obs-asset-title" id="obsAssetTitle">雷達台灣</div>
-                        <div class="obs-asset-note" id="obsAssetNote">
-                          中央氣象署雷達觀測圖，每次切換或更新會加上防快取參數。
-                        </div>
-                        <div class="obs-asset-zoom-hint">點擊圖片可放大；放大後可雙指縮放、單指拖曳。</div>
-                      </div>
-                      <button id="obsAssetRefreshBtn" class="obs-asset-refresh" type="button">
-                        更新圖資
+
+                <div class="obs-live-map-block">
+                  <div class="obs-live-map-heading">觀測地圖</div>
+
+                  <div class="obs-live-map-toolbar" aria-label="觀測地圖控制">
+                    <div class="obs-live-map-picker">
+                      <button
+                        id="obsMapMetricBtn"
+                        class="obs-live-map-select"
+                        type="button"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                      >
+                        <span id="obsMapMetricBtnLabel">溫度</span>
+                        <span class="obs-live-map-select-arrow" aria-hidden="true">⌄</span>
                       </button>
+
+                      <div
+                        id="obsMapMetricMenu"
+                        class="obs-live-map-menu"
+                        role="listbox"
+                        aria-label="觀測項目"
+                        hidden
+                      >
+                        <button type="button" role="option" data-obs-metric="temperature" class="is-selected">溫度</button>
+                        <button type="button" role="option" data-obs-metric="humidity">相對濕度</button>
+                        <button type="button" role="option" data-obs-metric="wind">風向風速</button>
+                        <button type="button" role="option" data-obs-metric="pressure">氣壓</button>
+                        <button type="button" role="option" data-obs-metric="rain1h">1 小時雨量</button>
+                      </div>
                     </div>
+
+                    <button id="obsMapRefreshBtn" class="obs-live-map-btn" type="button">更新資料</button>
+                    <button id="obsMapFitBtn" class="obs-live-map-btn" type="button">回到全域</button>
+                  </div>
+
+                  <div class="obs-live-map-wrap">
+                    <div id="obsLiveMap" aria-label="台灣與中國大陸即時測站互動地圖"></div>
+
+                    <div class="obs-live-map-loading" id="obsMapLoading">
+                      正在載入測站資料…
+                    </div>
+
+                  <div class="obs-live-map-detail" id="obsMapDetail" aria-hidden="true">
+                      <button id="obsMapDetailClose" class="obs-live-map-detail-close" type="button" aria-label="關閉測站資料">×</button>
+                      <div class="obs-live-map-detail-source" id="obsMapDetailSource">--</div>
+                      <div class="obs-live-map-detail-name" id="obsMapDetailName">--</div>
+                      <div class="obs-live-map-detail-value" id="obsMapDetailValue">--</div>
+                      <div class="obs-live-map-detail-grid">
+                        <span>溫度 <b id="obsMapDetailTemp">--</b></span>
+                        <span>濕度 <b id="obsMapDetailHum">--</b></span>
+                        <span>風 <b id="obsMapDetailWind">--</b></span>
+                        <span>氣壓 <b id="obsMapDetailPressure">--</b></span>
+                        <span>1h 雨量 <b id="obsMapDetailRain">--</b></span>
+                      </div>
+                      <div class="obs-live-map-detail-time" id="obsMapDetailTime">觀測時間：--</div>
+                    </div>
+                  </div>
+
+                  <div class="obs-live-map-legend" id="obsMapLegend" aria-live="polite"></div>
+
+
+                  <div class="obs-live-map-meta">
+                    <span id="obsMapStatus">尚未載入測站資料</span>
+                    <span id="obsMapCount">0 站</span>
                   </div>
                 </div>
 
@@ -3541,7 +3967,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.2</div>
+              <div class="version-badge">v8.3</div>
             </div>
           </section>
         </div>
@@ -3640,11 +4066,13 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.2";
+      const APP_VERSION = "v8.3";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0001-001.json";
+      const CWA_RAIN_1H_S3 =
+        "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0002-001.json";
       const WORKER_ORIGIN = (() => {
         try {
           return new URL(PROXY_BASE).origin;
@@ -3654,6 +4082,7 @@
       })();
       const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0003-001" : "";
       const CWA_OBS_1H_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0001-001" : "";
+      const CWA_RAIN_1H_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0002-001" : "";
       const WEATHER_FULL_ENDPOINT = WORKER_ORIGIN ? WORKER_ORIGIN + "/full" : "/full";
       const ELEVATION_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/elev" : "/elev";
       const elevationCache = new Map();
@@ -3721,60 +4150,941 @@
         if (debugOn) $("debugBox").textContent += s + "\n";
       }
 
-      const OBS_ASSET_LAYERS = {
-        radar_tw: {
-          title: "雷達台灣",
-          note: "中央氣象署雷達觀測：台灣範圍。",
-          url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-003.png",
-        },
-        radar_wide: {
-          title: "雷達大範圍",
-          note: "中央氣象署雷達觀測：大範圍回波。",
-          url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0058-001.png",
-        },
-        rain: {
-          title: "雨量觀測",
-          note: "中央氣象署雨量觀測圖資。",
-          url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0040-002.jpg",
-        },
-        sat_tw: {
-          title: "衛星台灣",
-          note: "中央氣象署衛星雲圖：台灣範圍。",
-          url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-C0042-002.jpg",
-        },
-        sat_east_asia: {
-          title: "衛星東亞",
-          note: "中央氣象署衛星雲圖：東亞範圍。",
-          url: "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-B0032-002.jpg",
-        },
+      /* ===========================
+         互動式觀測測站地圖
+         - 台灣：CWA O-A0003 / O-A0001
+         - 中國大陸：優先讀取 Worker 的全測站端點
+         =========================== */
+      const CMA_MAP_ENDPOINT_CANDIDATES = WORKER_ORIGIN
+        ? [
+            WORKER_ORIGIN + "/cma/map/all",
+            WORKER_ORIGIN + "/cma-map-all",
+            WORKER_ORIGIN + "/cma/map",
+            WORKER_ORIGIN + "/map/cma/all",
+          ]
+        : [];
+
+      const OBS_MAP_METRICS = {
+        temperature: { label: "溫度", unit: "°C" },
+        humidity: { label: "相對濕度", unit: "%" },
+        wind: { label: "風速", unit: "m/s" },
+        pressure: { label: "氣壓", unit: "hPa" },
+        rain1h: { label: "1 小時雨量", unit: "mm" },
       };
-      let currentObsAssetKey = "radar_tw";
-      function obsAssetNoCache(url) {
-        return url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+
+      const OBS_MAP_DEMO_CMA = [
+        { id:"50136", name:"漠河", lat:52.58, lon:122.31, alt:439.7, temperature:21.6, humidity:50, windSpeed:1.2, windDirection:331, pressure:964, rain1h:0, feels:22.2, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"50953", name:"哈爾濱", lat:45.56, lon:126.34, alt:119, temperature:22.2, humidity:65, windSpeed:4.6, windDirection:354, pressure:996, rain1h:0, feels:21.5, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"54161", name:"長春", lat:43.54, lon:125.13, alt:237.8, temperature:23.9, humidity:56, windSpeed:4.9, windDirection:331, pressure:983, rain1h:0, feels:23.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"54511", name:"北京", lat:39.48, lon:116.28, alt:31.3, temperature:27.8, humidity:71, windSpeed:2.1, windDirection:32, pressure:1000, rain1h:0, feels:30.2, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"58362", name:"上海", lat:31.24, lon:121.29, alt:4.5, temperature:32.2, humidity:66, windSpeed:3.2, windDirection:118, pressure:1003, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"57494", name:"武漢", lat:30.36, lon:114.03, alt:23.6, temperature:33.1, humidity:62, windSpeed:2.5, windDirection:188, pressure:999, rain1h:0, feels:38.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"59287", name:"廣州", lat:23.13, lon:113.29, alt:41, temperature:33.0, humidity:66, windSpeed:2.2, windDirection:145, pressure:1001, rain1h:0, feels:39.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"59134", name:"廈門", lat:24.48, lon:118.08, alt:139, temperature:31.2, humidity:73, windSpeed:3.6, windDirection:138, pressure:996, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"59431", name:"南寧", lat:22.49, lon:108.21, alt:122, temperature:31.4, humidity:72, windSpeed:2.0, windDirection:160, pressure:990, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"56294", name:"成都", lat:30.40, lon:104.01, alt:506, temperature:28.0, humidity:76, windSpeed:1.4, windDirection:90, pressure:951, rain1h:0, feels:31.5, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"55591", name:"拉薩", lat:29.40, lon:91.08, alt:3648, temperature:20.0, humidity:39, windSpeed:3.1, windDirection:225, pressure:652, rain1h:0, feels:18.8, obsTime:"2026-08-27T13:50:00+08:00" },
+        { id:"51463", name:"烏魯木齊", lat:43.47, lon:87.37, alt:935, temperature:25.2, humidity:31, windSpeed:3.2, windDirection:340, pressure:904, rain1h:0, feels:24.0, obsTime:"2026-08-27T13:50:00+08:00" },
+      ].map(s => ({ ...s, source: "CMA 示範" }));
+
+      let obsLiveMap = null,
+        obsLiveMapLayer = null,
+        obsLiveMapInstalled = false,
+        obsLiveMapLoading = false,
+        obsLiveMapStations = [],
+        obsLiveMapSelected = null,
+        obsLiveMapMetric = "temperature",
+        obsLiveMapUsedDemoCma = false,
+        obsLiveMapLastLoadAt = 0,
+        obsLiveCanvasRenderer = null,
+        obsLiveMapRedrawFrame = 0,
+        obsLiveMapDataLoaded = false;
+
+      function obsMapNum(v) {
+        if (v == null || v === "") return NaN;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return NaN;
+        if (n === -99 || n === -999 || n === -9999 || n === 9999 || n === 99999) return NaN;
+        return n;
       }
-      function setObsAsset(key) {
-        const layer = OBS_ASSET_LAYERS[key] || OBS_ASSET_LAYERS.radar_tw;
-        currentObsAssetKey = Object.prototype.hasOwnProperty.call(OBS_ASSET_LAYERS, key) ? key : "radar_tw";
-        document
-          .querySelectorAll(".obs-asset-tab")
-          .forEach((btn) => btn.classList.toggle("on", btn.dataset.obsAsset === currentObsAssetKey));
-        const img = $("obsAssetImg");
-        if ($("obsAssetTitle")) $("obsAssetTitle").textContent = layer.title;
-        if ($("obsAssetNote")) $("obsAssetNote").textContent = layer.note;
-        if (img) {
-          img.alt = layer.title;
-          img.src = obsAssetNoCache(layer.url);
+
+      function obsMapQcTemperature(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n > -95 && n < 90 ? n : NaN;
+      }
+
+      function obsMapQcHumidity(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n : NaN;
+      }
+
+      function obsMapQcWind(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n >= 0 && n <= 100 ? n : NaN;
+      }
+
+      function obsMapQcWindDir(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n >= 0 && n <= 360 ? n : NaN;
+      }
+
+      function obsMapQcPressure(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n >= 1 && n <= 1150 ? n : NaN;
+      }
+
+      function obsMapQcRain(v) {
+        const n = obsMapNum(v);
+        return Number.isFinite(n) && n >= 0 && n <= 1000 ? n : NaN;
+      }
+
+      function obsMapFindStationArray(raw) {
+        const direct = [
+          raw?.records?.Station,
+          raw?.records?.station,
+          raw?.records?.locations,
+          raw?.records?.location,
+          raw?.Station,
+          raw?.station,
+          raw?.stations,
+          raw?.data?.stations,
+        ];
+        for (const arr of direct) if (Array.isArray(arr)) return arr;
+        const seen = new Set();
+        const queue = [raw];
+        while (queue.length) {
+          const v = queue.shift();
+          if (!v || typeof v !== "object" || seen.has(v)) continue;
+          seen.add(v);
+          if (Array.isArray(v)) {
+            if (v.length && v.some(x => x && typeof x === "object" && (x.StationId || x.stationId || x.GeoInfo || x.WeatherElement))) return v;
+            for (const x of v) if (x && typeof x === "object") queue.push(x);
+          } else {
+            for (const x of Object.values(v)) if (x && typeof x === "object") queue.push(x);
+          }
+        }
+        return [];
+      }
+
+      function obsMapReadCwaCoord(st) {
+        const geo = st?.GeoInfo || st?.geoInfo || {};
+        const coords = geo?.Coordinates || geo?.coordinates || [];
+        const wgs = Array.isArray(coords)
+          ? (coords.find(c => String(c?.CoordinateName || c?.coordinateName || "").toUpperCase() === "WGS84") ||
+             coords.find(c => c?.StationLatitude != null || c?.stationLatitude != null))
+          : null;
+        return {
+          lat: obsMapNum(wgs?.StationLatitude ?? wgs?.stationLatitude ?? st?.StationLatitude ?? st?.stationLatitude ?? st?.Latitude ?? st?.latitude ?? st?.lat),
+          lon: obsMapNum(wgs?.StationLongitude ?? wgs?.stationLongitude ?? st?.StationLongitude ?? st?.stationLongitude ?? st?.Longitude ?? st?.longitude ?? st?.lon),
+        };
+      }
+
+      function obsMapCwaRain1h(we) {
+        const candidates = [
+          we?.Past1hr?.Precipitation,
+          we?.Past1hr?.precipitation,
+          we?.Past1Hr?.Precipitation,
+          we?.Past1Hr?.precipitation,
+          we?.Past1Hour?.Precipitation,
+          we?.Past1Hour?.precipitation,
+          we?.past1hr?.Precipitation,
+          we?.past1hr?.precipitation,
+        ];
+        for (const v of candidates) {
+          const n = obsMapQcRain(v);
+          if (Number.isFinite(n)) return n;
+        }
+        return NaN;
+      }
+
+      function obsMapParseCwa(raw, fallbackSource = "CWA") {
+        const rows = obsMapFindStationArray(raw);
+        const out = [];
+        for (const st of rows) {
+          const { lat, lon } = obsMapReadCwaCoord(st);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+          const geo = st?.GeoInfo || st?.geoInfo || {};
+          const we = st?.WeatherElement || st?.weatherElement || st?.weatherElements || {};
+          const temperature = obsMapQcTemperature(we?.AirTemperature ?? we?.airTemperature ?? we?.TEMP ?? we?.Temperature);
+          const humidity = obsMapQcHumidity(we?.RelativeHumidity ?? we?.relativeHumidity ?? we?.HUMD ?? we?.Humidity);
+          const windSpeed = obsMapQcWind(we?.WindSpeed ?? we?.windSpeed ?? we?.WDSD);
+          const windDirection = obsMapQcWindDir(we?.WindDirection ?? we?.windDirection ?? we?.WDIR);
+          const pressure = obsMapQcPressure(we?.AirPressure ?? we?.airPressure ?? we?.PRES ?? we?.Pressure);
+          const feels = obsMapNum(we?.ApparentTemperature ?? we?.apparentTemperature);
+          const rain1h = obsMapCwaRain1h(we);
+          const obsTime =
+            st?.ObsTime?.DateTime ||
+            st?.ObsTime?.dateTime ||
+            st?.obsTime?.DateTime ||
+            st?.obsTime?.dateTime ||
+            st?.ObsTime ||
+            st?.obsTime ||
+            null;
+          const id = String(st?.StationId ?? st?.stationId ?? st?.StationID ?? st?.id ?? `${lat},${lon}`);
+          const name = String(st?.StationName ?? st?.stationName ?? st?.name ?? id);
+          const alt = obsMapNum(geo?.StationAltitude ?? geo?.stationAltitude ?? st?.StationAltitude ?? st?.altitude);
+          if (![temperature, humidity, windSpeed, pressure, rain1h, feels].some(Number.isFinite)) continue;
+          out.push({
+            id: "tw-" + id,
+            rawId: id,
+            name,
+            lat, lon, alt,
+            temperature,
+            humidity,
+            windSpeed,
+            windDirection,
+            pressure,
+            rain1h: Number.isFinite(rain1h) && rain1h >= 0 ? rain1h : NaN,
+            feels,
+            obsTime,
+            source: fallbackSource,
+          });
+        }
+        return out;
+      }
+
+      function obsMapParseCwaRain1h(raw) {
+        const rows = obsMapFindStationArray(raw);
+        const out = [];
+
+        for (const st of rows) {
+          const { lat, lon } = obsMapReadCwaCoord(st);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+          const geo = st?.GeoInfo || st?.geoInfo || {};
+          const re =
+            st?.RainfallElement ||
+            st?.rainfallElement ||
+            st?.WeatherElement ||
+            st?.weatherElement ||
+            {};
+
+          const rain1h = obsMapCwaRain1h(re);
+          if (!Number.isFinite(rain1h)) continue;
+
+          const id = String(
+            st?.StationId ??
+            st?.stationId ??
+            st?.StationID ??
+            st?.id ??
+            `${lat},${lon}`
+          );
+          const name = String(
+            st?.StationName ??
+            st?.stationName ??
+            st?.name ??
+            id
+          );
+          const alt = obsMapNum(
+            geo?.StationAltitude ??
+            geo?.stationAltitude ??
+            st?.StationAltitude ??
+            st?.altitude
+          );
+          const obsTime =
+            st?.ObsTime?.DateTime ||
+            st?.ObsTime?.dateTime ||
+            st?.obsTime?.DateTime ||
+            st?.obsTime?.dateTime ||
+            st?.ObsTime ||
+            st?.obsTime ||
+            null;
+
+          out.push({
+            id: "tw-" + id,
+            rawId: id,
+            name,
+            lat,
+            lon,
+            alt,
+            rain1h,
+            obsTime,
+            source: "CWA",
+          });
+        }
+
+        return out;
+      }
+
+      function obsMapMergeCwa(...groups) {
+        const map = new Map();
+        for (const s of groups.flat()) {
+          if (!s) continue;
+          const old = map.get(s.id) || {};
+          map.set(s.id, {
+            ...old,
+            ...s,
+            temperature: Number.isFinite(s.temperature) ? s.temperature : old.temperature,
+            humidity: Number.isFinite(s.humidity) ? s.humidity : old.humidity,
+            windSpeed: Number.isFinite(s.windSpeed) ? s.windSpeed : old.windSpeed,
+            windDirection: Number.isFinite(s.windDirection) ? s.windDirection : old.windDirection,
+            pressure: Number.isFinite(s.pressure) ? s.pressure : old.pressure,
+            rain1h: Number.isFinite(s.rain1h) ? s.rain1h : old.rain1h,
+            feels: Number.isFinite(s.feels) ? s.feels : old.feels,
+          });
+        }
+        return [...map.values()];
+      }
+
+      async function obsMapLoadCwa() {
+        const urls10 = [CWA_OBS_10M_PROXY, CWA_OBS_10M_S3].filter(Boolean);
+        const urls1h = [CWA_OBS_1H_PROXY, CWA_OBS_1H_S3].filter(Boolean);
+        const urlsRain = [CWA_RAIN_1H_PROXY, CWA_RAIN_1H_S3].filter(Boolean);
+
+        const tryUrls = async (urls) => {
+          let last = null;
+          for (const url of urls) {
+            try {
+              const data = await fetchJson(url, 10000);
+              if (data) return data;
+            } catch (e) {
+              last = e;
+            }
+          }
+          throw last || new Error("CWA 觀測資料讀取失敗");
+        };
+
+        const settled = await Promise.allSettled([
+          tryUrls(urls10),
+          tryUrls(urls1h),
+          tryUrls(urlsRain),
+        ]);
+
+        const s10 =
+          settled[0].status === "fulfilled"
+            ? obsMapParseCwa(settled[0].value, "CWA")
+            : [];
+        const s1h =
+          settled[1].status === "fulfilled"
+            ? obsMapParseCwa(settled[1].value, "CWA")
+            : [];
+        const rain1h =
+          settled[2].status === "fulfilled"
+            ? obsMapParseCwaRain1h(settled[2].value)
+            : [];
+
+        // O-A0002-001 is the authoritative 1-hour rainfall feed for this map.
+        return obsMapMergeCwa(s1h, s10, rain1h);
+      }
+
+      async function obsMapLoadCma() {
+        let lastErr = null;
+        for (const url of CMA_MAP_ENDPOINT_CANDIDATES) {
+          try {
+            const data = await fetchJson(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now(), 20000);
+            if (data?.ok !== false && Array.isArray(data?.stations) && data.stations.length) {
+              obsLiveMapUsedDemoCma = false;
+              return data.stations.map(s => ({
+                id: "cn-" + String(s.id ?? `${s.lat},${s.lon}`),
+                rawId: String(s.id ?? ""),
+                name: String(s.name ?? s.id ?? "CMA 測站"),
+                lat: obsMapNum(s.lat),
+                lon: obsMapNum(s.lon),
+                alt: obsMapNum(s.alt),
+                temperature: obsMapQcTemperature(s.temperature ?? s.temp),
+                humidity: obsMapQcHumidity(s.humidity ?? s.rh),
+                windSpeed: obsMapQcWind(s.windSpeed ?? s.wind),
+                windDirection: obsMapQcWindDir(s.windDirection ?? s.windDir),
+                pressure: obsMapQcPressure(s.pressure ?? s.pres),
+                rain1h: obsMapQcRain(s.rain1h ?? s.precipitation),
+                feels: obsMapNum(s.feels ?? s.feelst),
+                obsTime: s.obsTime ?? s.time ?? null,
+                source: "CMA",
+              })).filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon));
+            }
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        obsLiveMapUsedDemoCma = true;
+        if (lastErr) console.warn("[obs map CMA]", lastErr);
+        return OBS_MAP_DEMO_CMA.map(s => ({ ...s, id: "cn-" + s.id }));
+      }
+
+      function obsMapValue(station, metric = obsLiveMapMetric) {
+        if (metric === "temperature") return obsMapNum(station?.temperature);
+        if (metric === "humidity") return obsMapNum(station?.humidity);
+        if (metric === "wind") return obsMapNum(station?.windSpeed);
+        if (metric === "pressure") return obsMapNum(station?.pressure);
+        if (metric === "rain1h") return obsMapNum(station?.rain1h);
+        return NaN;
+      }
+
+      function obsMapColor(metric, value) {
+        const v = Number(value);
+        if (!Number.isFinite(v)) return "transparent";
+
+        if (metric === "temperature") {
+          if (v < -40) return "#4b1f6f";
+          if (v < -30) return "#6d35a8";
+          if (v < -20) return "#6556c8";
+          if (v < -10) return "#3559b7";
+          if (v < 0) return "#2f7fd3";
+          if (v < 10) return "#41a9d8";
+          if (v < 18) return "#43b7aa";
+          if (v < 24) return "#43b978";
+          if (v < 28) return "#9bc94b";
+          if (v < 32) return "#e4cf43";
+          if (v < 36) return "#f2a13a";
+          if (v < 40) return "#e75643";
+          if (v < 45) return "#d83b72";
+          return "#9f245e";
+        }
+
+        if (metric === "humidity") {
+          if (v < 20) return "#c9783f";
+          if (v < 35) return "#e39b3f";
+          if (v < 50) return "#e3c648";
+          if (v < 65) return "#a8ca4a";
+          if (v < 75) return "#54b86f";
+          if (v < 85) return "#43b6b6";
+          if (v < 95) return "#438fd2";
+          return "#5556b8";
+        }
+
+        if (metric === "wind") {
+          if (v < 0.3) return "#d9dee5";
+          if (v < 5.5) return "#9aa5b1";
+          if (v < 8.0) return "#4fc17a";
+          if (v < 10.8) return "#3aaee8";
+          if (v < 13.9) return "#2679e8";
+          if (v < 17.2) return "#f2b43f";
+          if (v < 20.8) return "#e89b2f";
+          if (v < 24.5) return "#c97828";
+          if (v < 28.5) return "#e94c9c";
+          if (v < 32.7) return "#a832a4";
+          if (v < 41.5) return "#663095";
+          return "#24245f";
+        }
+
+        if (metric === "pressure") {
+          if (v < 600) return "#4b1f6f";
+          if (v < 700) return "#6c37a8";
+          if (v < 800) return "#5f56c5";
+          if (v < 900) return "#3d70c8";
+          if (v < 950) return "#39a5cc";
+          if (v < 980) return "#43b9a2";
+          if (v < 1000) return "#55b86f";
+          if (v < 1020) return "#9bc94b";
+          if (v < 1040) return "#e3c94a";
+          if (v < 1060) return "#ee9639";
+          return "#dd5142";
+        }
+
+        if (metric === "rain1h") {
+          if (v < 0.5) return "#ffffff";
+          if (v < 5) return "#3c96ff";
+          if (v < 15) return "#00c800";
+          if (v < 35) return "#ffc800";
+          if (v < 55) return "#ff8c00";
+          if (v < 70) return "#ff0000";
+          return "#b400ff";
+        }
+
+        return "#4f9fe8";
+      }
+
+      function obsMapLegendConfig(metric) {
+        if (metric === "temperature") {
+          return {
+            labels: ["<-40","-40","-30","-20","-10","0","10","18","24","28","32","36","40","45","≥45"],
+            colors: [
+              "#4b1f6f","#6d35a8","#6556c8","#3559b7","#2f7fd3",
+              "#41a9d8","#43b7aa","#43b978","#9bc94b","#e4cf43",
+              "#f2a13a","#e75643","#d83b72","#9f245e"
+            ]
+          };
+        }
+        if (metric === "humidity") {
+          return {
+            labels: ["0","20","35","50","65","75","85","95","100"],
+            colors: ["#c9783f","#e39b3f","#e3c648","#a8ca4a","#54b86f","#43b6b6","#438fd2","#5556b8"]
+          };
+        }
+        if (metric === "wind") {
+          return {
+            labels: ["0","0.3","5.5","8.0","10.8","13.9","17.2","20.8","24.5","28.5","32.7","41.5","≥41.5"],
+            colors: ["#d9dee5","#9aa5b1","#4fc17a","#3aaee8","#2679e8","#f2b43f","#e89b2f","#c97828","#e94c9c","#a832a4","#663095","#24245f"]
+          };
+        }
+        if (metric === "pressure") {
+          return {
+            labels: ["<600","600","700","800","900","950","980","1000","1020","1040","1060","≥1060"],
+            colors: ["#4b1f6f","#6c37a8","#5f56c5","#3d70c8","#39a5cc","#43b9a2","#55b86f","#9bc94b","#e3c94a","#ee9639","#dd5142"]
+          };
+        }
+        if (metric === "rain1h") {
+          return {
+            labels: ["0","0.5","5","15","35","55","70","≥70"],
+            colors: ["#ffffff","#3c96ff","#00c800","#ffc800","#ff8c00","#ff0000","#b400ff"]
+          };
+        }
+        return { labels:["--","--"], colors:["#4f9fe8"] };
+      }
+
+      function obsMapUpdateLegend() {
+        const box = $("obsMapLegend");
+        if (!box) return;
+
+        const cfg = obsMapLegendConfig(obsLiveMapMetric);
+        const title = OBS_MAP_METRICS[obsLiveMapMetric]?.label || "觀測";
+        const labels = Array.isArray(cfg.labels) ? cfg.labels : [];
+        const colors = Array.isArray(cfg.colors) ? cfg.colors : [];
+        const count = Math.max(1, colors.length);
+
+        box.innerHTML =
+          `<div class="obs-live-map-legend-title">${title}</div>` +
+          `<div class="obs-live-map-legend-scale">` +
+            `<div class="obs-live-map-legend-bar" style="grid-template-columns:repeat(${count},minmax(0,1fr))">` +
+              colors.map(c => `<i class="obs-live-map-legend-seg" style="background:${c}"></i>`).join("") +
+            `</div>` +
+            `<div class="obs-live-map-legend-values" style="grid-template-columns:repeat(${count},minmax(0,1fr))">` +
+              colors.map((_, i) => {
+                const label = labels[Math.min(i, labels.length - 1)] ?? "";
+                return `<span class="obs-live-map-legend-value">${label}</span>`;
+              }).join("") +
+            `</div>` +
+          `</div>`;
+      }
+
+      function obsMapMetricText(station, metric = obsLiveMapMetric) {
+        const v = obsMapValue(station, metric);
+        const unit = OBS_MAP_METRICS[metric]?.unit || "";
+        if (!Number.isFinite(v)) return "--";
+        if (metric === "humidity") return `${Math.round(v)}%`;
+        if (metric === "pressure") return `${Math.round(v)} hPa`;
+        if (metric === "rain1h") return `${v.toFixed(v < 10 ? 1 : 0)} mm`;
+        if (metric === "wind") return `${v.toFixed(1)} m/s`;
+        return `${v.toFixed(1)}°`;
+      }
+
+      function obsMapWindText(station) {
+        const speed = obsMapNum(station?.windSpeed),
+          dir = obsMapNum(station?.windDirection);
+        if (!Number.isFinite(speed)) return "--";
+        return `${Number.isFinite(dir) ? Math.round(dir) + "° " : ""}${speed.toFixed(1)} m/s`;
+      }
+
+      function obsMapFormatTime(v) {
+        if (!v) return "--";
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return new Intl.DateTimeFormat("zh-TW", {
+          timeZone: "Asia/Taipei",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        }).format(d);
+      }
+
+      function obsMapOpenDetail(station) {
+        obsLiveMapSelected = station;
+        const box = $("obsMapDetail");
+        if (!box) return;
+
+        $("obsMapDetailSource").textContent = station?.source || "測站";
+        $("obsMapDetailName").textContent = station?.name || station?.rawId || "測站";
+        $("obsMapDetailValue").textContent = obsMapMetricText(station);
+        $("obsMapDetailTemp").textContent =
+          Number.isFinite(obsMapNum(station?.temperature))
+            ? `${obsMapNum(station.temperature).toFixed(1)}°C`
+            : "--";
+        $("obsMapDetailHum").textContent =
+          Number.isFinite(obsMapNum(station?.humidity))
+            ? `${Math.round(obsMapNum(station.humidity))}%`
+            : "--";
+        $("obsMapDetailWind").textContent = obsMapWindText(station);
+        $("obsMapDetailPressure").textContent =
+          Number.isFinite(obsMapNum(station?.pressure))
+            ? `${Math.round(obsMapNum(station.pressure))} hPa`
+            : "--";
+        $("obsMapDetailRain").textContent =
+          Number.isFinite(obsMapNum(station?.rain1h))
+            ? `${obsMapNum(station.rain1h).toFixed(1)} mm`
+            : "--";
+        $("obsMapDetailTime").textContent =
+          `觀測時間：${obsMapFormatTime(station?.obsTime)}`;
+
+        box.classList.add("is-open");
+        box.setAttribute("aria-hidden", "false");
+      }
+
+      function obsMapCloseDetail() {
+        obsLiveMapSelected = null;
+        const box = $("obsMapDetail");
+        if (!box) return;
+        box.classList.remove("is-open");
+        box.setAttribute("aria-hidden", "true");
+      }
+
+function obsMapPickVisibleStations() {
+  if (!obsLiveMap) return [];
+
+  const zoom = obsLiveMap.getZoom();
+  const bounds = obsLiveMap.getBounds().pad(0.12);
+
+  // 先留下目前圖層有有效值的站
+  const valid = obsLiveMapStations.filter((station) => {
+    const lat = obsMapNum(station?.lat);
+    const lon = obsMapNum(station?.lon);
+    const value = obsMapValue(station);
+
+    if (
+      !Number.isFinite(lat) ||
+      !Number.isFinite(lon) ||
+      !Number.isFinite(value)
+    ) {
+      return false;
+    }
+
+    // 放大後只處理目前畫面附近測站
+    if (zoom >= 6 && !bounds.contains([lat, lon])) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // 放大到一定程度直接全部顯示
+  if (zoom >= 7) {
+    return valid;
+  }
+
+  // 不同 zoom 使用固定地理網格
+  let gridSize;
+
+  if (zoom <= 3.5) {
+    gridSize = 0.8;
+  } else if (zoom <= 4.5) {
+    gridSize = 0.5;
+  } else if (zoom <= 5.5) {
+    gridSize = 0.25;
+  } else {
+    gridSize = 0.12;
+  }
+
+  const grid = new Map();
+
+  for (const station of valid) {
+    const lat = Number(station.lat);
+    const lon = Number(station.lon);
+
+    // 固定地理格子
+    const gridY = Math.floor(lat / gridSize);
+    const gridX = Math.floor(lon / gridSize);
+    const key = `${gridY}:${gridX}`;
+
+    const old = grid.get(key);
+
+    if (!old) {
+      grid.set(key, station);
+      continue;
+    }
+
+    // 每個格子盡量固定選最靠近格子中心的測站
+    // 這樣縮放時代表站不會亂跳
+    const centerLat = (gridY + 0.5) * gridSize;
+    const centerLon = (gridX + 0.5) * gridSize;
+
+    const oldDist =
+      Math.pow(Number(old.lat) - centerLat, 2) +
+      Math.pow(Number(old.lon) - centerLon, 2);
+
+    const newDist =
+      Math.pow(lat - centerLat, 2) +
+      Math.pow(lon - centerLon, 2);
+
+    if (newDist < oldDist) {
+      grid.set(key, station);
+    }
+  }
+
+  return [...grid.values()];
+}
+
+      function obsMapRenderStationsNow() {
+        obsLiveMapRedrawFrame = 0;
+        if (!obsLiveMap || typeof L === "undefined") return;
+
+        if (obsLiveMapLayer) {
+          try { obsLiveMap.removeLayer(obsLiveMapLayer); } catch {}
+        }
+        obsLiveMapLayer = L.layerGroup().addTo(obsLiveMap);
+
+        const zoom = obsLiveMap.getZoom();
+        const stationsToDraw = obsMapPickVisibleStations();
+        let displayed = 0;
+
+        if (!obsLiveCanvasRenderer) {
+          obsLiveCanvasRenderer = L.canvas({
+            padding: 0.45,
+            tolerance: 7,
+          });
+        }
+
+        for (const station of stationsToDraw) {
+          const lat = obsMapNum(station?.lat),
+            lon = obsMapNum(station?.lon),
+            value = obsMapValue(station);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(value)) continue;
+
+          const color = obsMapColor(obsLiveMapMetric, value);
+          let layer;
+
+          // Only use DOM wind arrows when zoomed in. Overview remains one shared canvas.
+          if (
+            obsLiveMapMetric === "wind" &&
+            zoom >= 8 &&
+            Number.isFinite(obsMapNum(station?.windDirection))
+          ) {
+            const deg = obsMapNum(station.windDirection);
+            const icon = L.divIcon({
+              className: "obs-wind-arrow-icon",
+              html: `<div class="obs-wind-arrow" style="--wind-color:${color};--wind-dir:${deg}deg">↑</div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            });
+            layer = L.marker([lat, lon], {
+              icon,
+              keyboard: false,
+              riseOnHover: true,
+            });
+          } else {
+            const radius = zoom <= 4 ? 3.4 : zoom <= 6 ? 4.2 : 5.2;
+            layer = L.circleMarker([lat, lon], {
+              renderer: obsLiveCanvasRenderer,
+              radius,
+              color: "rgba(255,255,255,.90)",
+              weight: zoom <= 4 ? 0.8 : 1.2,
+              fillColor: color,
+              fillOpacity: .94,
+              opacity: 1,
+              bubblingMouseEvents: false,
+            });
+          }
+
+          // Zoom 11+：直接在站點旁顯示站名與目前圖層數值，分成兩行。
+          if (zoom >= 11) {
+            layer.bindTooltip(
+              `${station.name}<br><b>${obsMapMetricText(station)}</b>`,
+              {
+                permanent: true,
+                direction: "bottom",
+                offset: [0, 5],
+                className: "obs-station-label",
+                opacity: 1,
+                interactive: false,
+              },
+            );
+          } else if (zoom >= 5.5) {
+            layer.bindTooltip(`${station.name} · ${obsMapMetricText(station)}`, {
+              direction: "top",
+              offset: [0, -4],
+              className: "obs-station-tooltip",
+              opacity: .98,
+            });
+          }
+          layer.on("click", () => obsMapOpenDetail(station));
+          layer.addTo(obsLiveMapLayer);
+          displayed++;
+        }
+
+        if ($("obsMapCount")) {
+          $("obsMapCount").textContent =
+            ``;
+        }
+        obsMapUpdateLegend();
+        if (
+          obsLiveMapSelected &&
+          $("obsMapDetail")?.classList.contains("is-open")
+        ) {
+          obsMapOpenDetail(obsLiveMapSelected);
         }
       }
-      function installObsAssetControls() {
-        document
-          .querySelectorAll(".obs-asset-tab")
-          .forEach((btn) =>
-            btn.addEventListener("click", () => setObsAsset(btn.dataset.obsAsset || "radar_tw")),
+
+      function obsMapRenderStations() {
+        if (!obsLiveMap || typeof L === "undefined") return;
+        if (obsLiveMapRedrawFrame) cancelAnimationFrame(obsLiveMapRedrawFrame);
+        obsLiveMapRedrawFrame = requestAnimationFrame(obsMapRenderStationsNow);
+      }
+
+      async function refreshObservationMapData({ force = false } = {}) {
+        if (obsLiveMapLoading) return;
+        if (!force && obsLiveMapStations.length && Date.now() - obsLiveMapLastLoadAt < 60_000) {
+          obsMapRenderStations();
+          return;
+        }
+        obsLiveMapLoading = true;
+        const loading = $("obsMapLoading"),
+          btn = $("obsMapRefreshBtn");
+        if (loading) loading.hidden = false;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "更新中…";
+        }
+        if ($("obsMapStatus")) $("obsMapStatus").textContent = "正在取得 CWA / CMA 測站資料…";
+
+        try {
+          const [twResult, cnResult] = await Promise.allSettled([obsMapLoadCwa(), obsMapLoadCma()]);
+          const tw = twResult.status === "fulfilled" ? twResult.value : [];
+          const cn = cnResult.status === "fulfilled" ? cnResult.value : [];
+          obsLiveMapStations = [...tw, ...cn];
+          obsLiveMapLastLoadAt = Date.now();
+          obsLiveMapDataLoaded = true;
+
+          const statusParts = [];
+          statusParts.push(``);
+          statusParts.push(
+            obsLiveMapUsedDemoCma
+              ? `CMA 全站端點未接通，暫顯示 ${cn.length} 個示範站`
+              : ``
           );
-        if ($("obsAssetRefreshBtn"))
-          $("obsAssetRefreshBtn").addEventListener("click", () => setObsAsset(currentObsAssetKey));
-        setObsAsset(currentObsAssetKey);
+          if ($("obsMapStatus")) $("obsMapStatus").textContent = statusParts.join("");
+          obsMapRenderStations();
+        } catch (e) {
+          console.warn("[observation map]", e);
+          if ($("obsMapStatus")) $("obsMapStatus").textContent = `測站載入失敗：${e?.message || e}`;
+        } finally {
+          obsLiveMapLoading = false;
+          if (loading) loading.hidden = true;
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "更新資料";
+          }
+        }
+      }
+
+      function fitObservationMap() {
+        if (!obsLiveMap) return;
+        // Taiwan + mainland China, but not so wide that the map becomes unusable.
+        obsLiveMap.fitBounds([[18.0, 73.0], [54.5, 135.5]], {
+          padding: [8, 8],
+          animate: true,
+        });
+      }
+
+      function initObservationMap() {
+        const el = $("obsLiveMap");
+        if (!el) return;
+        if (typeof L === "undefined") {
+          ensureLeafletReady().then(ok => {
+            if (ok) initObservationMap();
+            else if ($("obsMapStatus")) $("obsMapStatus").textContent = "Leaflet 地圖套件載入失敗";
+          });
+          return;
+        }
+        if (obsLiveMap) {
+          setTimeout(() => {
+            obsLiveMap.invalidateSize();
+            obsMapRenderStations();
+          }, 80);
+          return;
+        }
+
+        obsLiveMap = L.map("obsLiveMap", {
+          center: [31.5, 113.5],
+          zoom: 4,
+          minZoom: 3,
+          maxZoom: 13,
+          zoomControl: true,
+          attributionControl: true,
+          preferCanvas: true,
+          zoomSnap: .5,
+          wheelPxPerZoomLevel: 85,
+          tap: true,
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          detectRetina: false,
+          attribution: "&copy; OpenStreetMap",
+        }).addTo(obsLiveMap);
+
+        let obsMapMoveTimer = 0;
+        obsLiveMap.on("zoomend moveend", () => {
+          clearTimeout(obsMapMoveTimer);
+          obsMapMoveTimer = setTimeout(obsMapRenderStations, 90);
+        });
+
+        fitObservationMap();
+        setTimeout(() => obsLiveMap.invalidateSize(), 120);
+      }
+
+      function ensureObservationMapActive({ forceRefresh = false } = {}) {
+        initObservationMap();
+        if (!obsLiveMap) return;
+        requestAnimationFrame(() => {
+          try { obsLiveMap.invalidateSize(false); } catch {}
+          if (forceRefresh || !obsLiveMapDataLoaded) {
+            refreshObservationMapData({ force: forceRefresh });
+          } else {
+            obsMapRenderStations();
+          }
+        });
+      }
+
+      function installObservationMap() {
+        if (obsLiveMapInstalled) return;
+        obsLiveMapInstalled = true;
+
+        // IMPORTANT: do not create the map or fetch thousands of stations while
+        // the user is still on the current-weather page. Load only when page 3 is opened.
+        const metricPicker = $("obsMapMetricBtn")?.closest(".obs-live-map-picker");
+        const metricBtn = $("obsMapMetricBtn");
+        const metricMenu = $("obsMapMetricMenu");
+        const metricLabel = $("obsMapMetricBtnLabel");
+
+        const closeMetricMenu = () => {
+          if (!metricMenu || !metricBtn || !metricPicker) return;
+          metricMenu.hidden = true;
+          metricBtn.setAttribute("aria-expanded", "false");
+          metricPicker.classList.remove("is-open");
+        };
+
+        metricBtn?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (!metricMenu || !metricPicker) return;
+          const willOpen = metricMenu.hidden;
+          metricMenu.hidden = !willOpen;
+          metricBtn.setAttribute("aria-expanded", String(willOpen));
+          metricPicker.classList.toggle("is-open", willOpen);
+        });
+
+        metricMenu?.querySelectorAll("[data-obs-metric]").forEach((item) => {
+          item.addEventListener("click", () => {
+            const metric = item.dataset.obsMetric || "temperature";
+            obsLiveMapMetric = metric;
+
+            metricMenu.querySelectorAll("[data-obs-metric]").forEach((btn) => {
+              btn.classList.toggle("is-selected", btn === item);
+              btn.setAttribute("aria-selected", btn === item ? "true" : "false");
+            });
+
+            if (metricLabel) {
+              metricLabel.textContent = OBS_MAP_METRICS[metric]?.label || "觀測";
+            }
+
+            closeMetricMenu();
+            obsMapCloseDetail();
+            obsMapRenderStations();
+          });
+        });
+
+        document.addEventListener("click", (event) => {
+          if (!metricPicker?.contains(event.target)) closeMetricMenu();
+        });
+
+        $("obsMapRefreshBtn")?.addEventListener("click", () => {
+          ensureObservationMapActive({ forceRefresh: true });
+        });
+        $("obsMapFitBtn")?.addEventListener("click", fitObservationMap);
+        $("obsMapDetailClose")?.addEventListener("click", obsMapCloseDetail);
+
+        if (currentWeatherPage === "observation") {
+          ensureObservationMapActive({ forceRefresh: false });
+        }
       }
 
       const QPF60_URL = "https://api.leochangrainapi.com/api/qpf60.png";
@@ -3980,7 +5290,7 @@
           else initWrfQpfMap();
         } catch {}
         try {
-          setObsAsset(currentObsAssetKey || "radar_tw");
+          if (currentWeatherPage === "observation") refreshObservationMapData({ force: true });
         } catch {}
         try {
           if (qpfMap) qpfMap.invalidateSize(true);
@@ -4971,6 +6281,10 @@
               wrfQpfMap.invalidateSize();
               updateWrfQpfLocationMarker();
             }
+          }, 100);
+        if (page === "observation")
+          setTimeout(() => {
+            ensureObservationMapActive({ forceRefresh: false });
           }, 100);
       }
       function switchWeatherPage(direction) {
@@ -7148,7 +8462,7 @@
 
       installWeatherPageGestures();
       installHourlyDetail();
-      installObsAssetControls();
+      installObservationMap();
       installQpfForecastMap();
       installWrfQpfForecastMap();
       installImageLightbox();
