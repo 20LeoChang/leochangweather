@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.3</title>
+    <title>天氣網站v8.4</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3445,7 +3445,7 @@
         background: transparent !important;
         box-shadow: none !important;
         color: #111 !important;
-        font-size: 8px !important;
+        font-size: 10px !important;
         font-weight: 700 !important;
         line-height: 1.12 !important;
         text-align: center !important;
@@ -3461,7 +3461,7 @@
         display: none !important;
       }
       .obs-station-label b {
-        font-size: 8px;
+        font-size: 10px;
         font-weight: 900;
       }
       .obs-wind-arrow-icon {
@@ -3573,7 +3573,7 @@
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.3</div>
+              <div class="version-badge" id="versionLabel">v8.4</div>
             </div>
           </section>
 
@@ -3756,7 +3756,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.3</div>
+              <div class="version-badge">v8.4</div>
             </div>
           </section>
 
@@ -3967,7 +3967,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.3</div>
+              <div class="version-badge">v8.4</div>
             </div>
           </section>
         </div>
@@ -4066,7 +4066,7 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.3";
+      const APP_VERSION = "v8.4";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4198,7 +4198,37 @@
         obsLiveMapLastLoadAt = 0,
         obsLiveCanvasRenderer = null,
         obsLiveMapRedrawFrame = 0,
-        obsLiveMapDataLoaded = false;
+        obsLiveMapDataLoaded = false,
+        obsLiveMapLocationMarker = null;
+
+      function updateObservationLocationMarker() {
+        if (!obsLiveMap || typeof L === "undefined" || !lastTarget) return;
+
+        const lat = Number(lastTarget.lat);
+        const lon = Number(lastTarget.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        if (!obsLiveMapLocationMarker) {
+          obsLiveMapLocationMarker = L.circleMarker([lat, lon], {
+            radius: 6,
+            color: "#075fc7",
+            weight: 3,
+            fillColor: "#fff",
+            fillOpacity: 1,
+            opacity: 1,
+            interactive: false,
+            pane: "markerPane",
+          }).addTo(obsLiveMap);
+        } else {
+          obsLiveMapLocationMarker.setLatLng([lat, lon]);
+        }
+
+        try {
+          obsLiveMapLocationMarker.unbindTooltip();
+          obsLiveMapLocationMarker.unbindPopup();
+          obsLiveMapLocationMarker.bringToFront();
+        } catch {}
+      }
 
       function obsMapNum(v) {
         if (v == null || v === "") return NaN;
@@ -4896,6 +4926,7 @@ function obsMapPickVisibleStations() {
             ``;
         }
         obsMapUpdateLegend();
+        updateObservationLocationMarker();
         if (
           obsLiveMapSelected &&
           $("obsMapDetail")?.classList.contains("is-open")
@@ -5009,7 +5040,11 @@ function obsMapPickVisibleStations() {
         });
 
         fitObservationMap();
-        setTimeout(() => obsLiveMap.invalidateSize(), 120);
+        updateObservationLocationMarker();
+        setTimeout(() => {
+          obsLiveMap.invalidateSize();
+          updateObservationLocationMarker();
+        }, 120);
       }
 
       function ensureObservationMapActive({ forceRefresh = false } = {}) {
@@ -5017,6 +5052,7 @@ function obsMapPickVisibleStations() {
         if (!obsLiveMap) return;
         requestAnimationFrame(() => {
           try { obsLiveMap.invalidateSize(false); } catch {}
+          updateObservationLocationMarker();
           if (forceRefresh || !obsLiveMapDataLoaded) {
             refreshObservationMapData({ force: forceRefresh });
           } else {
@@ -5290,7 +5326,12 @@ function obsMapPickVisibleStations() {
           else initWrfQpfMap();
         } catch {}
         try {
-          if (currentWeatherPage === "observation") refreshObservationMapData({ force: true });
+          // 第一頁手動更新或自動更新後，同步刷新已載入過的觀測地圖。
+          // 尚未開過觀測頁時仍維持延遲載入，避免首頁額外抓取數千測站。
+          if (currentWeatherPage === "observation" || obsLiveMapDataLoaded) {
+            refreshObservationMapData({ force: true });
+          }
+          updateObservationLocationMarker();
         } catch {}
         try {
           if (qpfMap) qpfMap.invalidateSize(true);
