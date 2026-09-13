@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.4</title>
+    <title>天氣網站v8.5</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3243,6 +3243,10 @@
         filter: grayscale(100%) brightness(1.12) contrast(.84) saturate(.28);
       }
       #obsLiveMap .leaflet-tile-pane { opacity: .88; }
+      #obsLiveMap .obs-radar-overlay {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
       #obsLiveMap .leaflet-control-attribution {
         font-size: 8px;
         background: rgba(255,255,255,.72);
@@ -3573,7 +3577,7 @@
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.4</div>
+              <div class="version-badge" id="versionLabel">v8.5</div>
             </div>
           </section>
 
@@ -3756,7 +3760,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.4</div>
+              <div class="version-badge">v8.5</div>
             </div>
           </section>
 
@@ -3807,6 +3811,7 @@
                         <button type="button" role="option" data-obs-metric="wind">風向風速</button>
                         <button type="button" role="option" data-obs-metric="pressure">氣壓</button>
                         <button type="button" role="option" data-obs-metric="rain1h">1 小時雨量</button>
+                        <button type="button" role="option" data-obs-metric="radar">即時雷達</button>
                       </div>
                     </div>
 
@@ -3967,7 +3972,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.4</div>
+              <div class="version-badge">v8.5</div>
             </div>
           </section>
         </div>
@@ -4066,7 +4071,7 @@
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.4";
+      const APP_VERSION = "v8.5";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4083,6 +4088,7 @@
       const CWA_OBS_10M_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0003-001" : "";
       const CWA_OBS_1H_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0001-001" : "";
       const CWA_RAIN_1H_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0002-001" : "";
+      const CWA_RADAR_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/O-A0059-001" : "";
       const WEATHER_FULL_ENDPOINT = WORKER_ORIGIN ? WORKER_ORIGIN + "/full" : "/full";
       const ELEVATION_PROXY = WORKER_ORIGIN ? WORKER_ORIGIN + "/elev" : "/elev";
       const elevationCache = new Map();
@@ -4170,6 +4176,7 @@
         wind: { label: "風速", unit: "m/s" },
         pressure: { label: "氣壓", unit: "hPa" },
         rain1h: { label: "1 小時雨量", unit: "mm" },
+        radar: { label: "即時雷達", unit: "dBZ" },
       };
 
       const OBS_MAP_DEMO_CMA = [
@@ -4199,7 +4206,15 @@
         obsLiveCanvasRenderer = null,
         obsLiveMapRedrawFrame = 0,
         obsLiveMapDataLoaded = false,
-        obsLiveMapLocationMarker = null;
+        obsLiveMapLocationMarker = null,
+        obsRadarOverlay = null,
+        obsRadarObjectUrl = "",
+        obsRadarLastLoadAt = 0,
+        obsRadarDataTime = null,
+        obsRadarLoading = false,
+        obsRadarHasFit = false;
+
+      const OBS_RADAR_DEFAULT_BOUNDS = [[18.0, 115.0], [29.0, 126.5]];
 
       function updateObservationLocationMarker() {
         if (!obsLiveMap || typeof L === "undefined" || !lastTarget) return;
@@ -4615,6 +4630,16 @@
       }
 
       function obsMapLegendConfig(metric) {
+        if (metric === "radar") {
+          return {
+            labels: ["0","5","10","15","20","25","30","35","40","45","50","55","60","65","≥70"],
+            colors: [
+              "#00ffff","#00b5ff","#006eff","#003cff","#00c800",
+              "#009600","#ffff00","#ffc800","#ff9600","#ff5000",
+              "#ff0000","#c00000","#ff00ff","#b000d0","#7800a8"
+            ]
+          };
+        }
         if (metric === "temperature") {
           return {
             labels: ["<-40","-40","-30","-20","-10","0","10","18","24","28","32","36","40","45","≥45"],
@@ -4843,6 +4868,20 @@ function obsMapPickVisibleStations() {
         }
         obsLiveMapLayer = L.layerGroup().addTo(obsLiveMap);
 
+        if (obsLiveMapMetric === "radar") {
+          if (obsRadarOverlay && !obsLiveMap.hasLayer(obsRadarOverlay)) {
+            obsRadarOverlay.addTo(obsLiveMap);
+          }
+          if ($("obsMapCount")) $("obsMapCount").textContent = "";
+          obsMapUpdateLegend();
+          updateObservationLocationMarker();
+          return;
+        }
+
+        if (obsRadarOverlay && obsLiveMap.hasLayer(obsRadarOverlay)) {
+          obsLiveMap.removeLayer(obsRadarOverlay);
+        }
+
         const zoom = obsLiveMap.getZoom();
         const stationsToDraw = obsMapPickVisibleStations();
         let displayed = 0;
@@ -4941,7 +4980,165 @@ function obsMapPickVisibleStations() {
         obsLiveMapRedrawFrame = requestAnimationFrame(obsMapRenderStationsNow);
       }
 
+      function obsRadarColor(dbz) {
+        if (!Number.isFinite(dbz) || dbz < 0) return [0, 0, 0, 0];
+        if (dbz < 5) return [0, 255, 255, 135];
+        if (dbz < 10) return [0, 181, 255, 185];
+        if (dbz < 15) return [0, 110, 255, 205];
+        if (dbz < 20) return [0, 60, 255, 215];
+        if (dbz < 25) return [0, 200, 0, 220];
+        if (dbz < 30) return [0, 150, 0, 225];
+        if (dbz < 35) return [255, 255, 0, 230];
+        if (dbz < 40) return [255, 200, 0, 232];
+        if (dbz < 45) return [255, 150, 0, 235];
+        if (dbz < 50) return [255, 80, 0, 238];
+        if (dbz < 55) return [255, 0, 0, 240];
+        if (dbz < 60) return [192, 0, 0, 242];
+        if (dbz < 65) return [255, 0, 255, 244];
+        if (dbz < 70) return [176, 0, 208, 246];
+        return [120, 0, 168, 248];
+      }
+
+      function obsRadarBuildCanvas(content, nx, ny) {
+        const canvas = document.createElement("canvas");
+        canvas.width = nx;
+        canvas.height = ny;
+        const ctx = canvas.getContext("2d", { alpha: true });
+        const image = ctx.createImageData(nx, ny);
+        const pixels = image.data;
+        let start = 0;
+        let sourceIndex = 0;
+
+        // 直接逐值掃描，避免 split 讓 8.9 MB 雷達字串額外產生大型陣列。
+        while (start < content.length && sourceIndex < nx * ny) {
+          let end = content.indexOf(",", start);
+          if (end < 0) end = content.length;
+          const dbz = Number(content.slice(start, end));
+          const x = sourceIndex % nx;
+          const southRow = Math.floor(sourceIndex / nx);
+          const y = ny - 1 - southRow;
+          const p = (y * nx + x) * 4;
+          const rgba = obsRadarColor(dbz);
+          pixels[p] = rgba[0];
+          pixels[p + 1] = rgba[1];
+          pixels[p + 2] = rgba[2];
+          pixels[p + 3] = rgba[3];
+          sourceIndex++;
+          start = end + 1;
+        }
+
+        if (sourceIndex !== nx * ny) {
+          throw new Error(`雷達格點數不符（${sourceIndex}/${nx * ny}）`);
+        }
+        ctx.putImageData(image, 0, 0);
+        return canvas;
+      }
+
+      function obsRadarParsePayload(data) {
+        const root = data?.cwaopendata || data;
+        const dataset = root?.dataset || root?.Dataset;
+        const info = dataset?.datasetInfo || dataset?.DatasetInfo || {};
+        const params = info?.parameterSet || info?.ParameterSet || {};
+        const contents = dataset?.contents || dataset?.Contents || {};
+        const content = contents?.content || contents?.Content;
+        const nx = Number(params?.GridDimensionX);
+        const ny = Number(params?.GridDimensionY);
+        const resolution = Number(params?.GridResolution);
+        const startLon = Number(params?.StartPointLongitude);
+        const startLat = Number(params?.StartPointLatitude);
+        const dataTime = params?.DateTime || root?.sent || null;
+
+        if (!content || !Number.isFinite(nx) || !Number.isFinite(ny) ||
+            !Number.isFinite(resolution) || !Number.isFinite(startLon) ||
+            !Number.isFinite(startLat)) {
+          throw new Error("氣象署雷達欄位格式不完整");
+        }
+
+        return {
+          content,
+          nx,
+          ny,
+          dataTime,
+          bounds: [
+            [startLat, startLon],
+            [startLat + (ny - 1) * resolution, startLon + (nx - 1) * resolution],
+          ],
+        };
+      }
+
+      async function refreshObservationRadar({ force = false, fit = false } = {}) {
+        if (!obsLiveMap || obsRadarLoading) return;
+        if (!force && obsRadarOverlay && Date.now() - obsRadarLastLoadAt < 60_000) {
+          obsMapRenderStations();
+          return;
+        }
+        if (!CWA_RADAR_PROXY) throw new Error("即時雷達代理網址尚未設定");
+
+        obsRadarLoading = true;
+        const loading = $("obsMapLoading");
+        const btn = $("obsMapRefreshBtn");
+        if (loading) {
+          loading.hidden = false;
+          loading.textContent = "正在下載並繪製即時雷達…";
+        }
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "更新中…";
+        }
+        if ($("obsMapStatus")) $("obsMapStatus").textContent = "正在取得氣象署 1.25 公里雷達格點…";
+
+        try {
+          const data = await fetchJson(CWA_RADAR_PROXY + "?t=" + Date.now(), 30000);
+          const radar = obsRadarParsePayload(data);
+          const canvas = obsRadarBuildCanvas(radar.content, radar.nx, radar.ny);
+          const blob = await new Promise((resolve, reject) =>
+            canvas.toBlob((value) => value ? resolve(value) : reject(new Error("雷達影像輸出失敗")), "image/png")
+          );
+          const nextUrl = URL.createObjectURL(blob);
+
+          if (obsRadarOverlay) {
+            try { obsLiveMap.removeLayer(obsRadarOverlay); } catch {}
+          }
+          if (obsRadarObjectUrl) URL.revokeObjectURL(obsRadarObjectUrl);
+          obsRadarObjectUrl = nextUrl;
+          obsRadarOverlay = L.imageOverlay(nextUrl, radar.bounds, {
+            opacity: 0.88,
+            interactive: false,
+            className: "obs-radar-overlay",
+          });
+          obsRadarLastLoadAt = Date.now();
+          obsRadarDataTime = radar.dataTime;
+
+          if (obsLiveMapMetric === "radar") obsRadarOverlay.addTo(obsLiveMap);
+          if ((fit || !obsRadarHasFit) && obsLiveMapMetric === "radar") {
+            obsLiveMap.fitBounds(radar.bounds, { padding: [8, 8], animate: true });
+            obsRadarHasFit = true;
+          }
+          if ($("obsMapStatus")) {
+            $("obsMapStatus").textContent = `氣象署雷達｜資料時間 ${obsMapFormatTime(radar.dataTime)}`;
+          }
+          obsMapRenderStations();
+        } catch (e) {
+          console.warn("[observation radar]", e);
+          if ($("obsMapStatus")) $("obsMapStatus").textContent = `雷達載入失敗：${e?.message || e}`;
+        } finally {
+          obsRadarLoading = false;
+          if (loading) {
+            loading.hidden = true;
+            loading.textContent = "正在載入測站資料…";
+          }
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = "更新資料";
+          }
+        }
+      }
+
       async function refreshObservationMapData({ force = false } = {}) {
+        if (obsLiveMapMetric === "radar") {
+          await refreshObservationRadar({ force });
+          return;
+        }
         if (obsLiveMapLoading) return;
         if (!force && obsLiveMapStations.length && Date.now() - obsLiveMapLastLoadAt < 60_000) {
           obsMapRenderStations();
@@ -4989,6 +5186,11 @@ function obsMapPickVisibleStations() {
 
       function fitObservationMap() {
         if (!obsLiveMap) return;
+        if (obsLiveMapMetric === "radar") {
+          const bounds = obsRadarOverlay?.getBounds?.() || L.latLngBounds(OBS_RADAR_DEFAULT_BOUNDS);
+          obsLiveMap.fitBounds(bounds, { padding: [8, 8], animate: true });
+          return;
+        }
         // Taiwan + mainland China, but not so wide that the map becomes unusable.
         obsLiveMap.fitBounds([[18.0, 73.0], [54.5, 135.5]], {
           padding: [8, 8],
@@ -5105,6 +5307,15 @@ function obsMapPickVisibleStations() {
             closeMetricMenu();
             obsMapCloseDetail();
             obsMapRenderStations();
+            if ($("obsMapFitBtn")) {
+              $("obsMapFitBtn").textContent = metric === "radar" ? "雷達範圍" : "回到全域";
+            }
+            if (metric === "radar") {
+              refreshObservationRadar({ force: false, fit: !obsRadarHasFit });
+            } else {
+              if ($("obsMapStatus")) $("obsMapStatus").textContent = "";
+              if (!obsLiveMapDataLoaded) refreshObservationMapData({ force: false });
+            }
           });
         });
 
