@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.5</title>
+    <title>天氣網站 v8.5.1</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
       * {
@@ -3503,7 +3503,13 @@
         .obs-live-map-legend-bar { width: 180px; }
       }
 
-    </style>
+    
+/* Small screens and keyboard navigation: keep all controls reachable. */
+body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-y: contain; }
+.weather-status { margin: 6px 12px; font-size: 13px; line-height: 1.5; }
+.weather-status:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+</style>
   </head>
 
   <body data-scene="clear-day" data-page="current">
@@ -3577,7 +3583,7 @@
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.5</div>
+              <div class="version-badge" id="versionLabel">v8.5.1</div>
             </div>
           </section>
 
@@ -3760,7 +3766,7 @@
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.5</div>
+              <div class="version-badge">v8.5.1</div>
             </div>
           </section>
 
@@ -3972,7 +3978,7 @@
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.5</div>
+              <div class="version-badge">v8.5.1</div>
             </div>
           </section>
         </div>
@@ -4066,12 +4072,124 @@
       </section>
     </div>
 
-    <script>
+    <script>// Strict input parsing: missing values stay missing, and local times need a declared zone.
+function strictNumber(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+  if (typeof value !== "string" || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim())) return NaN;
+  const n = Number(value.trim());
+  return Number.isFinite(n) ? n : NaN;
+}
+function weatherTimestamp(value, offsetMinutes = 480, timeZone = "") {
+  if (typeof value === "number" || (typeof value === "string" && /^\d{10}(?:\d{3})?$/.test(value.trim()))) {
+    const n = strictNumber(value);
+    return Number.isFinite(n) ? (Math.abs(n) < 1e11 ? n * 1000 : n) : NaN;
+  }
+  if (typeof value !== "string") return NaN;
+  const s = value.trim().replace(/\//g, "-").replace(" ", "T");
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(\.\d{1,3})?)?)?(Z|[+-]\d{2}:?\d{2})?$/i.exec(s);
+  if (!m) return NaN;
+  const [y, mo, d, h, mi, sec] = [m[1],m[2],m[3],m[4]||0,m[5]||0,m[6]||0].map(Number);
+  const ms = Math.round(Number(m[7]||0)*1000);
+  const base = Date.UTC(y,mo-1,d,h,mi,sec,ms), check = new Date(base);
+  if (mo<1 || mo>12 || d<1 || check.getUTCDate()!==d || h>23 || mi>59 || sec>59) return NaN;
+  if (m[8]) return Date.parse(s);
+  if (!timeZone) return base - offsetMinutes*60000;
+  try {
+    const fmt = new Intl.DateTimeFormat("en-CA", {timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+    const displayed = ts => {
+      const p = Object.fromEntries(fmt.formatToParts(new Date(ts)).map(x=>[x.type,x.value]));
+      return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second,ms);
+    };
+    let ts = base-offsetMinutes*60000;
+    for(let i=0;i<4;i++) { const delta=base-displayed(ts); if(delta===0) return ts; ts+=delta; }
+    return displayed(ts)===base ? ts : NaN;
+  } catch { return base-offsetMinutes*60000; }
+}
+function weatherDateKey(value,timeZone="",offsetSeconds=0) {
+  if(typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value))return Number.isFinite(weatherTimestamp(value))?value:"";
+  const ts=weatherTimestamp(value,(strictNumber(offsetSeconds)||0)/60,timeZone);if(!Number.isFinite(ts))return "";
+  try {if(timeZone){const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date(ts)).map(x=>[x.type,x.value]));return p.year+"-"+p.month+"-"+p.day;}}catch{}
+  return new Date(ts+(strictNumber(offsetSeconds)||0)*1000).toISOString().slice(0,10);
+}
+
+function showWeatherStatus(message) {
+  let el = $("weatherStatus");
+  if (!el) { el=document.createElement("div"); el.id="weatherStatus"; el.className="weather-status"; el.setAttribute("role","status"); el.setAttribute("aria-live","polite"); $("locationName")?.parentElement?.appendChild(el); }
+  el.textContent=message || "";
+}
+function assertWeatherRun(seq) {
+  if (seq !== weatherRunSeq) throw new DOMException("查詢已更新", "AbortError");
+}
+function omHourIndex(om, now=Date.now()) {
+  const times=om?.hourly?.time;
+  if(!Array.isArray(times)) return -1;
+  let best=-1, bestTs=-Infinity;
+  times.forEach((t,i)=> { const ts=weatherTimestamp(t,strictNumber(om.utc_offset_seconds)/60||0,om.timezone); if(ts<=now && now-ts<3600000 && ts>bestTs) {best=i;bestTs=ts;} });
+  return best;
+}
+function validatedRainSeries(data, minutes) {
+  const raw=[data?.series,data?.p60_series,data?.mean_series].find(Array.isArray);
+  if(!Number.isInteger(minutes)||minutes<1||minutes>60||!raw||raw.length<minutes) throw new Error("降雨逐分鐘資料不足，無法判定是否下雨");
+  const values=raw.slice(0,minutes).map(strictNumber);
+  if(values.some(v=>!Number.isFinite(v)||v<0)) throw new Error("降雨資料含缺值或無效數值");
+  return values;
+}
+function cleanForecastHours(items) {
+  if(!Array.isArray(items)) return [];
+  return [...new Map(items.filter(x=>x&&Number.isFinite(x.ts)).sort((a,b)=>a.ts-b.ts).map(x=>[x.ts,x])).values()];
+}
+function interpolateForecastHours(items, now=Date.now()) {
+  const all=cleanForecastHours(items), result=[];
+  if(!all.length) return result;
+  let j=0;
+  for(let ts=Math.ceil(now/600000)*600000;result.length<144 && ts<=all.at(-1).ts;ts+=600000) {
+    if(ts<all[0].ts) continue;
+    while(j<all.length-1 && all[j+1].ts<=ts) j++;
+    const a=all[j],b=all[j+1]||a;
+    if(b.ts-a.ts>3*3600000) continue;
+    const ratio=b.ts===a.ts?0:(ts-a.ts)/(b.ts-a.ts), p={...a,ts};
+    for(const key of ["temp","at","dewPoint","humidity","windSpeed"]) p[key]=ratio===0?a[key]:(Number.isFinite(a[key])&&Number.isFinite(b[key])?a[key]+(b[key]-a[key])*ratio:NaN);
+    if(ratio>0) {
+      if([a.windSpeed,b.windSpeed,a.windDirection,b.windDirection].every(Number.isFinite)) {
+        const r=Math.PI/180, u=-(1-ratio)*a.windSpeed*Math.sin(a.windDirection*r)-ratio*b.windSpeed*Math.sin(b.windDirection*r),v=-(1-ratio)*a.windSpeed*Math.cos(a.windDirection*r)-ratio*b.windSpeed*Math.cos(b.windDirection*r);
+        p.windSpeed=Math.hypot(u,v); p.windDirection=p.windSpeed<0.01?NaN:(Math.atan2(-u,-v)/r+360)%360;
+      } else p.windDirection=NaN;
+    }
+    p.windDirectionText=Number.isFinite(p.windDirection)?degToDir16(p.windDirection):"";
+    p.windText=Number.isFinite(p.windSpeed)?(p.windDirectionText||"--")+" "+p.windSpeed.toFixed(1)+" m/s":"";
+    result.push(p);
+  }
+  return result;
+}
+
+let obsStationStatus="",obsRadarStatus="",qpfImageLoadSeq=0;
+function syncObservationLoading() {
+  const radar=obsLiveMapMetric==="radar",busy=radar?obsRadarLoading:obsLiveMapLoading;
+  const loading=$("obsMapLoading"),btn=$("obsMapRefreshBtn"),status=$("obsMapStatus");
+  if(loading) {loading.hidden=!busy;loading.textContent=radar?"正在下載並繪製雷達…":"正在載入測站資料…";}
+  if(btn) {btn.disabled=busy;btn.textContent=busy?"更新中…":"更新資料";}
+  if(status) status.textContent=radar?obsRadarStatus:obsStationStatus;
+}
+function validMapBounds(b) {
+  return Array.isArray(b)&&b.length===2&&b.every(p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(strictNumber(v))))&&b[0][0]>=-85.051129&&b[1][0]<=85.051129&&b[0][1]>=-180&&b[1][1]<=180&&b[0][0]<b[1][0]&&b[0][1]<b[1][1];
+}
+function waitForOverlay(candidate,map,timeout=15000) {
+  return new Promise((resolve,reject)=> {
+    let settled=false;
+    const done=(error)=>{if(settled)return;settled=true;clearTimeout(timer);candidate.off?.("load",loaded);candidate.off?.("error",failed);candidate.off?.("remove",removed);error?reject(error):resolve(candidate);};
+    const loaded=()=>done(),failed=()=>done(new Error("圖資載入失敗")),removed=()=>done(new Error("圖資已取消"));
+    const timer=setTimeout(()=>done(new Error("圖資載入逾時")),timeout);
+    candidate.once("load",loaded);candidate.once("error",failed);candidate.once("remove",removed);
+    try {candidate.addTo(map);requestAnimationFrame(()=>{const el=candidate.getElement?.();if(el?.complete&&el.naturalWidth)loaded();});} catch(e){done(e);}
+  });
+}
+
+
       /* ===========================
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.5";
+      const APP_VERSION = "v8.5.1";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4161,14 +4279,7 @@
          - 台灣：CWA O-A0003 / O-A0001
          - 中國大陸：優先讀取 Worker 的全測站端點
          =========================== */
-      const CMA_MAP_ENDPOINT_CANDIDATES = WORKER_ORIGIN
-        ? [
-            WORKER_ORIGIN + "/cma/map/all",
-            WORKER_ORIGIN + "/cma-map-all",
-            WORKER_ORIGIN + "/cma/map",
-            WORKER_ORIGIN + "/map/cma/all",
-          ]
-        : [];
+      const CMA_MAP_ENDPOINT_CANDIDATES = WORKER_ORIGIN ? [WORKER_ORIGIN + "/cma/map/all"] : [];
 
       const OBS_MAP_METRICS = {
         temperature: { label: "溫度", unit: "°C" },
@@ -4179,20 +4290,7 @@
         radar: { label: "即時雷達", unit: "dBZ" },
       };
 
-      const OBS_MAP_DEMO_CMA = [
-        { id:"50136", name:"漠河", lat:52.58, lon:122.31, alt:439.7, temperature:21.6, humidity:50, windSpeed:1.2, windDirection:331, pressure:964, rain1h:0, feels:22.2, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"50953", name:"哈爾濱", lat:45.56, lon:126.34, alt:119, temperature:22.2, humidity:65, windSpeed:4.6, windDirection:354, pressure:996, rain1h:0, feels:21.5, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"54161", name:"長春", lat:43.54, lon:125.13, alt:237.8, temperature:23.9, humidity:56, windSpeed:4.9, windDirection:331, pressure:983, rain1h:0, feels:23.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"54511", name:"北京", lat:39.48, lon:116.28, alt:31.3, temperature:27.8, humidity:71, windSpeed:2.1, windDirection:32, pressure:1000, rain1h:0, feels:30.2, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"58362", name:"上海", lat:31.24, lon:121.29, alt:4.5, temperature:32.2, humidity:66, windSpeed:3.2, windDirection:118, pressure:1003, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"57494", name:"武漢", lat:30.36, lon:114.03, alt:23.6, temperature:33.1, humidity:62, windSpeed:2.5, windDirection:188, pressure:999, rain1h:0, feels:38.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"59287", name:"廣州", lat:23.13, lon:113.29, alt:41, temperature:33.0, humidity:66, windSpeed:2.2, windDirection:145, pressure:1001, rain1h:0, feels:39.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"59134", name:"廈門", lat:24.48, lon:118.08, alt:139, temperature:31.2, humidity:73, windSpeed:3.6, windDirection:138, pressure:996, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"59431", name:"南寧", lat:22.49, lon:108.21, alt:122, temperature:31.4, humidity:72, windSpeed:2.0, windDirection:160, pressure:990, rain1h:0, feels:37.0, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"56294", name:"成都", lat:30.40, lon:104.01, alt:506, temperature:28.0, humidity:76, windSpeed:1.4, windDirection:90, pressure:951, rain1h:0, feels:31.5, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"55591", name:"拉薩", lat:29.40, lon:91.08, alt:3648, temperature:20.0, humidity:39, windSpeed:3.1, windDirection:225, pressure:652, rain1h:0, feels:18.8, obsTime:"2026-08-27T13:50:00+08:00" },
-        { id:"51463", name:"烏魯木齊", lat:43.47, lon:87.37, alt:935, temperature:25.2, humidity:31, windSpeed:3.2, windDirection:340, pressure:904, rain1h:0, feels:24.0, obsTime:"2026-08-27T13:50:00+08:00" },
-      ].map(s => ({ ...s, source: "CMA 示範" }));
+      
 
       let obsLiveMap = null,
         obsLiveMapLayer = null,
@@ -4247,7 +4345,7 @@
 
       function obsMapNum(v) {
         if (v == null || v === "") return NaN;
-        const n = Number(v);
+        const n = strictNumber(v);
         if (!Number.isFinite(n)) return NaN;
         if (n === -99 || n === -999 || n === -9999 || n === 9999 || n === 99999) return NaN;
         return n;
@@ -4452,24 +4550,22 @@
       }
 
       function obsMapMergeCwa(...groups) {
-        const map = new Map();
-        for (const s of groups.flat()) {
-          if (!s) continue;
-          const old = map.get(s.id) || {};
-          map.set(s.id, {
-            ...old,
-            ...s,
-            temperature: Number.isFinite(s.temperature) ? s.temperature : old.temperature,
-            humidity: Number.isFinite(s.humidity) ? s.humidity : old.humidity,
-            windSpeed: Number.isFinite(s.windSpeed) ? s.windSpeed : old.windSpeed,
-            windDirection: Number.isFinite(s.windDirection) ? s.windDirection : old.windDirection,
-            pressure: Number.isFinite(s.pressure) ? s.pressure : old.pressure,
-            rain1h: Number.isFinite(s.rain1h) ? s.rain1h : old.rain1h,
-            feels: Number.isFinite(s.feels) ? s.feels : old.feels,
-          });
-        }
-        return [...map.values()];
-      }
+  const map=new Map(),fields=["temperature","humidity","windSpeed","windDirection","pressure","rain1h","feels"];
+  for(const s of groups.flat()) {
+    if(!s?.id) continue;
+    const old=map.get(s.id),ts=weatherTimestamp(s.obsTime),oldTs=weatherTimestamp(old?.obsTime);
+    if(!Number.isFinite(ts)) continue;
+    const out={...(old||{}),...(!old||!Number.isFinite(oldTs)||ts>=oldTs?s:{}),fieldTimes:{...(old?.fieldTimes||{})}};
+    for(const key of fields) {
+      const prevTime=weatherTimestamp(old?.fieldTimes?.[key]||old?.obsTime);
+      if(Number.isFinite(s[key])&&(!Number.isFinite(old?.[key])||!Number.isFinite(prevTime)||ts>=prevTime)) {out[key]=s[key];out.fieldTimes[key]=s.obsTime;}
+      else out[key]=old?.[key];
+    }
+    // Main timestamp describes the temperature; individual rows carry their own times.
+    out.obsTime=out.fieldTimes.temperature||out.obsTime;map.set(s.id,out);
+  }
+  return [...map.values()];
+}
 
       async function obsMapLoadCwa() {
         const urls10 = [CWA_OBS_10M_PROXY, CWA_OBS_10M_S3].filter(Boolean);
@@ -4481,7 +4577,8 @@
           for (const url of urls) {
             try {
               const data = await fetchJson(url, 10000);
-              if (data) return data;
+              if (data && obsMapFindStationArray(data).length) return data;
+              throw new Error("CWA 回應沒有測站資料");
             } catch (e) {
               last = e;
             }
@@ -4509,7 +4606,10 @@
             : [];
 
         // O-A0002-001 is the authoritative 1-hour rainfall feed for this map.
-        return obsMapMergeCwa(s1h, s10, rain1h);
+        const stations=obsMapMergeCwa(s1h,s10,rain1h);
+        if(!stations.length) throw new Error("CWA 測站來源全部失敗或無有效資料");
+        stations.partialFailure=settled.some(x=>x.status==="rejected");
+        return stations;
       }
 
       async function obsMapLoadCma() {
@@ -4541,12 +4641,14 @@
             lastErr = e;
           }
         }
-        obsLiveMapUsedDemoCma = true;
+        obsLiveMapUsedDemoCma = false;
         if (lastErr) console.warn("[obs map CMA]", lastErr);
-        return OBS_MAP_DEMO_CMA.map(s => ({ ...s, id: "cn-" + s.id }));
+        throw lastErr || new Error("CMA 尚無可用測站資料");
       }
 
       function obsMapValue(station, metric = obsLiveMapMetric) {
+        const key=metric==="wind"?"windSpeed":metric,ts=weatherTimestamp(station?.fieldTimes?.[key]||station?.obsTime);
+        if(!Number.isFinite(ts)||Date.now()-ts>90*60000||ts-Date.now()>120000)return NaN;
         if (metric === "temperature") return obsMapNum(station?.temperature);
         if (metric === "humidity") return obsMapNum(station?.humidity);
         if (metric === "wind") return obsMapNum(station?.windSpeed);
@@ -4722,7 +4824,7 @@
 
       function obsMapFormatTime(v) {
         if (!v) return "--";
-        const d = new Date(v);
+        const d = new Date(weatherTimestamp(v));
         if (Number.isNaN(d.getTime())) return String(v);
         return new Intl.DateTimeFormat("zh-TW", {
           timeZone: "Asia/Taipei",
@@ -4760,7 +4862,7 @@
             ? `${obsMapNum(station.rain1h).toFixed(1)} mm`
             : "--";
         $("obsMapDetailTime").textContent =
-          `觀測時間：${obsMapFormatTime(station?.obsTime)}`;
+          `觀測時間：${obsMapFormatTime(station?.fieldTimes?.[obsLiveMapMetric==="wind"?"windSpeed":obsLiveMapMetric]||station?.obsTime)}`;
 
         box.classList.add("is-open");
         box.setAttribute("aria-hidden", "false");
@@ -4937,7 +5039,7 @@ function obsMapPickVisibleStations() {
           // Zoom 11+：直接在站點旁顯示站名與目前圖層數值，分成兩行。
           if (zoom >= 11) {
             layer.bindTooltip(
-              `${station.name}<br><b>${obsMapMetricText(station)}</b>`,
+              `${escapeHtml(station.name)}<br><b>${obsMapMetricText(station)}</b>`,
               {
                 permanent: true,
                 direction: "bottom",
@@ -4948,7 +5050,7 @@ function obsMapPickVisibleStations() {
               },
             );
           } else if (zoom >= 5.5) {
-            layer.bindTooltip(`${station.name} · ${obsMapMetricText(station)}`, {
+            layer.bindTooltip(`${escapeHtml(station.name)} · ${obsMapMetricText(station)}`, {
               direction: "top",
               offset: [0, -4],
               className: "obs-station-tooltip",
@@ -4999,190 +5101,69 @@ function obsMapPickVisibleStations() {
         return [120, 0, 168, 248];
       }
 
-      function obsRadarBuildCanvas(content, nx, ny) {
-        const canvas = document.createElement("canvas");
-        canvas.width = nx;
-        canvas.height = ny;
-        const ctx = canvas.getContext("2d", { alpha: true });
-        const image = ctx.createImageData(nx, ny);
-        const pixels = image.data;
-        let start = 0;
-        let sourceIndex = 0;
-
-        // 直接逐值掃描，避免 split 讓 8.9 MB 雷達字串額外產生大型陣列。
-        while (start < content.length && sourceIndex < nx * ny) {
-          let end = content.indexOf(",", start);
-          if (end < 0) end = content.length;
-          const dbz = Number(content.slice(start, end));
-          const x = sourceIndex % nx;
-          const southRow = Math.floor(sourceIndex / nx);
-          const y = ny - 1 - southRow;
-          const p = (y * nx + x) * 4;
-          const rgba = obsRadarColor(dbz);
-          pixels[p] = rgba[0];
-          pixels[p + 1] = rgba[1];
-          pixels[p + 2] = rgba[2];
-          pixels[p + 3] = rgba[3];
-          sourceIndex++;
-          start = end + 1;
-        }
-
-        if (sourceIndex !== nx * ny) {
-          throw new Error(`雷達格點數不符（${sourceIndex}/${nx * ny}）`);
-        }
-        ctx.putImageData(image, 0, 0);
-        return canvas;
-      }
+      function obsRadarBuildCanvas(content,nx,ny,radar=null) {
+  if(typeof content!=="string"||!Number.isInteger(nx)||!Number.isInteger(ny)||nx<1||ny<1||nx*ny>4000000) throw new Error("雷達格點尺寸無效");
+  const values=new Float32Array(nx*ny);let start=0,index=0;
+  while(start<=content.length) {let end=content.indexOf(",",start);if(end<0) end=content.length;const token=content.slice(start,end).trim();if(!token||index>=values.length) throw new Error("雷達格點數不符或包含空值");const n=strictNumber(token);if(!Number.isFinite(n)) throw new Error("雷達格點含非數字");values[index++]=n;if(end===content.length)break;start=end+1;}
+  if(index!==values.length) throw new Error("雷達格點數不符（"+index+"/"+values.length+"）");
+  const merc=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
+  let north=0,south=0,height=ny;
+  if(radar) {if(!validMapBounds(radar.bounds)) throw new Error("雷達範圍無效");south=merc(radar.bounds[0][0]);north=merc(radar.bounds[1][0]);height=Math.min(4096,Math.max(2,Math.round(nx*(north-south)/((radar.bounds[1][1]-radar.bounds[0][1])*Math.PI/180))));}
+  const canvas=document.createElement("canvas");canvas.width=nx;canvas.height=height;
+  const ctx=canvas.getContext("2d",{alpha:true});if(!ctx) throw new Error("此裝置無法建立雷達影像");
+  const img=ctx.createImageData(nx,height);
+  for(let y=0;y<height;y++) {
+    let row=ny-1-y;
+    if(radar) {const lat=(2*Math.atan(Math.exp(north-y/(height-1)*(north-south)))-Math.PI/2)*180/Math.PI;row=Math.max(0,Math.min(ny-1,Math.round((lat-radar.startLat)/radar.resolution)));}
+    for(let x=0;x<nx;x++) img.data.set(obsRadarColor(values[row*nx+x]),(y*nx+x)*4);
+  }
+  ctx.putImageData(img,0,0);return canvas;
+}
 
       function obsRadarParsePayload(data) {
-        const root = data?.cwaopendata || data;
-        const dataset = root?.dataset || root?.Dataset;
-        const info = dataset?.datasetInfo || dataset?.DatasetInfo || {};
-        const params = info?.parameterSet || info?.ParameterSet || {};
-        const contents = dataset?.contents || dataset?.Contents || {};
-        const content = contents?.content || contents?.Content;
-        const nx = Number(params?.GridDimensionX);
-        const ny = Number(params?.GridDimensionY);
-        const resolution = Number(params?.GridResolution);
-        const startLon = Number(params?.StartPointLongitude);
-        const startLat = Number(params?.StartPointLatitude);
-        const dataTime = params?.DateTime || root?.sent || null;
+  const root=data?.cwaopendata||data,dataset=root?.dataset||root?.Dataset,info=dataset?.datasetInfo||dataset?.DatasetInfo||{},params=info.parameterSet||info.ParameterSet||{},contents=dataset?.contents||dataset?.Contents||{};
+  const content=contents.content??contents.Content,nx=strictNumber(params.GridDimensionX),ny=strictNumber(params.GridDimensionY),resolution=strictNumber(params.GridResolution),startLon=strictNumber(params.StartPointLongitude),startLat=strictNumber(params.StartPointLatitude);
+  if(typeof content!=="string"||!content.trim()||!Number.isInteger(nx)||!Number.isInteger(ny)||nx<2||ny<2||nx*ny>4000000||!(resolution>0)||!Number.isFinite(startLon)||!Number.isFinite(startLat)) throw new Error("雷達格點格式或尺寸無效");
+  const bounds=[[startLat,startLon],[startLat+(ny-1)*resolution,startLon+(nx-1)*resolution]];
+  if(!validMapBounds(bounds)) throw new Error("雷達範圍不適用此地圖投影");
+  return {content,nx,ny,resolution,startLat,startLon,bounds,dataTime:params.DateTime||root.sent||null};
+}
 
-        if (!content || !Number.isFinite(nx) || !Number.isFinite(ny) ||
-            !Number.isFinite(resolution) || !Number.isFinite(startLon) ||
-            !Number.isFinite(startLat)) {
-          throw new Error("氣象署雷達欄位格式不完整");
-        }
+      async function refreshObservationRadar({force=false,fit=false}={}) {
+  if(!obsLiveMap||obsRadarLoading) return;
+  if(!force&&obsRadarOverlay&&Date.now()-obsRadarLastLoadAt<60000) {obsMapRenderStations();syncObservationLoading();return;}
+  obsRadarLoading=true;obsRadarStatus="正在取得氣象署雷達…";syncObservationLoading();let candidate=null,nextUrl="";
+  try {
+    if(!CWA_RADAR_PROXY) throw new Error("雷達代理網址尚未設定");
+    const radar=obsRadarParsePayload(await fetchJson(CWA_RADAR_PROXY+"?t="+Date.now(),30000)),canvas=obsRadarBuildCanvas(radar.content,radar.nx,radar.ny,radar);
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(new Error("雷達影像輸出失敗")),"image/png"));
+    nextUrl=URL.createObjectURL(blob);candidate=L.imageOverlay(nextUrl,radar.bounds,{opacity:0,interactive:false,className:"obs-radar-overlay"});
+    await waitForOverlay(candidate,obsLiveMap);
+    const previous=obsRadarOverlay,oldUrl=obsRadarObjectUrl;
+    obsRadarOverlay=candidate;obsRadarObjectUrl=nextUrl;obsRadarLastLoadAt=Date.now();obsRadarDataTime=radar.dataTime;
+    if(previous) obsLiveMap.removeLayer(previous);if(oldUrl) URL.revokeObjectURL(oldUrl);
+    candidate.setOpacity(0.88);if(obsLiveMapMetric!=="radar") obsLiveMap.removeLayer(candidate);
+    if((fit||!obsRadarHasFit)&&obsLiveMapMetric==="radar") {obsLiveMap.fitBounds(radar.bounds,{padding:[8,8],animate:true});obsRadarHasFit=true;}
+    obsRadarStatus="氣象署雷達｜資料時間 "+obsMapFormatTime(radar.dataTime);
+  } catch(e) {if(candidate&&candidate!==obsRadarOverlay) obsLiveMap.removeLayer(candidate);if(nextUrl&&nextUrl!==obsRadarObjectUrl) URL.revokeObjectURL(nextUrl);obsRadarStatus="雷達更新失敗："+(e.message||e)+(obsRadarOverlay?"；保留 "+obsMapFormatTime(obsRadarDataTime)+" 圖資":"");}
+  finally {obsRadarLoading=false;obsMapRenderStations();syncObservationLoading();}
+}
 
-        return {
-          content,
-          nx,
-          ny,
-          dataTime,
-          bounds: [
-            [startLat, startLon],
-            [startLat + (ny - 1) * resolution, startLon + (nx - 1) * resolution],
-          ],
-        };
-      }
-
-      async function refreshObservationRadar({ force = false, fit = false } = {}) {
-        if (!obsLiveMap || obsRadarLoading) return;
-        if (!force && obsRadarOverlay && Date.now() - obsRadarLastLoadAt < 60_000) {
-          obsMapRenderStations();
-          return;
-        }
-        if (!CWA_RADAR_PROXY) throw new Error("即時雷達代理網址尚未設定");
-
-        obsRadarLoading = true;
-        const loading = $("obsMapLoading");
-        const btn = $("obsMapRefreshBtn");
-        if (loading) {
-          loading.hidden = false;
-          loading.textContent = "正在下載並繪製即時雷達…";
-        }
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = "更新中…";
-        }
-        if ($("obsMapStatus")) $("obsMapStatus").textContent = "正在取得氣象署 1.25 公里雷達格點…";
-
-        try {
-          const data = await fetchJson(CWA_RADAR_PROXY + "?t=" + Date.now(), 30000);
-          const radar = obsRadarParsePayload(data);
-          const canvas = obsRadarBuildCanvas(radar.content, radar.nx, radar.ny);
-          const blob = await new Promise((resolve, reject) =>
-            canvas.toBlob((value) => value ? resolve(value) : reject(new Error("雷達影像輸出失敗")), "image/png")
-          );
-          const nextUrl = URL.createObjectURL(blob);
-
-          if (obsRadarOverlay) {
-            try { obsLiveMap.removeLayer(obsRadarOverlay); } catch {}
-          }
-          if (obsRadarObjectUrl) URL.revokeObjectURL(obsRadarObjectUrl);
-          obsRadarObjectUrl = nextUrl;
-          obsRadarOverlay = L.imageOverlay(nextUrl, radar.bounds, {
-            opacity: 0.88,
-            interactive: false,
-            className: "obs-radar-overlay",
-          });
-          obsRadarLastLoadAt = Date.now();
-          obsRadarDataTime = radar.dataTime;
-
-          if (obsLiveMapMetric === "radar") obsRadarOverlay.addTo(obsLiveMap);
-          if ((fit || !obsRadarHasFit) && obsLiveMapMetric === "radar") {
-            obsLiveMap.fitBounds(radar.bounds, { padding: [8, 8], animate: true });
-            obsRadarHasFit = true;
-          }
-          if ($("obsMapStatus")) {
-            $("obsMapStatus").textContent = `氣象署雷達｜資料時間 ${obsMapFormatTime(radar.dataTime)}`;
-          }
-          obsMapRenderStations();
-        } catch (e) {
-          console.warn("[observation radar]", e);
-          if ($("obsMapStatus")) $("obsMapStatus").textContent = `雷達載入失敗：${e?.message || e}`;
-        } finally {
-          obsRadarLoading = false;
-          if (loading) {
-            loading.hidden = true;
-            loading.textContent = "正在載入測站資料…";
-          }
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = "更新資料";
-          }
-        }
-      }
-
-      async function refreshObservationMapData({ force = false } = {}) {
-        if (obsLiveMapMetric === "radar") {
-          await refreshObservationRadar({ force });
-          return;
-        }
-        if (obsLiveMapLoading) return;
-        if (!force && obsLiveMapStations.length && Date.now() - obsLiveMapLastLoadAt < 60_000) {
-          obsMapRenderStations();
-          return;
-        }
-        obsLiveMapLoading = true;
-        const loading = $("obsMapLoading"),
-          btn = $("obsMapRefreshBtn");
-        if (loading) loading.hidden = false;
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = "更新中…";
-        }
-        if ($("obsMapStatus")) $("obsMapStatus").textContent = "正在取得 CWA / CMA 測站資料…";
-
-        try {
-          const [twResult, cnResult] = await Promise.allSettled([obsMapLoadCwa(), obsMapLoadCma()]);
-          const tw = twResult.status === "fulfilled" ? twResult.value : [];
-          const cn = cnResult.status === "fulfilled" ? cnResult.value : [];
-          obsLiveMapStations = [...tw, ...cn];
-          obsLiveMapLastLoadAt = Date.now();
-          obsLiveMapDataLoaded = true;
-
-          const statusParts = [];
-          statusParts.push(``);
-          statusParts.push(
-            obsLiveMapUsedDemoCma
-              ? `CMA 全站端點未接通，暫顯示 ${cn.length} 個示範站`
-              : ``
-          );
-          if ($("obsMapStatus")) $("obsMapStatus").textContent = statusParts.join("");
-          obsMapRenderStations();
-        } catch (e) {
-          console.warn("[observation map]", e);
-          if ($("obsMapStatus")) $("obsMapStatus").textContent = `測站載入失敗：${e?.message || e}`;
-        } finally {
-          obsLiveMapLoading = false;
-          if (loading) loading.hidden = true;
-          if (btn) {
-            btn.disabled = false;
-            btn.textContent = "更新資料";
-          }
-        }
-      }
+      async function refreshObservationMapData({force=false}={}) {
+  if(obsLiveMapMetric==="radar") return refreshObservationRadar({force});
+  if(obsLiveMapLoading) return;
+  if(!force&&obsLiveMapDataLoaded&&Date.now()-obsLiveMapLastLoadAt<60000) {obsMapRenderStations();syncObservationLoading();return;}
+  obsLiveMapLoading=true;obsStationStatus="正在取得 CWA / CMA 測站資料…";syncObservationLoading();
+  try {
+    const results=await Promise.allSettled([obsMapLoadCwa(),obsMapLoadCma()]),parts=[],next=[];
+    for(let i=0;i<results.length;i++) {const r=results[i],source=i===0?"CWA":"CMA";if(r.status==="fulfilled") {next.push(...r.value);parts.push(source+" "+r.value.length+" 站"+(r.value.partialFailure?"（部分來源失敗）":""));} else {parts.push(source+" 取得失敗");next.push(...obsLiveMapStations.filter(s=>s.source===source));}}
+    const now=Date.now();obsLiveMapStations=next.filter(s=> {const ts=weatherTimestamp(s.obsTime);return Number.isFinite(ts)&&now-ts<=90*60000&&ts-now<=120000;});
+    if(results.every(r=>r.status==="rejected")) throw new Error("CWA / CMA 都無法更新；只保留未過期的上次資料");
+    obsLiveMapLastLoadAt=now;obsLiveMapDataLoaded=true;obsStationStatus=parts.join("｜")+"；僅顯示 90 分鐘內資料";
+    if(obsLiveMapSelected) {const updated=obsLiveMapStations.find(s=>s.id===obsLiveMapSelected.id);updated?obsMapOpenDetail(updated):obsMapCloseDetail();}
+  } catch(e) {obsStationStatus="測站更新失敗："+(e.message||e);}
+  finally {obsLiveMapLoading=false;obsMapRenderStations();syncObservationLoading();}
+}
 
       function fitObservationMap() {
         if (!obsLiveMap) return;
@@ -5203,7 +5184,7 @@ function obsMapPickVisibleStations() {
         if (!el) return;
         if (typeof L === "undefined") {
           ensureLeafletReady().then(ok => {
-            if (ok) initObservationMap();
+            if (ok) { initObservationMap(); if(currentWeatherPage==="observation") ensureObservationMapActive(); }
             else if ($("obsMapStatus")) $("obsMapStatus").textContent = "Leaflet 地圖套件載入失敗";
           });
           return;
@@ -5255,10 +5236,10 @@ function obsMapPickVisibleStations() {
         requestAnimationFrame(() => {
           try { obsLiveMap.invalidateSize(false); } catch {}
           updateObservationLocationMarker();
-          if (forceRefresh || !obsLiveMapDataLoaded) {
+          if (forceRefresh || !obsLiveMapDataLoaded || obsLiveMapMetric==="radar" || Date.now()-obsLiveMapLastLoadAt>=60000) {
             refreshObservationMapData({ force: forceRefresh });
           } else {
-            obsMapRenderStations();
+            obsMapRenderStations(); syncObservationLoading();
           }
         });
       }
@@ -5313,8 +5294,8 @@ function obsMapPickVisibleStations() {
             if (metric === "radar") {
               refreshObservationRadar({ force: false, fit: !obsRadarHasFit });
             } else {
-              if ($("obsMapStatus")) $("obsMapStatus").textContent = "";
-              if (!obsLiveMapDataLoaded) refreshObservationMapData({ force: false });
+              syncObservationLoading();
+              if (!obsLiveMapDataLoaded||Date.now()-obsLiveMapLastLoadAt>=60000) refreshObservationMapData({ force: false });
             }
           });
         });
@@ -5346,29 +5327,16 @@ function obsMapPickVisibleStations() {
         qpfMapInstalled = false,
         leafletLoadPromise = null;
       function loadLeafletScriptFrom(url) {
-        return new Promise((resolve, reject) => {
-          const existed = [...document.scripts].some((s) => s.src === url);
-          if (existed) {
-            const start = Date.now();
-            const timer = setInterval(() => {
-              if (typeof L !== "undefined") {
-                clearInterval(timer);
-                resolve(true);
-              } else if (Date.now() - start > 6500) {
-                clearInterval(timer);
-                reject(new Error("Leaflet not ready"));
-              }
-            }, 80);
-            return;
-          }
-          const script = document.createElement("script");
-          script.src = url;
-          script.async = true;
-          script.onload = () => resolve(true);
-          script.onerror = () => reject(new Error("Leaflet load failed"));
-          document.head.appendChild(script);
-        });
-      }
+  if(typeof L!=="undefined") return Promise.resolve(true);
+  return new Promise((resolve,reject)=> {
+    let script=[...document.scripts].find(s=>s.src===url),created=!script,done=false;
+    const finish=error=>{if(done)return;done=true;clearTimeout(timer);clearInterval(poll);script?.removeEventListener("load",loaded);script?.removeEventListener("error",failed);if(error&&created)script?.remove();error?reject(error):resolve(true);};
+    const loaded=()=>typeof L!=="undefined"?finish():finish(new Error("Leaflet 未就緒")),failed=()=>finish(new Error("Leaflet 下載失敗"));
+    const timer=setTimeout(()=>finish(new Error("Leaflet 載入逾時")),7000),poll=setInterval(()=>{if(typeof L!=="undefined")finish();},100);
+    if(!script) {script=document.createElement("script");script.src=url;script.async=true;}
+    script.addEventListener("load",loaded);script.addEventListener("error",failed);if(created)document.head.appendChild(script);
+  });
+}
       function ensureLeafletReady() {
         if (typeof L !== "undefined") return Promise.resolve(true);
         if (leafletLoadPromise) return leafletLoadPromise;
@@ -5381,7 +5349,7 @@ function obsMapPickVisibleStations() {
             (p, url) => p.catch(() => loadLeafletScriptFrom(url).then(() => typeof L !== "undefined")),
             Promise.reject(),
           )
-          .catch(() => false);
+          .catch(() => { leafletLoadPromise=null; return false; });
         return leafletLoadPromise;
       }
       function qpfNoCache(url) {
@@ -5395,12 +5363,7 @@ function obsMapPickVisibleStations() {
         const d = new Date(ts);
         return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
       }
-      function qpfDateFromApi(value) {
-        const s = String(value || "").trim();
-        if (!s || ["None", "null", "undefined"].includes(s)) return null;
-        const d = new Date(s.includes("T") ? s : s.replace(" ", "T"));
-        return Number.isNaN(d.getTime()) ? null : d;
-      }
+      function qpfDateFromApi(value) { if(value instanceof Date)return Number.isFinite(value.getTime())?value:null; const ts=weatherTimestamp(value);return Number.isFinite(ts)?new Date(ts):null; }
       function formatQpfClock(value) {
         const d = value instanceof Date ? value : qpfDateFromApi(value);
         if (!d) return "--:--";
@@ -5439,49 +5402,7 @@ function obsMapPickVisibleStations() {
         const d = new Date(s.includes("T") ? s : s.replace(" ", "T"));
         return Number.isNaN(d.getTime()) ? s : formatManualUpdateTime(d.getTime());
       }
-      async function updateQpfDataTimeFromMeta() {
-        const dataTimeEl = $("qpfDataTime"),
-          forecastTimeEl = $("qpfForecastTime");
-        if (!dataTimeEl && !forecastTimeEl) return;
-
-        try {
-          const r = await fetch(getQpfMetaUrl(), { cache: "no-store" });
-
-          const data = await r.json();
-
-          if (!data || data.ok !== true) {
-            if (dataTimeEl) dataTimeEl.textContent = "資料時間：取得失敗";
-            if (forecastTimeEl) forecastTimeEl.textContent = "預報時間：--:--～--:--";
-            return;
-          }
-
-          // 從後端取得真正的雷達圖片邊界
-          if (Array.isArray(data.leaflet_bounds) && data.leaflet_bounds.length === 2) {
-            QPF60_BOUNDS = data.leaflet_bounds;
-
-            if (qpfOverlay) {
-              qpfOverlay.setBounds(QPF60_BOUNDS);
-            }
-
-            if (qpfBoundsBox) {
-              qpfBoundsBox.setBounds(QPF60_BOUNDS);
-            }
-          }
-
-          const forecastStart = qpfDateFromApi(data.forecast_start_time || data.base_time),
-            explicitEnd = qpfDateFromApi(data.forecast_end_time),
-            forecastEnd = explicitEnd ||
-              (forecastStart ? new Date(forecastStart.getTime() + 60 * 60 * 1000) : null);
-          if (dataTimeEl)
-            dataTimeEl.textContent = `資料時間：${formatQpfDataTime(data.base_time)}`;
-          if (forecastTimeEl)
-            forecastTimeEl.textContent =
-              `預報時間：${formatQpfClock(forecastStart)}～${formatQpfClock(forecastEnd)}`;
-        } catch {
-          if (dataTimeEl) dataTimeEl.textContent = "資料時間：取得失敗";
-          if (forecastTimeEl) forecastTimeEl.textContent = "預報時間：--:--～--:--";
-        }
-      }
+      async function updateQpfDataTimeFromMeta() { return loadQpfImage(); }
       function updateQpfLocationMarker() {
         if (!qpfMap || typeof L === "undefined" || !lastTarget) return;
         const lat = Number(lastTarget.lat),
@@ -5505,15 +5426,22 @@ function obsMapPickVisibleStations() {
           qpfLocationMarker.bringToFront();
         } catch {}
       }
-      function loadQpfImage() {
-        if (!qpfOverlay) return;
-        updateQpfDataTimeFromMeta();
-        qpfOverlay.setUrl(qpfNoCache(QPF60_URL));
-        setQpfMeta(
-          "本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。",
-        );
-        setTimeout(updateQpfLocationMarker, 80);
-      }
+      async function loadQpfImage() {
+  if(!qpfMap) return false;
+  const seq=++qpfImageLoadSeq;let candidate=null;
+  try {
+    const data=await fetchJson(getQpfMetaUrl(),12000);if(seq!==qpfImageLoadSeq)return false;
+    if(data?.ok!==true||!validMapBounds(data.leaflet_bounds)) throw new Error("預報圖時間或範圍資料無效");
+    const start=qpfDateFromApi(data.forecast_start_time||data.base_time),base=qpfDateFromApi(data.base_time),end=qpfDateFromApi(data.forecast_end_time)||(start?new Date(start.getTime()+3600000):null);
+    if(!start||!base||!end||end<=start) throw new Error("預報圖時間無效");
+    candidate=L.imageOverlay(qpfNoCache(QPF60_URL),data.leaflet_bounds,{opacity:0,interactive:false});await waitForOverlay(candidate,qpfMap);
+    if(seq!==qpfImageLoadSeq) {qpfMap.removeLayer(candidate);return false;}
+    const previous=qpfOverlay;qpfOverlay=candidate;QPF60_BOUNDS=data.leaflet_bounds;candidate.setOpacity(clamp(strictNumber($("qpfOpacity")?.value)||0.78,0.25,1));if(previous)qpfMap.removeLayer(previous);qpfBoundsBox?.setBounds(QPF60_BOUNDS);
+    if($("qpfDataTime"))$("qpfDataTime").textContent="資料時間："+formatQpfDataTime(data.base_time);
+    if($("qpfForecastTime"))$("qpfForecastTime").textContent="預報時間："+formatQpfClock(start)+"～"+formatQpfClock(end);
+    setQpfMeta("依雷達回波推估未來降雨，實際雨勢與起停時間可能不同。");updateQpfLocationMarker();return true;
+  } catch(e) {if(candidate&&candidate!==qpfOverlay)qpfMap.removeLayer(candidate);if(seq===qpfImageLoadSeq)setQpfMeta("圖資更新失敗："+(e.message||e)+(qpfOverlay?"；保留上次圖資與時間":""));return false;}
+}
       function sleep(ms) {
         return new Promise((r) => setTimeout(r, ms));
       }
@@ -5530,11 +5458,11 @@ function obsMapPickVisibleStations() {
       }
       function refreshAllVisualLayers() {
         try {
-          qpfOverlay ? loadQpfImage() : initQpfForecastMap();
+          if(qpfMap) loadQpfImage();
         } catch {}
         try {
-          if (wrfQpfInstalled) loadWrfQpfManifest({ fit: false });
-          else initWrfQpfMap();
+          if (wrfQpfMap) loadWrfQpfManifest({ fit: false });
+          
         } catch {}
         try {
           // 第一頁手動更新或自動更新後，同步刷新已載入過的觀測地圖。
@@ -5549,28 +5477,7 @@ function obsMapPickVisibleStations() {
           updateQpfLocationMarker();
         } catch {}
       }
-      function refreshQpfOverlay() {
-        const btn = $("qpfRefreshBtn"),
-          old = btn?.textContent || "";
-        try {
-          if (btn) {
-            btn.disabled = true;
-            btn.textContent = "更新中…";
-          }
-          if (qpfOverlay) loadQpfImage();
-          else initQpfForecastMap();
-        } catch (e) {
-          console.warn(e);
-          setQpfDataTimeText("資料時間：更新失敗");
-        } finally {
-          setTimeout(() => {
-            if (!btn) return;
-            btn.disabled = false;
-            btn.textContent = old || "更新圖資";
-          }, 500);
-          setTimeout(updateQpfLocationMarker, 120);
-        }
-      }
+      async function refreshQpfOverlay() {const btn=$("qpfRefreshBtn");if(btn){btn.disabled=true;btn.textContent="更新中…";}try {if(!qpfMap)initQpfForecastMap();else await loadQpfImage();} finally {if(btn){btn.disabled=false;btn.textContent="更新圖資";}} }
       function fitQpfBounds() {
         if (qpfMap) qpfMap.fitBounds(QPF60_BOUNDS, { padding: [10, 10], animate: true });
       }
@@ -5614,7 +5521,7 @@ function obsMapPickVisibleStations() {
           detectRetina: false,
           attribution: "&copy; OpenStreetMap",
         }).addTo(qpfMap);
-        qpfOverlay = L.imageOverlay("", QPF60_BOUNDS, { opacity: 0.78, interactive: false }).addTo(qpfMap);
+        
         loadQpfImage();
         setTimeout(updateQpfLocationMarker, 150);
         qpfBoundsBox = L.rectangle(QPF60_BOUNDS, {
@@ -5636,7 +5543,7 @@ function obsMapPickVisibleStations() {
             const v = Math.max(0.25, Math.min(1, parseFloat($("qpfOpacity").value) || 0.78));
             if (qpfOverlay) qpfOverlay.setOpacity(v);
           });
-        initQpfForecastMap();
+        if(currentWeatherPage==="forecast") initQpfForecastMap();
       }
 
       const WRF_QPF_ROOT = "https://qpf.leochangrainapi.com/qpf/";
@@ -5670,7 +5577,7 @@ function obsMapPickVisibleStations() {
           );
       }
       function formatWrfQpfTime(value, withDate = true) {
-        const d = new Date(value);
+        const d = new Date(weatherTimestamp(value));
         if (Number.isNaN(d.getTime())) return "--";
         return new Intl.DateTimeFormat("zh-TW", {
           timeZone: "Asia/Taipei",
@@ -5698,12 +5605,9 @@ function obsMapPickVisibleStations() {
         );
       }
       function wrfQpfAbsoluteUrl(relativeUrl) {
-        try {
-          return new URL(String(relativeUrl || ""), WRF_QPF_ROOT).toString();
-        } catch {
-          return "";
-        }
-      }
+  if(typeof relativeUrl!=="string"||!relativeUrl.trim())return "";
+  try {const u=new URL(relativeUrl,WRF_QPF_ROOT);if(!["http:","https:"].includes(u.protocol))return "";if(wrfQpfManifest?.cycle_time)u.searchParams.set("cycle",wrfQpfManifest.cycle_time);return u.toString();} catch{return "";}
+}
       function setWrfQpfLoadingUi(key = "", loading = false) {
         document.querySelectorAll(".wrf-qpf-time-btn").forEach((btn) => {
           btn.classList.toggle("is-loading", loading && btn.dataset.wrfQpfKey === key);
@@ -5753,9 +5657,11 @@ function obsMapPickVisibleStations() {
           image.fetchPriority = priority;
         } catch {}
         entry.promise = new Promise((resolve, reject) => {
+          const timer=setTimeout(()=>{image.onload=null;image.onerror=null;image.src="";reject(new Error("圖資下載逾時"));},15000);
           image.onload = async () => {
+            clearTimeout(timer);
             try {
-              if (typeof image.decode === "function") await image.decode();
+              // The load event plus natural size validates the decoded image.
             } catch {}
             if (!image.naturalWidth || !image.naturalHeight) {
               reject(new Error("圖資解碼失敗"));
@@ -5766,7 +5672,7 @@ function obsMapPickVisibleStations() {
             trimWrfQpfImageCache(url);
             resolve(url);
           };
-          image.onerror = () => reject(new Error("圖資下載失敗"));
+          image.onerror = () => {clearTimeout(timer);reject(new Error("圖資下載失敗"));};
           image.src = url;
         }).catch((error) => {
           if (wrfQpfImageCache.get(url) === entry) wrfQpfImageCache.delete(url);
@@ -5988,7 +5894,7 @@ function obsMapPickVisibleStations() {
               const map = this._map;
               const canvas = this._canvas;
               const size = map.getSize();
-              const ratio = Math.max(1, Number(window.devicePixelRatio) || 1);
+              const ratio = Math.min(3,Math.max(1, Number(window.devicePixelRatio) || 1));
               const pixelWidth = Math.max(1, Math.round(size.x * ratio));
               const pixelHeight = Math.max(1, Math.round(size.y * ratio));
 
@@ -6040,7 +5946,7 @@ function obsMapPickVisibleStations() {
         if (!layer || !wrfQpfMap || typeof L === "undefined") return;
         const bounds = layer.leaflet_bounds,
           imageUrl = wrfQpfAbsoluteUrl(layer.url);
-        if (!Array.isArray(bounds) || bounds.length !== 2 || !imageUrl) return;
+        if (!validMapBounds(bounds) || !imageUrl) return;
         const key = wrfQpfLayerKey(layer),
           seq = ++wrfQpfLayerLoadSeq;
         wrfQpfPreloadSeq++;
@@ -6061,8 +5967,7 @@ function obsMapPickVisibleStations() {
               ? ``
               : "高解析度圖資已載入";
           if ($("wrfQpfValidTime"))
-            $("wrfQpfValidTime").textContent =
-              ``;
+            $("wrfQpfValidTime").textContent = "預報時間："+formatWrfQpfTime(layer.valid_from)+" ～ "+formatWrfQpfTime(layer.valid_to);
           if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
           preloadWrfQpfNeighbours(layer);
           return;
@@ -6085,21 +5990,7 @@ function obsMapPickVisibleStations() {
             interactive: false,
           });
           wrfQpfPendingOverlay = candidate;
-          await new Promise((resolve, reject) => {
-            let settled = false;
-            const finish = (ok) => {
-              if (settled) return;
-              settled = true;
-              ok ? resolve() : reject(new Error("圖層顯示失敗"));
-            };
-            candidate.once("load", () => finish(true));
-            candidate.once("error", () => finish(false));
-            candidate.addTo(wrfQpfMap);
-            requestAnimationFrame(() => {
-              const el = candidate.getElement?.();
-              if (el?.complete && el.naturalWidth) finish(true);
-            });
-          });
+          await waitForOverlay(candidate,wrfQpfMap);
           if (seq !== wrfQpfLayerLoadSeq) {
             try {
               wrfQpfMap.removeLayer(candidate);
@@ -6111,7 +6002,7 @@ function obsMapPickVisibleStations() {
           wrfQpfDisplayedKey = key;
           wrfQpfDisplayedUrl = imageUrl;
           wrfQpfPendingOverlay = null;
-          requestAnimationFrame(() => candidate.setOpacity(opacity));
+          requestAnimationFrame(() => { if(seq===wrfQpfLayerLoadSeq) candidate.setOpacity(clamp(strictNumber($("wrfQpfOpacity")?.value)||0.78,0.25,1)); });
           if (previousOverlay && previousOverlay !== candidate) {
             setTimeout(() => {
               try {
@@ -6135,19 +6026,20 @@ function obsMapPickVisibleStations() {
               ? ``
               : "高解析度圖資已載入";
           if ($("wrfQpfValidTime"))
-            $("wrfQpfValidTime").textContent =
-              ``;
+            $("wrfQpfValidTime").textContent = "預報時間："+formatWrfQpfTime(layer.valid_from)+" ～ "+formatWrfQpfTime(layer.valid_to);
           if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
           setTimeout(updateWrfQpfLocationMarker, 60);
           preloadWrfQpfNeighbours(layer);
         } catch (error) {
-          if (seq !== wrfQpfLayerLoadSeq) return;
           if (candidate) {
             try {
               wrfQpfMap.removeLayer(candidate);
             } catch {}
           }
           if (wrfQpfPendingOverlay === candidate) wrfQpfPendingOverlay = null;
+          if(seq!==wrfQpfLayerLoadSeq)return;
+          wrfQpfSelectedKey=wrfQpfDisplayedKey;
+          document.querySelectorAll(".wrf-qpf-time-btn").forEach(btn=>btn.classList.toggle("on",btn.dataset.wrfQpfKey===wrfQpfDisplayedKey));
           console.warn("[WRF QPF image]", error);
           if ($("wrfQpfStatus"))
             $("wrfQpfStatus").textContent = `圖資載入失敗：${error.message || error}`;
@@ -6161,6 +6053,11 @@ function obsMapPickVisibleStations() {
         if (!box) return;
         box.replaceChildren();
         if (!layers.length) {
+          wrfQpfLayerLoadSeq++;wrfQpfPreloadSeq++;
+          for(const layer of [wrfQpfOverlay,wrfQpfPendingOverlay]) if(layer&&wrfQpfMap)wrfQpfMap.removeLayer(layer);
+          wrfQpfOverlay=null;wrfQpfPendingOverlay=null;wrfQpfSelectedKey="";wrfQpfDisplayedKey="";wrfQpfDisplayedUrl="";
+          if($("wrfQpfValidTime"))$("wrfQpfValidTime").textContent="預報時間：--";
+          setWrfQpfLoadingUi("",false);
           box.innerHTML = '<div class="forecast-empty">此累積時距沒有可用圖層</div>';
           return;
         }
@@ -6246,15 +6143,12 @@ function obsMapPickVisibleStations() {
         }
         if ($("wrfQpfStatus")) $("wrfQpfStatus").textContent = "正在讀取最新模式資料…";
         try {
-          const response = await fetch(
-            `${WRF_QPF_CURRENT_URL}?t=${Date.now()}`,
-            { cache: "no-store" },
-          );
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const manifest = await response.json();
+          const manifest = await fetchJson(WRF_QPF_CURRENT_URL+"?t="+Date.now(),15000);
           if (seq !== wrfQpfLoadSeq) return;
           if (!manifest || !Array.isArray(manifest.layers) || !manifest.layers.length)
             throw new Error("current.json 沒有可用圖層");
+          manifest.layers=manifest.layers.filter(l=>l&&validMapBounds(l.leaflet_bounds)&&typeof l.url==="string"&&l.url.trim());
+          if(!manifest.layers.length) throw new Error("圖層範圍或網址無效");
           wrfQpfManifest = manifest;
           initWrfQpfMap();
           updateWrfQpfDurationButtons();
@@ -6306,8 +6200,7 @@ function obsMapPickVisibleStations() {
           );
           if (wrfQpfOverlay) wrfQpfOverlay.setOpacity(opacity);
         });
-        initWrfQpfMap();
-        loadWrfQpfManifest({ fit: true });
+        if(currentWeatherPage==="forecast") {initWrfQpfMap();loadWrfQpfManifest({fit:true});}
       }
 
       const imageLightboxState = {
@@ -6363,19 +6256,15 @@ function obsMapPickVisibleStations() {
         modal.setAttribute("aria-hidden", "true");
         document.body.classList.remove("image-lightbox-open");
         imageLightboxState.pointers.clear();
+        $("imageLightboxStage")?.classList.remove("dragging");resetImageLightboxTransform();
         if (img) img.removeAttribute("src");
       }
       function installImageLightbox() {
-        const obs = $("obsAssetImg"),
-          modal = $("imageLightbox"),
+        const modal = $("imageLightbox"),
           stage = $("imageLightboxStage"),
           img = $("imageLightboxImg");
         if (!modal || !stage || !img) return;
-        if (obs)
-          obs.addEventListener("click", () => {
-            const l = OBS_ASSET_LAYERS[currentObsAssetKey] || OBS_ASSET_LAYERS.radar_tw;
-            openImageLightbox(obs.currentSrc || obs.src, l.title, l.note);
-          });
+
         if ($("imageLightboxClose")) $("imageLightboxClose").addEventListener("click", closeImageLightbox);
         modal.addEventListener("click", (e) => {
           if (e.target === modal) closeImageLightbox();
@@ -6434,6 +6323,7 @@ function obsMapPickVisibleStations() {
           try {
             stage.releasePointerCapture(e.pointerId);
           } catch {}
+          if(imageLightboxState.pointers.size===1) {const p=[...imageLightboxState.pointers.values()][0];imageLightboxState.dragStart={...p};imageLightboxState.startTx=imageLightboxState.tx;imageLightboxState.startTy=imageLightboxState.ty;}
           if (!imageLightboxState.pointers.size) {
             stage.classList.remove("dragging");
             if (imageLightboxState.scale <= 1.02) resetImageLightboxTransform();
@@ -6511,6 +6401,7 @@ function obsMapPickVisibleStations() {
           shouldScrollTop = options.scrollTop !== false,
           changed = currentWeatherPage !== page;
         currentWeatherPage = page;
+        document.querySelectorAll(".interface-page").forEach(el=>{const active=el.classList.contains("interface-"+page);el.inert=!active;el.setAttribute("aria-hidden",String(!active));});
         document.body.dataset.page = page;
         setTrackPosition(WEATHER_PAGES.indexOf(page), 0, animate);
         document
@@ -6525,6 +6416,7 @@ function obsMapPickVisibleStations() {
           setTimeout(() => {
             initQpfForecastMap();
             initWrfQpfMap();
+            if(!wrfQpfManifest) loadWrfQpfManifest({fit:true});
             if (qpfMap) {
               qpfMap.invalidateSize();
               updateQpfLocationMarker();
@@ -6753,21 +6645,15 @@ function obsMapPickVisibleStations() {
         }
       }
       function scheduleAutoRefresh(delay = AUTO_REFRESH_MS) {
-        clearAutoRefresh();
-        autoRefreshTimer = setTimeout(async () => {
-          if (weatherRefreshBusy || rainQueryBusy || !lastTarget) {
-            scheduleAutoRefresh();
-            return;
-          }
-          await runCurrentMode({ fromAuto: true });
-        }, delay);
-      }
+  clearAutoRefresh(); if(document.hidden || !lastTarget) return;
+  autoRefreshTimer=setTimeout(async()=>{ if(weatherRefreshBusy||rainQueryBusy) {scheduleAutoRefresh(); return;} await runCurrentMode({fromAuto:true}); },Math.max(1000,delay));
+}
       function resetAutoRefreshCountdown() {
         if (!lastTarget) return;
         const now = Date.now();
         if (now - lastAutoRefreshResetAt < 800) return;
         lastAutoRefreshResetAt = now;
-        scheduleAutoRefresh();
+        scheduleAutoRefresh(Math.min(AUTO_REFRESH_MS, Math.max(1000, 2*AUTO_REFRESH_MS - (now-lastWeatherRefreshAt))));
       }
       function installAutoRefreshActivityReset() {
         const opts = { passive: true };
@@ -6775,7 +6661,7 @@ function obsMapPickVisibleStations() {
           window.addEventListener(ev, resetAutoRefreshCountdown, opts),
         );
         document.addEventListener("visibilitychange", () => {
-          if (!document.hidden) resetAutoRefreshCountdown();
+          if (document.hidden) clearAutoRefresh(); else if(lastTarget) scheduleAutoRefresh(Math.max(1000,AUTO_REFRESH_MS-(Date.now()-lastWeatherRefreshAt)));
         });
       }
       function setRefreshBusy(busy, label = "更新") {
@@ -6886,9 +6772,9 @@ function obsMapPickVisibleStations() {
           8000,
         );
         if (!Array.isArray(arr) || !arr.length) throw new Error("找不到地點");
-        const lat = Number(arr[0].lat),
-          lon = Number(arr[0].lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("座標錯誤");
+        const lat = strictNumber(arr[0].lat),
+          lon = strictNumber(arr[0].lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180) throw new Error("座標錯誤");
         return { lat, lon, label: (arr[0].display_name || query).split(",")[0].trim() || query };
       }
       async function geocodeTownOfficeTaiwan(name) {
@@ -6898,31 +6784,14 @@ function obsMapPickVisibleStations() {
           return await geocodePlaceGlobal(`台灣 ${name}`);
         }
       }
-      async function getElevation(lat, lon, alt) {
-        if (Number.isFinite(Number(alt))) return Number(alt);
-        const key = `${Number(lat).toFixed(5)},${Number(lon).toFixed(5)}`;
-        if (elevationCache.has(key)) return elevationCache.get(key);
-        try {
-          const d = await fetchJson(
-            `${ELEVATION_PROXY}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,
-            7000,
-          );
-          const h = Number(d?.elevation);
-          if (Number.isFinite(h) && h !== -32768) {
-            elevationCache.set(key, h);
-            return h;
-          }
-        } catch {}
-        try {
-          const d = await fetchJson(`${OM_ELEVATION}?latitude=${lat}&longitude=${lon}`, 7000);
-          const h = Number(d?.elevation?.[0]);
-          const v = Number.isFinite(h) ? h : 0;
-          elevationCache.set(key, v);
-          return v;
-        } catch {
-          return 0;
-        }
-      }
+      async function getElevation(lat,lon,alt) {
+  const manual=strictNumber(alt); if(Number.isFinite(manual)) return manual;
+  const key=lat.toFixed(5)+","+lon.toFixed(5);
+  if(elevationCache.has(key)) return elevationCache.get(key);
+  const urls=[ELEVATION_PROXY+"?lat="+lat+"&lon="+lon,OM_ELEVATION+"?latitude="+lat+"&longitude="+lon];
+  for(const url of urls) try { const d=await fetchJson(url,7000); const h=strictNumber(Array.isArray(d?.elevation)?d.elevation[0]:d?.elevation); if(h>=-500 && h<=10000) { if(elevationCache.size>=256) elevationCache.delete(elevationCache.keys().next().value); elevationCache.set(key,h); return h; } } catch {}
+  return NaN;
+}
 
       const DIR16 = [
         "北風",
@@ -6943,11 +6812,11 @@ function obsMapPickVisibleStations() {
         "北北西風",
       ];
       function degToDir16(deg) {
-        if (!Number.isFinite(Number(deg))) return "--";
-        return DIR16[Math.round((((Number(deg) % 360) + 360) % 360) / 22.5) % 16];
+        if (!Number.isFinite(strictNumber(deg))) return "--";
+        return DIR16[Math.round((((strictNumber(deg) % 360) + 360) % 360) / 22.5) % 16];
       }
       function omCodeToTextIcon(code, isNight = false) {
-        const c = Number(code);
+        const c = strictNumber(code);
         if (c === 0) return { text: "晴", icon: isNight ? "🌙" : "☀" };
         if (c === 1) return { text: "大致晴朗", icon: isNight ? "🌙" : "🌤" };
         if (c === 2) return { text: "局部多雲", icon: isNight ? "☁" : "⛅" };
@@ -6963,17 +6832,7 @@ function obsMapPickVisibleStations() {
         if ([96, 99].includes(c)) return { text: "雷雨／冰雹", icon: "⛈" };
         return { text: "天氣不明", icon: "？" };
       }
-      function mapWeatherToIcon(text, isNight = false) {
-        const s = String(text || "");
-        if (s.includes("雷")) return "⛈";
-        if (s.includes("雪")) return "❄";
-        if (s.includes("雨")) return s.includes("陣") && !isNight ? "🌦" : "🌧";
-        if (s.includes("霧")) return "🌫";
-        if (s.includes("陰")) return "☁";
-        if (s.includes("多雲")) return isNight ? "☁" : "⛅";
-        if (s.includes("晴")) return isNight ? "🌙" : "☀";
-        return isNight ? "🌙" : "⛅";
-      }
+      function mapWeatherToIcon(text,isNight=false) {const s=String(text||"");if(s.includes("雷"))return "⛈";if(s.includes("雪"))return "❄";if(s.includes("雨")||s.includes("有降水"))return "🌧";if(s.includes("霧"))return "🌫";if(s.includes("陰"))return "☁";if(s.includes("多雲"))return isNight?"☁":"⛅";if(s.includes("晴"))return isNight?"🌙":"☀";return "？";}
       function canUseTimeZone(timeZone) {
         try {
           new Intl.DateTimeFormat("en-US", { timeZone }).format();
@@ -7004,7 +6863,7 @@ function obsMapPickVisibleStations() {
       function getTargetUtcOffsetMinutes(ts) {
         const p = getTargetDateTimeParts(ts);
         const shownAsUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
-        return Math.round((shownAsUtc - ts) / 60000);
+        return Math.round((shownAsUtc - Math.floor(ts / 60000) * 60000) / 60000);
       }
       function normalizeSolarHour(hour) {
         return ((hour % 24) + 24) % 24;
@@ -7015,6 +6874,7 @@ function obsMapPickVisibleStations() {
           deg = (radians) => (radians * 180) / Math.PI,
           dayOfYear = Math.floor((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 0)) / 86400000),
           longitudeHour = lon / 15;
+        let polarDay = false, polarNight = false;
         const one = (isRise) => {
           const t = dayOfYear + ((isRise ? 6 : 18) - longitudeHour) / 24;
           const meanAnomaly = 0.9856 * t - 3.289;
@@ -7030,12 +6890,12 @@ function obsMapPickVisibleStations() {
             cosHour =
               (Math.cos(rad(90.833)) - sinDeclination * Math.sin(rad(lat))) /
               (cosDeclination * Math.cos(rad(lat)));
-          if (cosHour > 1 || cosHour < -1) return NaN;
+          if (cosHour > 1 || cosHour < -1) { polarDay = cosHour < -1; polarNight = cosHour > 1; return NaN; }
           const hourAngle = (isRise ? 360 - deg(Math.acos(cosHour)) : deg(Math.acos(cosHour))) / 15,
             utcHour = hourAngle + rightAscension - 0.06571 * t - 6.622 - longitudeHour;
           return normalizeSolarHour(utcHour + utcOffsetMinutes / 60);
         };
-        return { sunriseHour: one(true), sunsetHour: one(false) };
+        const sunriseHour=one(true), sunsetHour=one(false); return { sunriseHour, sunsetHour, polarDay, polarNight };
       }
       function getSunHoursForTs(ts = Date.now()) {
         const p = getTargetDateTimeParts(ts),
@@ -7055,10 +6915,12 @@ function obsMapPickVisibleStations() {
         return p.hour + p.minute / 60;
       }
       function isNightAt(ts = Date.now()) {
-        const hour = getTargetHour(ts),
-          { sunriseHour, sunsetHour } = getSunHoursForTs(ts);
-        return !Number.isFinite(sunriseHour) || !Number.isFinite(sunsetHour) || hour < sunriseHour || hour >= sunsetHour;
-      }
+  const hour=getTargetHour(ts), sun=getSunHoursForTs(ts);
+  if(sun.polarDay) return false; if(sun.polarNight) return true;
+  const {sunriseHour:r,sunsetHour:s}=sun;
+  if(!Number.isFinite(r)||!Number.isFinite(s)) return hour<6||hour>=18;
+  return r<=s ? hour<r||hour>=s : hour>=s&&hour<r;
+}
       function getScene({ weatherText = "", ts = Date.now(), rain = 0, cloud = 0, visibility = 20 }) {
         const s = String(weatherText);
         const hour = getTargetHour(ts),
@@ -7419,9 +7281,9 @@ function obsMapPickVisibleStations() {
         queueEnvironmentSummaryRender();
       }
       function setPressureValues(local, sea, alt) {
-        local = Number(local);
-        sea = Number(sea);
-        alt = Number(alt);
+        local = strictNumber(local);
+        sea = strictNumber(sea);
+        alt = strictNumber(alt);
         if (!Number.isFinite(sea) && Number.isFinite(local) && Number.isFinite(alt))
           sea = seaLevelPressureFromStation(local, alt);
         if (!Number.isFinite(local) && Number.isFinite(sea) && Number.isFinite(alt))
@@ -7448,11 +7310,7 @@ function obsMapPickVisibleStations() {
         renderPressurePill();
       }
 
-      function backendNumber(v) {
-        if (v === null || v === undefined || v === "") return NaN;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : NaN;
-      }
+      function backendNumber(v) { return strictNumber(v); }
       function formatVisibilityForUi(v) {
         const s = String(v ?? "").trim();
         if (!s || s === "--") return "--";
@@ -7472,11 +7330,7 @@ function obsMapPickVisibleStations() {
         if (data?.provider === "open-meteo-backend") return "Open-Meteo";
         return data?.provider || "整合後端";
       }
-      function formatObsTimeHHMM(v) {
-        const d = new Date(v);
-        if (Number.isNaN(d.getTime())) return "";
-        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-      }
+      function formatObsTimeHHMM(v) { const ts=parseBackendForecastTs(v); return Number.isFinite(ts)?fmtHHMM(ts):""; }
       function getStationArray(data) {
         for (const arr of [
           data?.realtime?.stationDebug?.stations,
@@ -7747,14 +7601,9 @@ function obsMapPickVisibleStations() {
       }
 
       function parseBackendForecastTs(v, dateOnly = false) {
-        if (typeof v === "number" && Number.isFinite(v)) return v;
-        let s = String(v ?? "").trim();
-        if (!s) return NaN;
-        if (/^\d{10,}$/.test(s)) return Number(s);
-        if (dateOnly && /^\d{4}-\d{2}-\d{2}$/.test(s)) s += "T12:00:00";
-        const ts = Date.parse(s);
-        return Number.isFinite(ts) ? ts : NaN;
-      }
+  if(dateOnly && typeof v==="string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) v += "T12:00:00";
+  return weatherTimestamp(v,480,solarTargetTimeZone);
+}
       function normalizeBackendForecastHourlyItem(i) {
         const windDirection = backendNumber(
             i?.windDirection ?? i?.wind_direction ?? i?.wind_direction_10m,
@@ -7789,8 +7638,8 @@ function obsMapPickVisibleStations() {
           pop: backendNumber(i?.pop ?? i?.precipitation_probability),
           wx: String(i?.wx ?? i?.condition ?? i?.weather ?? "").trim(),
           _icon: String(i?.icon ?? i?._icon ?? "").trim(),
-          _code: Number.isFinite(Number(i?.code ?? i?.weather_code))
-            ? Number(i?.code ?? i?.weather_code)
+          _code: Number.isFinite(backendNumber(i?.code ?? i?.weather_code))
+            ? backendNumber(i?.code ?? i?.weather_code)
             : null,
         };
       }
@@ -7803,12 +7652,12 @@ function obsMapPickVisibleStations() {
           dow: String(
             i?.dow ??
               i?.weekday ??
-              (d ? ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][d.getDay()] : "--"),
+              (d ? ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][new Date(dateKey+"T12:00:00Z").getUTCDay()] : "--"),
           ),
           wx: String(i?.wx ?? i?.condition ?? i?.weather ?? "").trim(),
           _icon: String(i?.icon ?? i?._icon ?? "").trim(),
-          _code: Number.isFinite(Number(i?.code ?? i?.weather_code))
-            ? Number(i?.code ?? i?.weather_code)
+          _code: Number.isFinite(backendNumber(i?.code ?? i?.weather_code))
+            ? backendNumber(i?.code ?? i?.weather_code)
             : null,
           pop: backendNumber(i?.pop ?? i?.precipitation_probability),
           minT: backendNumber(i?.minT ?? i?.temperature_2m_min),
@@ -7914,6 +7763,7 @@ function obsMapPickVisibleStations() {
         modal.classList.add("open");
         modal.setAttribute("aria-hidden", "false");
         document.body.classList.add("hourly-detail-open");
+        const app=document.querySelector(".app");if(app&&!app.contains(modal))app.inert=true;
         requestAnimationFrame(() => modal.querySelector(".hourly-detail-sheet")?.focus());
       }
       function closeHourlyDetail({ restoreFocus = true } = {}) {
@@ -7922,12 +7772,14 @@ function obsMapPickVisibleStations() {
         modal.classList.remove("open");
         modal.setAttribute("aria-hidden", "true");
         document.body.classList.remove("hourly-detail-open");
+        const app=document.querySelector(".app");if(app)app.inert=false;
         selectedHourlyDetailTs = null;
         document.querySelectorAll(".forecast-item.is-selected").forEach((el) =>
           el.classList.remove("is-selected"),
         );
         if (restoreFocus && hourlyDetailReturnFocus?.focus) {
-          setTimeout(() => hourlyDetailReturnFocus.focus(), 0);
+          const target = hourlyDetailReturnFocus;
+          setTimeout(() => { if(target.isConnected !== false) target.focus(); }, 0);
         }
         hourlyDetailReturnFocus = null;
       }
@@ -7939,6 +7791,7 @@ function obsMapPickVisibleStations() {
         );
         $("hourlyDetailClose")?.addEventListener("click", () => closeHourlyDetail());
         document.addEventListener("keydown", (e) => {
+          if(e.key==="Tab"&&modal.classList.contains("open")){const items=[...modal.querySelectorAll('button:not([disabled]),a[href],input:not([disabled]),[tabindex="0"]')].filter(x=>!x.hidden);const first=items[0]||modal.querySelector(".hourly-detail-sheet"),last=items.at(-1)||first;if(first&&(e.shiftKey?(document.activeElement===first||!items.includes(document.activeElement)):(document.activeElement===last||!items.includes(document.activeElement)))){e.preventDefault();(e.shiftKey?last:first).focus();}}
           if (e.key === "Escape" && modal.classList.contains("open")) closeHourlyDetail();
         });
       }
@@ -7959,14 +7812,14 @@ function obsMapPickVisibleStations() {
                 : p._icon || mapWeatherToIcon(p.wx, rowNight),
             item = document.createElement("button");
           item.type = "button";
-          item.className = `forecast-item ${i === 0 ? "is-now" : ""} ${
+          item.className = `forecast-item ${Math.abs(p.ts - Date.now()) < 60000 ? "is-now" : ""} ${
             selectedHourlyDetailTs === p.ts ? "is-selected" : ""
           }`;
           item.setAttribute(
             "aria-label",
-            `${i === 0 ? "現在" : fmtHHMM(p.ts)}，${p.wx || "天氣預報"}，${Number.isFinite(p.temp) ? p.temp.toFixed(1) + "度" : "溫度無資料"}，點擊查看詳細資料`,
+            `${Math.abs(p.ts - Date.now()) < 60000 ? "現在" : fmtHHMM(p.ts)}，${p.wx || "天氣預報"}，${Number.isFinite(p.temp) ? p.temp.toFixed(1) + "度" : "溫度無資料"}，點擊查看詳細資料`,
           );
-          item.innerHTML = `<div class="fi-time">${i === 0 ? "現在" : fmtHHMM(p.ts)}</div><div class="fi-icon">${icon}</div><div class="fi-temp">${Number.isFinite(p.temp) ? (forecastMode === "10m" ? p.temp.toFixed(1) : Math.round(p.temp)) : "--"}°</div><div class="fi-sub">體感 ${Number.isFinite(p.at) ? (forecastMode === "10m" ? p.at.toFixed(1) : Math.round(p.at)) : "--"}°</div>${Number.isFinite(p.pop) ? `<div class="fi-pop">${Math.round(p.pop)}%</div>` : ""}`;
+          item.innerHTML = `<div class="fi-time">${Math.abs(p.ts - Date.now()) < 60000 ? "現在" : fmtHHMM(p.ts)}</div><div class="fi-icon">${escapeHtml(icon)}</div><div class="fi-temp">${Number.isFinite(p.temp) ? (forecastMode === "10m" ? p.temp.toFixed(1) : Math.round(p.temp)) : "--"}°</div><div class="fi-sub">體感 ${Number.isFinite(p.at) ? (forecastMode === "10m" ? p.at.toFixed(1) : Math.round(p.at)) : "--"}°</div>${Number.isFinite(p.pop) ? `<div class="fi-pop">${Math.round(p.pop)}%</div>` : ""}`;
           item.addEventListener("click", () => openHourlyDetail(p, forecastMode, item));
           box.appendChild(item);
         });
@@ -7988,29 +7841,23 @@ function obsMapPickVisibleStations() {
                 : mapWeatherToIcon(d.wx, false)),
             row = document.createElement("div");
           row.className = "daily-row";
-          row.innerHTML = `<div class="dr-left">${d.dow}</div><div class="dr-mid"><span class="dr-icon">${icon}</span><span class="dr-wx">${d.wx || "--"}</span></div><div class="dr-right"><div class="dr-temp"><span class="dr-min">${Number.isFinite(min) ? Math.round(min) + "°" : "--"}</span><span class="dr-max">${Number.isFinite(max) ? Math.round(max) + "°" : "--"}</span></div><div class="dr-pop"><span class="dr-pop-pill">${Number.isFinite(d.pop) ? Math.round(d.pop) + "%" : "--"}</span></div></div>`;
+          row.innerHTML = `<div class="dr-left">${escapeHtml(d.dow)}</div><div class="dr-mid"><span class="dr-icon">${escapeHtml(icon)}</span><span class="dr-wx">${escapeHtml(d.wx || "--")}</span></div><div class="dr-right"><div class="dr-temp"><span class="dr-min">${Number.isFinite(min) ? Math.round(min) + "°" : "--"}</span><span class="dr-max">${Number.isFinite(max) ? Math.round(max) + "°" : "--"}</span></div><div class="dr-pop"><span class="dr-pop-pill">${Number.isFinite(d.pop) ? Math.round(d.pop) + "%" : "--"}</span></div></div>`;
           box.appendChild(row);
         });
       }
       function renderBackendForecastIfAvailable(data) {
-        const fc = data?.forecast || data?.forecastData;
-        if (!fc || fc.ok === false) return false;
-        const h10 = (fc.hourly10m || fc.hourly_10m || fc.hourly_10min || [])
-            .map(normalizeBackendForecastHourlyItem)
-            .filter((x) => Number.isFinite(x.ts)),
-          h1 = (fc.hourly1h || fc.hourly_1h || fc.hourly || [])
-            .map(normalizeBackendForecastHourlyItem)
-            .filter((x) => Number.isFinite(x.ts)),
-          d7 = (fc.daily7 || fc.daily_7 || fc.daily || []).map(normalizeBackendForecastDailyItem);
-        if (!h10.length && !h1.length && !d7.length) return false;
-        hourly10m = h10.length ? h10 : h1;
-        hourly1h = h1.length ? h1 : h10.filter((_, i) => i % 6 === 0).slice(0, 24);
-        daily7 = d7;
-        $("fcTitle").textContent = fc.title || "未來 24 小時預報";
-        renderHourlyForecast();
-        renderDailyForecast();
-        return true;
-      }
+  const fc=data?.forecast||data?.forecastData; if(!fc||fc.ok===false) return false;
+  const arr=v=>Array.isArray(v)?v:[], now=Date.now();
+  const h10=cleanForecastHours(arr(fc.hourly10m||fc.hourly_10m||fc.hourly_10min).map(normalizeBackendForecastHourlyItem));
+  const h1=cleanForecastHours(arr(fc.hourly1h||fc.hourly_1h||fc.hourly).map(normalizeBackendForecastHourlyItem));
+  const days=arr(fc.daily7||fc.daily_7||fc.daily).map(normalizeBackendForecastDailyItem).filter(d=>Number.isFinite(parseBackendForecastTs(d.dateKey,true))&&d.dateKey>=weatherDateKey(now,solarTargetTimeZone));
+  hourly10m=h10.length?h10.filter(x=>x.ts>=now-60000).slice(0,144):interpolateForecastHours(h1,now);
+  hourly1h=(h1.length?h1:h10.filter(x=>getTargetDateTimeParts(x.ts).minute===0)).filter(x=>x.ts>=now-60000).slice(0,24);
+  daily7=[...new Map(days.sort((a,b)=>a.dateKey.localeCompare(b.dateKey)).map(x=>[x.dateKey,x])).values()].slice(0,7);
+  $("fcTitle").textContent=fc.title||"未來 24 小時預報";
+  renderHourlyForecast(); renderDailyForecast();
+  return !!(hourly10m.length && hourly1h.length && daily7.length);
+}
       function buildOpenMeteoUrl(lat, lon) {
         const p = new URLSearchParams({
           latitude: lat,
@@ -8020,8 +7867,9 @@ function obsMapPickVisibleStations() {
           hourly:
             "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover,visibility",
           current:
-            "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m",
+            "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m",
           timezone: "auto",
+          wind_speed_unit: "ms", timeformat: "unixtime",
         });
         return `${OM_FORECAST}?${p}`;
       }
@@ -8047,17 +7895,15 @@ function obsMapPickVisibleStations() {
       function renderOpenMeteoForecast(om, realtimeT, realtimeAT, targetAlt) {
         const h = om?.hourly,
           d = om?.daily;
-        if (!h?.time) return;
+        if (!Array.isArray(h?.time)) return;
         const now = Date.now(),
-          times = h.time.map(Date.parse),
-          start = Math.max(
-            0,
-            times.findIndex((ts) => ts >= now),
-          ),
+          times = h.time.map(t=>weatherTimestamp(t,strictNumber(om.utc_offset_seconds)/60||0,om.timezone)),
+          firstFuture = times.findIndex(ts=>ts>=now),
+          start = firstFuture < 0 ? times.length : Math.max(0,firstFuture-1),
           gridAlt = backendNumber(om.elevation),
-          dh = Number.isFinite(gridAlt) ? targetAlt - gridAlt : 0,
+          dh = Number.isFinite(gridAlt) && Number.isFinite(targetAlt) ? targetAlt - gridAlt : 0,
           all = [];
-        for (let i = start; i < Math.min(start + 25, times.length); i++) {
+        for (let i = start; i < Math.min(start + 26, times.length); i++) {
           const wx = omCodeToTextIcon(h.weather_code?.[i]);
           const windSpeed = backendNumber(h.wind_speed_10m?.[i]),
             windDirection = backendNumber(h.wind_direction_10m?.[i]);
@@ -8079,87 +7925,23 @@ function obsMapPickVisibleStations() {
             pop: backendNumber(h.precipitation_probability?.[i]),
             wx: wx.text,
             _icon: wx.icon,
-            _code: Number(h.weather_code?.[i]),
+            _code: backendNumber(h.weather_code?.[i]),
           });
         }
-        hourly1h = all.slice(0, 24);
-        hourly10m = [];
-        const start10 = Math.ceil(now / 600000) * 600000;
-        for (let i = 0; i < 144; i++) {
-          const ts = start10 + i * 600000;
-          let j = 0;
-          while (j < all.length - 1 && all[j + 1].ts < ts) j++;
-          const a = all[j],
-            b = all[Math.min(j + 1, all.length - 1)] || a;
-          if (!a) break;
-          const f = b.ts !== a.ts ? clamp((ts - a.ts) / (b.ts - a.ts), 0, 1) : 0;
-          const temp =
-              Number.isFinite(a.temp) && Number.isFinite(b.temp) ? a.temp + (b.temp - a.temp) * f : a.temp,
-            at = Number.isFinite(a.at) && Number.isFinite(b.at) ? a.at + (b.at - a.at) * f : a.at,
-            dewPoint =
-              Number.isFinite(a.dewPoint) && Number.isFinite(b.dewPoint)
-                ? a.dewPoint + (b.dewPoint - a.dewPoint) * f
-                : a.dewPoint,
-            humidity =
-              Number.isFinite(a.humidity) && Number.isFinite(b.humidity)
-                ? a.humidity + (b.humidity - a.humidity) * f
-                : a.humidity,
-            speedA = a.windSpeed,
-            speedB = b.windSpeed,
-            dirA = a.windDirection,
-            dirB = b.windDirection;
-          let windSpeed = a.windSpeed,
-            windDirection = a.windDirection;
-          if (
-            Number.isFinite(speedA) &&
-            Number.isFinite(speedB) &&
-            Number.isFinite(dirA) &&
-            Number.isFinite(dirB)
-          ) {
-            const ra = (dirA * Math.PI) / 180,
-              rb = (dirB * Math.PI) / 180,
-              ua = -speedA * Math.sin(ra),
-              va = -speedA * Math.cos(ra),
-              ub = -speedB * Math.sin(rb),
-              vb = -speedB * Math.cos(rb),
-              u = ua + (ub - ua) * f,
-              v = va + (vb - va) * f;
-            windSpeed = Math.hypot(u, v);
-            windDirection = ((Math.atan2(-u, -v) * 180) / Math.PI + 360) % 360;
-          }
-          const windDirectionText = Number.isFinite(windDirection) ? degToDir16(windDirection) : "";
-          hourly10m.push({
-            ts,
-            temp,
-            at,
-            dewPoint,
-            humidity,
-            windSpeed,
-            windDirection,
-            windDirectionText,
-            windText: Number.isFinite(windSpeed)
-              ? `${windDirectionText || "--"} ${windSpeed.toFixed(1)} m/s`
-              : "",
-            comfort: a.comfort,
-            weatherDescription: a.weatherDescription,
-            primaryPoint: a.primaryPoint,
-            pop: a.pop,
-            wx: a.wx,
-            _icon: a._icon,
-            _code: a._code,
-          });
-        }
+        hourly1h = all.filter(x=>x.ts>=now-60000).slice(0,24);
+        hourly10m = interpolateForecastHours(all, now);
         daily7 = [];
         if (d?.time)
           for (let i = 0; i < Math.min(7, d.time.length); i++) {
             const wx = omCodeToTextIcon(d.weather_code?.[i]),
-              dd = new Date(d.time[i] + "T12:00:00");
+              dateKey=weatherDateKey(d.time[i],om.timezone,om.utc_offset_seconds),dd=new Date(dateKey+"T12:00:00Z");
+            if(!dateKey||dateKey<weatherDateKey(now,om.timezone,om.utc_offset_seconds))continue;
             daily7.push({
-              dateKey: d.time[i],
-              dow: ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][dd.getDay()],
+              dateKey,
+              dow: ["週日", "週一", "週二", "週三", "週四", "週五", "週六"][dd.getUTCDay()],
               wx: wx.text,
               _icon: wx.icon,
-              _code: Number(d.weather_code?.[i]),
+              _code: backendNumber(d.weather_code?.[i]),
               pop: backendNumber(d.precipitation_probability_mean?.[i]),
               minT: backendNumber(d.temperature_2m_min?.[i]) - LR_STD * dh,
               maxT: backendNumber(d.temperature_2m_max?.[i]) - LR_STD * dh,
@@ -8175,12 +7957,12 @@ function obsMapPickVisibleStations() {
         const u = new URL(WEATHER_FULL_ENDPOINT);
         u.searchParams.set("lat", lat);
         u.searchParams.set("lon", lon);
-        u.searchParams.set("alt", Number.isFinite(Number(alt)) ? Number(alt) : "auto");
+        u.searchParams.set("alt", Number.isFinite(strictNumber(alt)) ? strictNumber(alt) : "auto");
         u.searchParams.set("forecast", "1");
         if (extra.county) u.searchParams.set("county", extra.county);
         if (extra.district) u.searchParams.set("district", extra.district);
         if (extra.label) u.searchParams.set("label", extra.label);
-        const d = await fetchJson(u.toString(), 10000);
+        const d = await fetchJson(u.toString(), 45000);
         if (!d || d.ok !== true) throw new Error(d?.error || "整合後端失敗");
         return d;
       }
@@ -8282,7 +8064,7 @@ function obsMapPickVisibleStations() {
       function renderOpenMeteoRealtime(om, targetAlt, label) {
         const c = om?.current || {},
           gridAlt = backendNumber(om?.elevation),
-          dh = Number.isFinite(gridAlt) ? targetAlt - gridAlt : 0,
+          dh = Number.isFinite(gridAlt) && Number.isFinite(targetAlt) ? targetAlt - gridAlt : 0,
           T0 = backendNumber(c.temperature_2m),
           AT0 = backendNumber(c.apparent_temperature),
           temp = Number.isFinite(T0) ? T0 - LR_STD * dh : NaN,
@@ -8291,7 +8073,7 @@ function obsMapPickVisibleStations() {
           wx = omCodeToTextIcon(c.weather_code, night),
           p = backendNumber(c.surface_pressure),
           local = Number.isFinite(p)
-            ? Number.isFinite(gridAlt)
+            ? Number.isFinite(gridAlt) && Number.isFinite(targetAlt)
               ? pressureAtHeightFromSeaLevel(seaLevelPressureFromStation(p, gridAlt), targetAlt)
               : p
             : NaN;
@@ -8307,8 +8089,8 @@ function obsMapPickVisibleStations() {
           `風 <b>${Number.isFinite(wind) ? wind.toFixed(1) + " m/s " + degToDir16(dir) : "--"}</b>`;
         $("mHum").innerHTML = `相對濕度 <b>${Number.isFinite(rh) ? Math.round(rh) + "%" : "--"}</b>`;
         $("mSun").innerHTML = "日照 <b>--</b>";
-        const vis = backendNumber(om?.hourly?.visibility?.[0]),
-          visKm = Number.isFinite(vis) ? (vis > 200 ? vis / 1000 : vis) : NaN;
+        const vis = backendNumber(om?.hourly?.visibility?.[omHourIndex(om)]),
+          visKm = Number.isFinite(vis) ? vis / 1000 : NaN;
         $("mVis").innerHTML = `能見度 <b>${Number.isFinite(visKm) ? visKm.toFixed(1) + " km" : "--"}</b>`;
         applyWindMetricColor($("mWind"), wind);
         setMetricHighlight($("mHum"), Number.isFinite(rh) && (rh >= 85 || rh <= 35), "#5aa9ff");
@@ -8350,95 +8132,45 @@ function obsMapPickVisibleStations() {
         return { temp, feels, condition: wx.text, rain10: NaN, rain1h: NaN, visibility: visKm, targetAlt };
       }
 
-      async function runAllForTarget(lat, lon, alt, labelHint, adminOverride = null) {
-        closeHourlyDetail({ restoreFocus: false });
-        setSolarTarget(lat, lon);
-        resetWeatherUi(lat, lon, labelHint);
-        const rg = await reverseGeocodePlace(lat, lon),
-          inTW = isInsideTaiwan(lat, lon);
-        let label = labelHint || rg.label || "目前位置";
-        if (inTW && adminOverride)
-          label = adminOverride.startsWith(rg.county)
-            ? adminOverride
-            : buildTaiwanLabel(rg.county, adminOverride, adminOverride);
-        $("locationName").textContent = label;
-        let targetAlt = Number.isFinite(Number(alt)) ? Number(alt) : await getElevation(lat, lon, alt);
-        $("altitudeLabel").textContent = `${Math.round(targetAlt)} m`;
-        let data = null,
-          om = null,
-          realtime = null;
-        try {
-          data = await fetchCwaFull(lat, lon, alt, {
-            county: rg.county || "",
-            district: adminOverride || rg.district || "",
-            label,
-          });
-        } catch (e) {
-          dbg("[/full] " + e.message);
-        }
-        if (data && !isBadBackendRealtime(data)) {
-          realtime = renderBackendRealtime(data, targetAlt);
-          targetAlt = realtime.targetAlt;
-          if (!renderBackendForecastIfAvailable(data)) {
-            try {
-              om = await fetchOpenMeteoAll(lat, lon);
-              setSolarTarget(lat, lon, om);
-              renderOpenMeteoForecast(om, realtime.temp, realtime.feels, targetAlt);
-              $("hintBar").textContent = "Open-Meteo（後端未提供預報時的備援）";
-            } catch {
-              $("hintBar").textContent = "預報暫時無法取得";
-            }
-          }
-        } else {
-          try {
-            om = await fetchOpenMeteoAll(lat, lon);
-            setSolarTarget(lat, lon, om);
-            realtime = renderOpenMeteoRealtime(om, targetAlt, label);
-            renderOpenMeteoForecast(om, realtime.temp, realtime.feels, targetAlt);
-          } catch (e) {
-            $("stationLabel").textContent = "即時資料與預報暫時無法取得";
-            $("hintBar").textContent = e.message || "取得失敗";
-            return;
-          }
-        }
-        if (!om) {
-          try {
-            om = await fetchOpenMeteoAll(lat, lon);
-          } catch {}
-        }
-        if (om) {
-          setSolarTarget(lat, lon, om);
-          renderHourlyForecast();
-        }
-        const now = Date.now(),
-          night = isNightAt(now),
-          cloud = backendNumber(om?.hourly?.cloud_cover?.[0]),
-          rain = Math.max(
-            Number.isFinite(realtime?.rain10) ? realtime.rain10 * 6 : 0,
-            Number.isFinite(realtime?.rain1h) ? realtime.rain1h : 0,
-          ),
-          scene = getScene({
-            weatherText: realtime?.condition || "",
-            ts: now,
-            rain,
-            cloud: Number.isFinite(cloud) ? cloud : 0,
-            visibility: realtime?.visibility,
-          });
-        applyScene(scene);
-        renderAtmosphereEffects({
-          scene,
-          cloud: Number.isFinite(cloud) ? cloud : 0,
-          weatherText: realtime?.condition || "",
-          rain,
-          isNight: night,
-        });
-        if (Number.isFinite(realtime?.temp)) applyTemperatureTint(realtime.temp);
-        $("weatherIcon").textContent = mapWeatherToIcon(realtime?.condition || "", night);
-        updateQpfLocationMarker();
-        updateWrfQpfLocationMarker();
-      }
+      async function runAllForTarget(lat,lon,alt,labelHint,adminOverride=null,seq=weatherRunSeq) {
+  assertWeatherRun(seq); closeHourlyDetail({restoreFocus:false}); setSolarTarget(lat,lon); resetWeatherUi(lat,lon,labelHint);
+  const rg=await reverseGeocodePlace(lat,lon); assertWeatherRun(seq);
+  let label=labelHint||rg.label||"目前位置";
+  if(isInsideTaiwan(lat,lon)&&adminOverride) label=adminOverride.startsWith(rg.county)?adminOverride:buildTaiwanLabel(rg.county,adminOverride,adminOverride);
+  $("locationName").textContent=label;
+  let targetAlt=strictNumber(alt),data=null,om=null,realtime=null;
+  try { data=await fetchCwaFull(lat,lon,alt,{county:rg.county||"",district:adminOverride||rg.district||"",label}); } catch(e) {dbg("[/full] "+e.message);}
+  assertWeatherRun(seq);
+  if(data && !isBadBackendRealtime(data)) {
+    const tz=data.forecast?.meta?.timezone||data.location?.timezone||data.realtime?.timezone;
+    setSolarTarget(lat,lon,{timezone:tz||"Asia/Taipei"});
+    realtime=renderBackendRealtime(data,targetAlt); targetAlt=realtime.targetAlt;
+    if(!renderBackendForecastIfAvailable(data)) {
+      const saved={h10:hourly10m,h1:hourly1h,days:daily7};
+      try {om=await fetchOpenMeteoAll(lat,lon); assertWeatherRun(seq); setSolarTarget(lat,lon,om); renderOpenMeteoForecast(om,realtime.temp,realtime.feels,targetAlt);
+        if(saved.h10.length) hourly10m=saved.h10; if(saved.h1.length) hourly1h=saved.h1; if(saved.days.length) daily7=saved.days;
+        renderHourlyForecast(); renderDailyForecast(); $("hintBar").textContent="缺少的預報區段以 Open-Meteo 補充";
+      } catch(e) {assertWeatherRun(seq); $("hintBar").textContent="部分預報暫時無法取得";}
+    }
+  } else {
+    const results=await Promise.all([fetchOpenMeteoAll(lat,lon),Number.isFinite(targetAlt)?Promise.resolve(targetAlt):getElevation(lat,lon,alt)]);
+    assertWeatherRun(seq); [om,targetAlt]=results;
+    if(!Number.isFinite(backendNumber(om?.current?.temperature_2m))) throw new Error("即時資料暫時無法取得");
+    setSolarTarget(lat,lon,om); realtime=renderOpenMeteoRealtime(om,targetAlt,label); renderOpenMeteoForecast(om,realtime.temp,realtime.feels,targetAlt);
+  }
+  assertWeatherRun(seq);
+  $("altitudeLabel").textContent=Number.isFinite(targetAlt)?Math.round(targetAlt)+" m":"高度無資料";
+  lastTarget={lat,lon,alt,label,adminOverride};
+  const now=Date.now(),night=isNightAt(now),cloud=backendNumber(data?.realtime?.cloudCover??om?.current?.cloud_cover??om?.hourly?.cloud_cover?.[omHourIndex(om)]),rain=Math.max(Number.isFinite(realtime?.rain10)?realtime.rain10*6:0,Number.isFinite(realtime?.rain1h)?realtime.rain1h:0);
+  const scene=getScene({weatherText:realtime?.condition||"",ts:now,rain,cloud:Number.isFinite(cloud)?cloud:0,visibility:realtime?.visibility});
+  applyScene(scene); renderAtmosphereEffects({scene,cloud:Number.isFinite(cloud)?cloud:0,weatherText:realtime?.condition||"",rain,isNight:night});
+  if(Number.isFinite(realtime?.temp)) applyTemperatureTint(realtime.temp);
+  $("weatherIcon").textContent=mapWeatherToIcon(realtime?.condition||"",night);
+  updateQpfLocationMarker(); updateWrfQpfLocationMarker(); updateObservationLocationMarker();
+}
 
       function updateModeUI() {
+        if(weatherRefreshBusy){weatherRunSeq++;setRefreshBusy(false);resetRainResult();showWeatherStatus("已切換查詢方式，請按更新取得資料");}
         const mode = document.querySelector('input[name="mode"]:checked')?.value || "gps";
         $("mode-town").style.display = mode === "town" ? "block" : "none";
         $("mode-coord").style.display = mode === "coord" ? "block" : "none";
@@ -8449,88 +8181,35 @@ function obsMapPickVisibleStations() {
       document
         .querySelectorAll('input[name="mode"]')
         .forEach((r) => r.addEventListener("change", updateModeUI));
-      async function runGpsMode() {
-        if (!navigator.geolocation) throw new Error("此裝置不支援定位");
-        return new Promise((resolve) =>
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-              const lat = pos.coords.latitude,
-                lon = pos.coords.longitude,
-                alt = Number.isFinite(pos.coords.altitude) ? pos.coords.altitude : "auto";
-              lastTarget = { lat, lon, alt, label: "", adminOverride: null };
-              try {
-                await runAllForTarget(lat, lon, alt, "", null);
-              } finally {
-                resolve();
-              }
-            },
-            (err) => {
-              $("stationLabel").textContent = "GPS 失敗：" + err.message;
-              resolve();
-            },
-            { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
-          ),
-        );
-      }
-      async function runTownMode() {
-        const name = $("townName").value.trim();
-        if (!name) {
-          $("stationLabel").textContent = "請輸入地點";
-          return;
-        }
-        const isTown = ["鄉", "鎮", "市", "區"].includes(name.at(-1));
-        const p = isTown ? await geocodeTownOfficeTaiwan(name) : await geocodePlaceGlobal(name);
-        lastTarget = {
-          lat: p.lat,
-          lon: p.lon,
-          alt: "auto",
-          label: p.label || name,
-          adminOverride: isTown ? name : null,
-        };
-        await runAllForTarget(p.lat, p.lon, "auto", p.label || name, isTown ? name : null);
-      }
-      async function runCoordMode() {
-        const lat = Number($("manualLat").value),
-          lon = Number($("manualLon").value),
-          altRaw = $("manualAlt").value.trim(),
-          alt = altRaw === "" ? "auto" : Number(altRaw);
-        if (
-          !Number.isFinite(lat) ||
-          !Number.isFinite(lon) ||
-          lat < -90 ||
-          lat > 90 ||
-          lon < -180 ||
-          lon > 180
-        ) {
-          $("stationLabel").textContent = "請輸入正確的緯度與經度";
-          return;
-        }
-        lastTarget = { lat, lon, alt, label: "自訂座標", adminOverride: null };
-        await runAllForTarget(lat, lon, alt, "自訂座標", null);
-      }
-      async function runCurrentMode(options = {}) {
-        if (weatherRefreshBusy) return;
-        clearAutoRefresh();
-        const seq = ++weatherRunSeq;
-        setRefreshBusy(true);
-        if (!options.fromAuto) resetRainResult();
-        try {
-          const mode = document.querySelector('input[name="mode"]:checked')?.value || "gps";
-          if (mode === "gps") await runGpsMode();
-          else if (mode === "town") await runTownMode();
-          else await runCoordMode();
-        } catch (e) {
-          console.error(e);
-          $("stationLabel").textContent = "更新失敗：" + (e.message || e);
-        } finally {
-          if (seq === weatherRunSeq) {
-            lastWeatherRefreshAt = Date.now();
-            setRefreshBusy(false);
-            refreshAllVisualLayers();
-            scheduleAutoRefresh();
-          }
-        }
-      }
+      async function runGpsMode(seq=weatherRunSeq) {
+  if(!navigator.geolocation) throw new Error("此裝置不支援定位");
+  const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:12000,maximumAge:30000}));
+  assertWeatherRun(seq);
+  const {latitude:lat,longitude:lon}=pos.coords, alt=Number.isFinite(pos.coords.altitude)?pos.coords.altitude:"auto";
+  return runAllForTarget(lat,lon,alt,"",null,seq);
+}
+      async function runTownMode(seq=weatherRunSeq) {
+  const name=$("townName").value.trim(); if(!name) throw new Error("請輸入地點");
+  const isTown=["鄉","鎮","市","區"].includes(name.at(-1));
+  let p;try {p=isTown?await geocodeTownOfficeTaiwan(name):await geocodePlaceGlobal(name);}catch(e){if(!isTown)throw e;p=await geocodePlaceGlobal(name);}
+  assertWeatherRun(seq); return runAllForTarget(p.lat,p.lon,"auto",p.label||name,isTown&&isInsideTaiwan(p.lat,p.lon)?name:null,seq);
+}
+      async function runCoordMode(seq=weatherRunSeq) {
+  const lat=strictNumber($("manualLat").value),lon=strictNumber($("manualLon").value),a=$("manualAlt").value.trim(),alt=a===""?"auto":strictNumber(a);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180) throw new Error("請輸入正確的緯度與經度");
+  if(alt!=="auto"&&(!Number.isFinite(alt)||alt< -500||alt>10000)) throw new Error("高度請輸入 -500 至 10000 公尺，或留空自動取得");
+  return runAllForTarget(lat,lon,alt,"自訂座標",null,seq);
+}
+      async function runCurrentMode(options={}) {
+  if(options.fromAuto && weatherRefreshBusy) return;
+  clearAutoRefresh(); const seq=++weatherRunSeq; setRefreshBusy(true); resetRainResult(); showWeatherStatus("正在取得位置與天氣…");
+  try {
+    if(options.fromAuto && lastTarget) {const t=lastTarget; await runAllForTarget(t.lat,t.lon,t.alt,t.label,t.adminOverride,seq);}
+    else {const mode=document.querySelector('input[name="mode"]:checked')?.value||"gps"; if(mode==="gps") await runGpsMode(seq); else if(mode==="town") await runTownMode(seq); else await runCoordMode(seq);}
+    assertWeatherRun(seq); lastWeatherRefreshAt=Date.now(); showWeatherStatus("");
+  } catch(e) { if(seq===weatherRunSeq && e?.name!=="AbortError") { showWeatherStatus("更新失敗："+(e.message||e)); dbg(e.message||String(e)); } }
+  finally {if(seq===weatherRunSeq) {setRefreshBusy(false); refreshAllVisualLayers(); scheduleAutoRefresh();}}
+}
       $("refreshBtn").onclick = runCurrentMode;
       ["townName", "manualLat", "manualLon", "manualAlt"].forEach((id) =>
         $(id)?.addEventListener("keydown", (e) => {
@@ -8596,63 +8275,12 @@ function obsMapPickVisibleStations() {
         return chips.join("");
       }
       function buildRainSummaryHtml(data, minutes) {
-        const m = clamp(Math.floor(Number(minutes) || 1), 1, 60),
-          raw = Array.isArray(data.series)
-            ? data.series
-            : Array.isArray(data.p60_series)
-              ? data.p60_series
-              : Array.isArray(data.mean_series)
-                ? data.mean_series
-                : [],
-          series = raw.slice(0, m).map((v) => Math.max(0, Number(v) || 0)),
-          total = Number.isFinite(Number(data.accum_mm))
-            ? Number(data.accum_mm)
-            : series.reduce((a, b) => a + b, 0),
-          rates = series.map((v) => v * 60),
-          peak = rates.length ? Math.max(...rates) : 0,
-          peakMinute = rates.indexOf(peak) + 1,
-          WET = 0.5,
-          currently = avgRain(series.slice(0, Math.min(3, series.length))) * 60 >= WET;
-        let first = -1,
-          last = -1;
-        rates.forEach((r, i) => {
-          if (r >= WET) {
-            if (first < 0) first = i;
-            last = i;
-          }
-        });
-        let stop = null;
-        if (last >= 0) {
-          let dry = 0;
-          for (let i = last + 1; i < rates.length; i++) {
-            if (rates[i] < WET) dry++;
-            else dry = 0;
-            if (dry >= 3) {
-              stop = i - 1;
-              break;
-            }
-          }
-        }
-        let main, detail;
-        if (peak < WET && total < 0.1) {
-          main = `未來 ${m} 分鐘無明顯降雨`;
-          detail = `根據最新資料，未來 ${m} 分鐘內沒有明顯降雨訊號。`;
-        } else if (currently) {
-          main = "目前正在下雨";
-          const peakText = peakMinute <= 3 ? "雨勢正在逐漸趨緩" : `約 ${peakMinute} 分鐘後雨勢相對明顯`,
-            stopText = stop !== null ? `預計 ${stop + 1} 分鐘後雨停` : `在 ${m} 分鐘內無雨停跡象`;
-          detail = `根據最新資料，${peakText}，且${stopText}。期間預估累積雨量 ${total.toFixed(1)} mm，最大雨強 ${peak.toFixed(1)} mm/h（${rainLevelText(peak)}）。`;
-        } else if (first >= 0) {
-          main = first + 1 <= 5 ? "未來 5 分鐘內即將開始下雨" : `約 ${first + 1} 分鐘後可能開始下雨`;
-          detail = `根據最新資料，${stop !== null ? `降雨將持續至第 ${stop + 1} 分鐘左右雨停` : `開始後，在 ${m} 分鐘內將持續有雨`}。約 ${peakMinute} 分鐘後雨勢最明顯，期間預估累積 ${total.toFixed(1)} mm，最大雨強 ${peak.toFixed(1)} mm/h（${rainLevelText(peak)}）。`;
-        } else {
-          main = `未來 ${m} 分鐘無明顯降雨`;
-          detail = `根據最新資料，仍有零星降雨，預估累積約 ${total.toFixed(1)} mm。`;
-        }
-        const radar = formatRadarTime(data.base_time, data.delay_minutes ?? data.bridge_minutes),
-          chips = buildRainTrendChips(series, m);
-        return `<div class="rain-main">${main}</div><div class="rain-detail">${detail}</div>${chips ? `<div class="rain-trend">${chips}</div>` : ""}${radar ? `<div class="rain-radar-time">${radar}</div>` : ""}`;
-      }
+  const series=validatedRainSeries(data,minutes),total=series.reduce((a,b)=>a+b,0),rates=series.map(v=>v*60),peak=Math.max(...rates),first=rates.findIndex(v=>v>=0.5),peakMinute=rates.indexOf(peak)+1;
+  const main=first<0?"未來 "+minutes+" 分鐘無明顯降雨訊號":first<3?"短時推估顯示目前可能有雨":"約 "+(first+1)+" 分鐘後可能有雨";
+  const detail="期間預估累積 "+total.toFixed(1)+" mm，最大雨強 "+peak.toFixed(1)+" mm/h"+(first>=0?"（約第 "+peakMinute+" 分鐘）。降雨可能間歇，實際起停時間仍有誤差。":"。缺乏明顯訊號不代表一定不會下雨。");
+  const radar=formatRadarTime(data.base_time,data.delay_minutes??data.bridge_minutes),chips=buildRainTrendChips(series,minutes);
+  return '<div class="rain-main">'+escapeHtml(main)+'</div><div class="rain-detail">'+escapeHtml(detail)+'</div><div class="rain-trend">'+chips+'</div>'+(radar?'<div class="rain-radar-time">'+escapeHtml(radar)+'</div>':"");
+}
       async function fetchRainJson(url, timeoutMs = 10000) {
         return await fetchJson(url, timeoutMs);
       }
@@ -8666,6 +8294,7 @@ function obsMapPickVisibleStations() {
           box.textContent = "請輸入1–60間的整數";
           return;
         }
+        if (weatherRefreshBusy) { box.textContent = "位置與天氣更新中，請稍後查詢"; return; }
         if (!lastTarget) {
           box.textContent = "尚未取得位置";
           return;
@@ -8690,7 +8319,7 @@ function obsMapPickVisibleStations() {
                 : Array.isArray(data.mean_series)
                   ? data.mean_series
                   : [],
-            series = raw.slice(0, minutes).map((v) => Math.max(0, Number(v) || 0)),
+            series = validatedRainSeries(data, minutes),
             peak = series.length ? Math.max(...series) * 60 : 0;
           box.style.background = getRainBg(rainColorFromRate(peak));
           box.innerHTML = buildRainSummaryHtml(data, minutes);
