@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站 v8.5.1</title>
+    <title>天氣網站 v8.6</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3505,7 +3505,8 @@
 
     
 /* Small screens and keyboard navigation: keep all controls reachable. */
-body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-y: contain; }
+body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: none; }
+body[data-page="current"] .current-card::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .weather-status { margin: 6px 12px; font-size: 13px; line-height: 1.5; }
 .weather-status:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
@@ -3583,7 +3584,7 @@ body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.5.1</div>
+              <div class="version-badge" id="versionLabel">v8.6</div>
             </div>
           </section>
 
@@ -3715,7 +3716,6 @@ body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-
                       </div>
                     </div>
                     <div class="qpf-map-meta">
-                      <div id="wrfQpfValidTime">有效時間：尚未取得</div>
                       <div class="qpf-update-time" id="wrfQpfCycleTime">模式起報：尚未取得</div>
                       <div class="wrf-qpf-legend" id="wrfQpfLegend" aria-label="累積雨量顏色說明"></div>
                       <div class="qpf-data-time" id="wrfQpfLoadedTime">載入時間：尚未更新</div>
@@ -3766,7 +3766,7 @@ body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.5.1</div>
+              <div class="version-badge">v8.6</div>
             </div>
           </section>
 
@@ -3978,7 +3978,7 @@ body[data-page="current"] .current-card { overflow-y: auto; overscroll-behavior-
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.5.1</div>
+              <div class="version-badge">v8.6</div>
             </div>
           </section>
         </div>
@@ -4166,7 +4166,7 @@ let obsStationStatus="",obsRadarStatus="",qpfImageLoadSeq=0;
 function syncObservationLoading() {
   const radar=obsLiveMapMetric==="radar",busy=radar?obsRadarLoading:obsLiveMapLoading;
   const loading=$("obsMapLoading"),btn=$("obsMapRefreshBtn"),status=$("obsMapStatus");
-  if(loading) {loading.hidden=!busy;loading.textContent=radar?"正在下載並繪製雷達…":"正在載入測站資料…";}
+  if(loading) {loading.hidden=!busy;loading.textContent=radar?"正在下載並繪製即時雷達…":"正在載入測站資料…";}
   if(btn) {btn.disabled=busy;btn.textContent=busy?"更新中…":"更新資料";}
   if(status) status.textContent=radar?obsRadarStatus:obsStationStatus;
 }
@@ -4189,7 +4189,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.5.1";
+      const APP_VERSION = "v8.6";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -5026,6 +5026,7 @@ function obsMapPickVisibleStations() {
             const radius = zoom <= 4 ? 3.4 : zoom <= 6 ? 4.2 : 5.2;
             layer = L.circleMarker([lat, lon], {
               renderer: obsLiveCanvasRenderer,
+              interactive: true,
               radius,
               color: "rgba(255,255,255,.90)",
               weight: zoom <= 4 ? 0.8 : 1.2,
@@ -5132,9 +5133,9 @@ function obsMapPickVisibleStations() {
       async function refreshObservationRadar({force=false,fit=false}={}) {
   if(!obsLiveMap||obsRadarLoading) return;
   if(!force&&obsRadarOverlay&&Date.now()-obsRadarLastLoadAt<60000) {obsMapRenderStations();syncObservationLoading();return;}
-  obsRadarLoading=true;obsRadarStatus="正在取得氣象署雷達…";syncObservationLoading();let candidate=null,nextUrl="";
+  obsRadarLoading=true;obsRadarStatus="正在取得氣象署 1.25 公里雷達格點…";syncObservationLoading();let candidate=null,nextUrl="";
   try {
-    if(!CWA_RADAR_PROXY) throw new Error("雷達代理網址尚未設定");
+    if(!CWA_RADAR_PROXY) throw new Error("即時雷達代理網址尚未設定");
     const radar=obsRadarParsePayload(await fetchJson(CWA_RADAR_PROXY+"?t="+Date.now(),30000)),canvas=obsRadarBuildCanvas(radar.content,radar.nx,radar.ny,radar);
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(v=>v?resolve(v):reject(new Error("雷達影像輸出失敗")),"image/png"));
     nextUrl=URL.createObjectURL(blob);candidate=L.imageOverlay(nextUrl,radar.bounds,{opacity:0,interactive:false,className:"obs-radar-overlay"});
@@ -5145,7 +5146,7 @@ function obsMapPickVisibleStations() {
     candidate.setOpacity(0.88);if(obsLiveMapMetric!=="radar") obsLiveMap.removeLayer(candidate);
     if((fit||!obsRadarHasFit)&&obsLiveMapMetric==="radar") {obsLiveMap.fitBounds(radar.bounds,{padding:[8,8],animate:true});obsRadarHasFit=true;}
     obsRadarStatus="氣象署雷達｜資料時間 "+obsMapFormatTime(radar.dataTime);
-  } catch(e) {if(candidate&&candidate!==obsRadarOverlay) obsLiveMap.removeLayer(candidate);if(nextUrl&&nextUrl!==obsRadarObjectUrl) URL.revokeObjectURL(nextUrl);obsRadarStatus="雷達更新失敗："+(e.message||e)+(obsRadarOverlay?"；保留 "+obsMapFormatTime(obsRadarDataTime)+" 圖資":"");}
+  } catch(e) {if(candidate&&candidate!==obsRadarOverlay) obsLiveMap.removeLayer(candidate);if(nextUrl&&nextUrl!==obsRadarObjectUrl) URL.revokeObjectURL(nextUrl);obsRadarStatus="雷達載入失敗："+(e.message||e)+(obsRadarOverlay?"；保留 "+obsMapFormatTime(obsRadarDataTime)+" 圖資":"");}
   finally {obsRadarLoading=false;obsMapRenderStations();syncObservationLoading();}
 }
 
@@ -5159,9 +5160,9 @@ function obsMapPickVisibleStations() {
     for(let i=0;i<results.length;i++) {const r=results[i],source=i===0?"CWA":"CMA";if(r.status==="fulfilled") {next.push(...r.value);parts.push(source+" "+r.value.length+" 站"+(r.value.partialFailure?"（部分來源失敗）":""));} else {parts.push(source+" 取得失敗");next.push(...obsLiveMapStations.filter(s=>s.source===source));}}
     const now=Date.now();obsLiveMapStations=next.filter(s=> {const ts=weatherTimestamp(s.obsTime);return Number.isFinite(ts)&&now-ts<=90*60000&&ts-now<=120000;});
     if(results.every(r=>r.status==="rejected")) throw new Error("CWA / CMA 都無法更新；只保留未過期的上次資料");
-    obsLiveMapLastLoadAt=now;obsLiveMapDataLoaded=true;obsStationStatus=parts.join("｜")+"；僅顯示 90 分鐘內資料";
+    obsLiveMapLastLoadAt=now;obsLiveMapDataLoaded=true;obsStationStatus=parts.filter(part=>part.includes("失敗")).join("｜");
     if(obsLiveMapSelected) {const updated=obsLiveMapStations.find(s=>s.id===obsLiveMapSelected.id);updated?obsMapOpenDetail(updated):obsMapCloseDetail();}
-  } catch(e) {obsStationStatus="測站更新失敗："+(e.message||e);}
+  } catch(e) {obsStationStatus="測站載入失敗："+(e.message||e);}
   finally {obsLiveMapLoading=false;obsMapRenderStations();syncObservationLoading();}
 }
 
@@ -5215,6 +5216,24 @@ function obsMapPickVisibleStations() {
           detectRetina: false,
           attribution: "&copy; OpenStreetMap",
         }).addTo(obsLiveMap);
+
+        // Hit-test only visible stations, in screen pixels, for mouse and touch.
+        obsLiveMap.on("click", (event) => {
+          if (obsLiveMapMetric === "radar") return;
+          const point = event.containerPoint;
+          let nearest = null, distance = 18;
+          for (const station of obsMapPickVisibleStations()) {
+            const p = obsLiveMap.latLngToContainerPoint([station.lat, station.lon]);
+            const d = point.distanceTo(p);
+            if (d < distance) { nearest = station; distance = d; }
+          }
+          if (nearest) obsMapOpenDetail(nearest);
+        });
+        const detailPanel = $("obsMapDetail");
+        if (detailPanel) {
+          L.DomEvent.disableClickPropagation(detailPanel);
+          L.DomEvent.disableScrollPropagation(detailPanel);
+        }
 
         let obsMapMoveTimer = 0;
         obsLiveMap.on("zoomend moveend", () => {
@@ -5439,7 +5458,7 @@ function obsMapPickVisibleStations() {
     const previous=qpfOverlay;qpfOverlay=candidate;QPF60_BOUNDS=data.leaflet_bounds;candidate.setOpacity(clamp(strictNumber($("qpfOpacity")?.value)||0.78,0.25,1));if(previous)qpfMap.removeLayer(previous);qpfBoundsBox?.setBounds(QPF60_BOUNDS);
     if($("qpfDataTime"))$("qpfDataTime").textContent="資料時間："+formatQpfDataTime(data.base_time);
     if($("qpfForecastTime"))$("qpfForecastTime").textContent="預報時間："+formatQpfClock(start)+"～"+formatQpfClock(end);
-    setQpfMeta("依雷達回波推估未來降雨，實際雨勢與起停時間可能不同。");updateQpfLocationMarker();return true;
+    setQpfMeta("本系統是根據中央氣象署現有之雷達回波資料進行未來降雨推估，具有高度不確定性和即時性，請依中央氣象署發布之資料為準。");updateQpfLocationMarker();return true;
   } catch(e) {if(candidate&&candidate!==qpfOverlay)qpfMap.removeLayer(candidate);if(seq===qpfImageLoadSeq)setQpfMeta("圖資更新失敗："+(e.message||e)+(qpfOverlay?"；保留上次圖資與時間":""));return false;}
 }
       function sleep(ms) {
@@ -5966,8 +5985,6 @@ function obsMapPickVisibleStations() {
             $("wrfQpfStatus").textContent = Number.isFinite(maxMm)
               ? ``
               : "高解析度圖資已載入";
-          if ($("wrfQpfValidTime"))
-            $("wrfQpfValidTime").textContent = "預報時間："+formatWrfQpfTime(layer.valid_from)+" ～ "+formatWrfQpfTime(layer.valid_to);
           if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
           preloadWrfQpfNeighbours(layer);
           return;
@@ -6025,8 +6042,6 @@ function obsMapPickVisibleStations() {
             $("wrfQpfStatus").textContent = Number.isFinite(maxMm)
               ? ``
               : "高解析度圖資已載入";
-          if ($("wrfQpfValidTime"))
-            $("wrfQpfValidTime").textContent = "預報時間："+formatWrfQpfTime(layer.valid_from)+" ～ "+formatWrfQpfTime(layer.valid_to);
           if (fit) wrfQpfMap.fitBounds(bounds, { padding: [10, 10], animate: true });
           setTimeout(updateWrfQpfLocationMarker, 60);
           preloadWrfQpfNeighbours(layer);
@@ -6056,7 +6071,6 @@ function obsMapPickVisibleStations() {
           wrfQpfLayerLoadSeq++;wrfQpfPreloadSeq++;
           for(const layer of [wrfQpfOverlay,wrfQpfPendingOverlay]) if(layer&&wrfQpfMap)wrfQpfMap.removeLayer(layer);
           wrfQpfOverlay=null;wrfQpfPendingOverlay=null;wrfQpfSelectedKey="";wrfQpfDisplayedKey="";wrfQpfDisplayedUrl="";
-          if($("wrfQpfValidTime"))$("wrfQpfValidTime").textContent="預報時間：--";
           setWrfQpfLoadingUi("",false);
           box.innerHTML = '<div class="forecast-empty">此累積時距沒有可用圖層</div>';
           return;
@@ -6818,18 +6832,33 @@ function obsMapPickVisibleStations() {
       function omCodeToTextIcon(code, isNight = false) {
         const c = strictNumber(code);
         if (c === 0) return { text: "晴", icon: isNight ? "🌙" : "☀" };
-        if (c === 1) return { text: "大致晴朗", icon: isNight ? "🌙" : "🌤" };
+        if (c === 1) return { text: "晴時多雲", icon: isNight ? "🌙" : "🌤" };
         if (c === 2) return { text: "局部多雲", icon: isNight ? "☁" : "⛅" };
-        if (c === 3) return { text: "陰", icon: "☁" };
-        if ([45, 48].includes(c)) return { text: "霧", icon: "🌫" };
-        if ([51, 53, 55, 56, 57].includes(c)) return { text: "毛毛雨", icon: isNight ? "🌧" : "🌦" };
-        if ([61, 63, 65, 66, 67].includes(c)) return { text: "雨", icon: "🌧" };
-        if ([71, 73, 75].includes(c)) return { text: "雪", icon: "❄" };
-        if (c === 77) return { text: "霰", icon: "🌨" };
-        if ([80, 81, 82].includes(c)) return { text: "陣雨", icon: isNight ? "🌧" : "🌦" };
-        if ([85, 86].includes(c)) return { text: "陣雪", icon: "🌨" };
+        if (c === 3) return { text: "陰天", icon: "☁" };
+        if (c === 45) return { text: "霧", icon: "🌫" };
+        if (c === 48) return { text: "凍霧", icon: "🌫" };
+        if (c === 51) return { text: "輕微毛毛雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 53) return { text: "中度毛毛雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 55) return { text: "強毛毛雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 56) return { text: "輕微凍毛毛雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 57) return { text: "中至強凍毛毛雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 61) return { text: "小雨", icon: "🌧" };
+        if (c === 63) return { text: "中雨", icon: "🌧" };
+        if (c === 65) return { text: "大雨", icon: "🌧" };
+        if (c === 66) return { text: "輕微凍雨", icon: "🌧" };
+        if (c === 67) return { text: "強凍雨", icon: "🌧" };
+        if (c === 71) return { text: "小雪", icon: "❄" };
+        if (c === 73) return { text: "中雪", icon: "❄" };
+        if (c === 75) return { text: "大雪", icon: "❄" };
+        if (c === 77) return { text: "雪粒", icon: "🌨" };
+        if (c === 80) return { text: "小陣雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 81) return { text: "陣雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 82) return { text: "強陣雨", icon: isNight ? "🌧" : "🌦" };
+        if (c === 85) return { text: "小陣雪", icon: "🌨" };
+        if (c === 86) return { text: "強陣雪", icon: "🌨" };
         if (c === 95) return { text: "雷雨", icon: "⛈" };
-        if ([96, 99].includes(c)) return { text: "雷雨／冰雹", icon: "⛈" };
+        if (c === 96) return { text: "雷雨伴冰雹", icon: "⛈" };
+        if (c === 99) return { text: "強雷雨伴冰雹", icon: "⛈" };
         return { text: "天氣不明", icon: "？" };
       }
       function mapWeatherToIcon(text,isNight=false) {const s=String(text||"");if(s.includes("雷"))return "⛈";if(s.includes("雪"))return "❄";if(s.includes("雨")||s.includes("有降水"))return "🌧";if(s.includes("霧"))return "🌫";if(s.includes("陰"))return "☁";if(s.includes("多雲"))return isNight?"☁":"⛅";if(s.includes("晴"))return isNight?"🌙":"☀";return "？";}
@@ -8011,6 +8040,58 @@ function obsMapPickVisibleStations() {
         if (!nums) return NaN;
         return nums.length > 1 ? (Number(nums[0]) + Number(nums[1])) / 2 : Number(nums[0]);
       }
+      function observationAgeMinutes(v) {
+        const ts = weatherTimestamp(v, 480, solarTargetTimeZone);
+        if (!Number.isFinite(ts)) return NaN;
+        return Math.max(0, (Date.now() - ts) / 60000);
+      }
+      function stationDistanceKm(station) {
+        if (!station || typeof station !== "object") return NaN;
+        return backendNumber(
+          station.distanceKm ?? station.distKm ?? station.distance_km ?? station.dist_km ??
+          station.distance ?? station.dist,
+        );
+      }
+      function getConditionStationDistanceKm(data) {
+        const r = data?.realtime || {};
+        const directValues = [
+          r.conditionStationDistanceKm,
+          r.weatherStationDistanceKm,
+          r.wxStationDistanceKm,
+          r.conditionDistanceKm,
+          r.weatherDistanceKm,
+          r.wxDistanceKm,
+          r.condition_station_distance_km,
+          r.weather_station_distance_km,
+          r.wx_station_distance_km,
+          r.stationDebug?.conditionDistanceKm,
+          r.stationDebug?.weatherDistanceKm,
+        ];
+        for (const value of directValues) {
+          const distance = backendNumber(value);
+          if (Number.isFinite(distance)) return distance;
+        }
+        const sourceObjects = [
+          r.conditionStation,
+          r.weatherStation,
+          r.wxStation,
+          r.conditionSource,
+          r.weatherSource,
+          r.stationDebug?.conditionStation,
+          r.stationDebug?.weatherStation,
+          r.stationDebug?.wxStation,
+          r.fieldStations?.condition,
+          r.fieldStations?.weather,
+          r.fieldStations?.wx,
+        ];
+        for (const source of sourceObjects) {
+          const distance = stationDistanceKm(source);
+          if (Number.isFinite(distance)) return distance;
+        }
+
+        // 未明確指定狀況來源時視為距離未知，不以一般最近測站代替。
+        return NaN;
+      }
       function renderBackendRealtime(data, targetAlt) {
         const r = data?.realtime || {},
           loc = data?.location || {};
@@ -8058,6 +8139,8 @@ function obsMapPickVisibleStations() {
           rain10: backendNumber(r.rain10min),
           rain1h: backendNumber(r.rain1h),
           visibility: visibilityToKm(r.visibility),
+          conditionObsTime: r.conditionObsTime ?? r.weatherObsTime ?? r.wxObsTime ?? r.obsTime,
+          conditionStationDistanceKm: getConditionStationDistanceKm(data),
           targetAlt,
         };
       }
@@ -8129,7 +8212,7 @@ function obsMapPickVisibleStations() {
           },
         };
         renderSourceInfo(fake, "Open-Meteo（全球網格預報）");
-        return { temp, feels, condition: wx.text, rain10: NaN, rain1h: NaN, visibility: visKm, targetAlt };
+        return { temp, feels, condition: wx.text, rain10: NaN, rain1h: NaN, visibility: visKm, conditionObsTime: c.time, conditionStationDistanceKm: NaN, targetAlt };
       }
 
       async function runAllForTarget(lat,lon,alt,labelHint,adminOverride=null,seq=weatherRunSeq) {
@@ -8144,13 +8227,30 @@ function obsMapPickVisibleStations() {
   if(data && !isBadBackendRealtime(data)) {
     const tz=data.forecast?.meta?.timezone||data.location?.timezone||data.realtime?.timezone;
     setSolarTarget(lat,lon,{timezone:tz||"Asia/Taipei"});
+    if (data.provider === "cma-backend" && /^(?:有降水|無降水|无降水)$/.test(String(data.realtime?.condition || "").trim())) {
+      try { om = await fetchOpenMeteoAll(lat,lon); assertWeatherRun(seq); }
+      catch (e) { assertWeatherRun(seq); dbg("[CMA weather] " + e.message); }
+      const code = backendNumber(om?.current?.weather_code);
+      const wx = omCodeToTextIcon(code);
+      const available = Number.isFinite(code) && wx.text !== "天氣不明";
+      data = {...data, realtime: {...data.realtime,
+        condition: available ? wx.text : "天氣狀況暫無資料",
+        icon: available ? wx.icon : "？",
+        fieldSources: {...data.realtime?.fieldSources, condition: "open-meteo-model", icon: "open-meteo-model"}
+      }};
+      if (om) setSolarTarget(lat,lon,om);
+    }
     realtime=renderBackendRealtime(data,targetAlt); targetAlt=realtime.targetAlt;
+    if (data.provider === "cma-backend" && data.realtime?.fieldSources?.condition === "open-meteo-model") {
+      realtime.conditionStationDistanceKm = NaN;
+      realtime.conditionObsTime = om?.current?.time;
+    }
     if(!renderBackendForecastIfAvailable(data)) {
       const saved={h10:hourly10m,h1:hourly1h,days:daily7};
-      try {om=await fetchOpenMeteoAll(lat,lon); assertWeatherRun(seq); setSolarTarget(lat,lon,om); renderOpenMeteoForecast(om,realtime.temp,realtime.feels,targetAlt);
+      try {om=om || await fetchOpenMeteoAll(lat,lon); assertWeatherRun(seq); setSolarTarget(lat,lon,om); renderOpenMeteoForecast(om,realtime.temp,realtime.feels,targetAlt);
         if(saved.h10.length) hourly10m=saved.h10; if(saved.h1.length) hourly1h=saved.h1; if(saved.days.length) daily7=saved.days;
-        renderHourlyForecast(); renderDailyForecast(); $("hintBar").textContent="缺少的預報區段以 Open-Meteo 補充";
-      } catch(e) {assertWeatherRun(seq); $("hintBar").textContent="部分預報暫時無法取得";}
+        renderHourlyForecast(); renderDailyForecast(); $("hintBar").textContent="Open-Meteo（後端未提供預報時的備援）";
+      } catch(e) {assertWeatherRun(seq); $("hintBar").textContent="預報暫時無法取得";}
     }
   } else {
     const results=await Promise.all([fetchOpenMeteoAll(lat,lon),Number.isFinite(targetAlt)?Promise.resolve(targetAlt):getElevation(lat,lon,alt)]);
@@ -8162,8 +8262,14 @@ function obsMapPickVisibleStations() {
   $("altitudeLabel").textContent=Number.isFinite(targetAlt)?Math.round(targetAlt)+" m":"高度無資料";
   lastTarget={lat,lon,alt,label,adminOverride};
   const now=Date.now(),night=isNightAt(now),cloud=backendNumber(data?.realtime?.cloudCover??om?.current?.cloud_cover??om?.hourly?.cloud_cover?.[omHourIndex(om)]),rain=Math.max(Number.isFinite(realtime?.rain10)?realtime.rain10*6:0,Number.isFinite(realtime?.rain1h)?realtime.rain1h:0);
-  const scene=getScene({weatherText:realtime?.condition||"",ts:now,rain,cloud:Number.isFinite(cloud)?cloud:0,visibility:realtime?.visibility});
-  applyScene(scene); renderAtmosphereEffects({scene,cloud:Number.isFinite(cloud)?cloud:0,weatherText:realtime?.condition||"",rain,isNight:night});
+  const conditionAgeMinutes = observationAgeMinutes(realtime?.conditionObsTime);
+  const conditionStationDistanceKm = backendNumber(realtime?.conditionStationDistanceKm);
+  const conditionCanVetoRain = Number.isFinite(conditionStationDistanceKm) &&
+    conditionStationDistanceKm >= 0 && conditionStationDistanceKm <= 5 &&
+    !(Number.isFinite(conditionAgeMinutes) && conditionAgeMinutes > 20);
+  const rainForScene = /雨|雪|霰|雷|有降水/.test(realtime?.condition || "") || !conditionCanVetoRain ? rain : 0;
+  const scene=getScene({weatherText:realtime?.condition||"",ts:now,rain:rainForScene,cloud:Number.isFinite(cloud)?cloud:0,visibility:realtime?.visibility});
+  applyScene(scene); renderAtmosphereEffects({scene,cloud:Number.isFinite(cloud)?cloud:0,weatherText:realtime?.condition||"",rain:rainForScene,rain10:realtime?.rain10,rain1h:realtime?.rain1h,visibility:realtime?.visibility,conditionAgeMinutes,conditionStationDistanceKm,isNight:night});
   if(Number.isFinite(realtime?.temp)) applyTemperatureTint(realtime.temp);
   $("weatherIcon").textContent=mapWeatherToIcon(realtime?.condition||"",night);
   updateQpfLocationMarker(); updateWrfQpfLocationMarker(); updateObservationLocationMarker();
@@ -8275,12 +8381,54 @@ function obsMapPickVisibleStations() {
         return chips.join("");
       }
       function buildRainSummaryHtml(data, minutes) {
-  const series=validatedRainSeries(data,minutes),total=series.reduce((a,b)=>a+b,0),rates=series.map(v=>v*60),peak=Math.max(...rates),first=rates.findIndex(v=>v>=0.5),peakMinute=rates.indexOf(peak)+1;
-  const main=first<0?"未來 "+minutes+" 分鐘無明顯降雨訊號":first<3?"短時推估顯示目前可能有雨":"約 "+(first+1)+" 分鐘後可能有雨";
-  const detail="期間預估累積 "+total.toFixed(1)+" mm，最大雨強 "+peak.toFixed(1)+" mm/h"+(first>=0?"（約第 "+peakMinute+" 分鐘）。降雨可能間歇，實際起停時間仍有誤差。":"。缺乏明顯訊號不代表一定不會下雨。");
-  const radar=formatRadarTime(data.base_time,data.delay_minutes??data.bridge_minutes),chips=buildRainTrendChips(series,minutes);
-  return '<div class="rain-main">'+escapeHtml(main)+'</div><div class="rain-detail">'+escapeHtml(detail)+'</div><div class="rain-trend">'+chips+'</div>'+(radar?'<div class="rain-radar-time">'+escapeHtml(radar)+'</div>':"");
-}
+        const m = minutes,
+          series = validatedRainSeries(data, minutes),
+          total = series.reduce((a, b) => a + b, 0),
+          rates = series.map((v) => v * 60),
+          peak = rates.length ? Math.max(...rates) : 0,
+          peakMinute = rates.indexOf(peak) + 1,
+          WET = 0.5,
+          currently = avgRain(series.slice(0, Math.min(3, series.length))) * 60 >= WET;
+        let first = -1,
+          last = -1;
+        rates.forEach((r, i) => {
+          if (r >= WET) {
+            if (first < 0) first = i;
+            last = i;
+          }
+        });
+        let stop = null;
+        if (last >= 0) {
+          let dry = 0;
+          for (let i = last + 1; i < rates.length; i++) {
+            if (rates[i] < WET) dry++;
+            else dry = 0;
+            if (dry >= 3) {
+              stop = i - 1;
+              break;
+            }
+          }
+        }
+        let main, detail;
+        if (peak < WET && total < 0.1) {
+          main = `未來 ${m} 分鐘無明顯降雨`;
+          detail = `根據最新資料，未來 ${m} 分鐘內沒有明顯降雨訊號。`;
+        } else if (currently) {
+          main = "目前正在下雨";
+          const peakText = peakMinute <= 3 ? "雨勢正在逐漸趨緩" : `約 ${peakMinute} 分鐘後雨勢相對明顯`,
+            stopText = stop !== null ? `預計 ${stop + 1} 分鐘後雨停` : `在 ${m} 分鐘內無雨停跡象`;
+          detail = `根據最新資料，${peakText}，且${stopText}。期間預估累積雨量 ${total.toFixed(1)} mm，最大雨強 ${peak.toFixed(1)} mm/h（${rainLevelText(peak)}）。`;
+        } else if (first >= 0) {
+          main = first + 1 <= 5 ? "未來 5 分鐘內即將開始下雨" : `約 ${first + 1} 分鐘後可能開始下雨`;
+          detail = `根據最新資料，${stop !== null ? `降雨將持續至第 ${stop + 1} 分鐘左右雨停` : `開始後，在 ${m} 分鐘內將持續有雨`}。約 ${peakMinute} 分鐘後雨勢最明顯，期間預估累積 ${total.toFixed(1)} mm，最大雨強 ${peak.toFixed(1)} mm/h（${rainLevelText(peak)}）。`;
+        } else {
+          main = `未來 ${m} 分鐘無明顯降雨`;
+          detail = `根據最新資料，仍有零星降雨，預估累積約 ${total.toFixed(1)} mm。`;
+        }
+        const radar = formatRadarTime(data.base_time, data.delay_minutes ?? data.bridge_minutes),
+          chips = buildRainTrendChips(series, m);
+        return `<div class="rain-main">${escapeHtml(main)}</div><div class="rain-detail">${escapeHtml(detail)}</div>${chips ? `<div class="rain-trend">${chips}</div>` : ""}${radar ? `<div class="rain-radar-time">${escapeHtml(radar)}</div>` : ""}`;
+      }
       async function fetchRainJson(url, timeoutMs = 10000) {
         return await fetchJson(url, timeoutMs);
       }
@@ -8354,5 +8502,967 @@ function obsMapPickVisibleStations() {
       if ($("versionLabel")) $("versionLabel").textContent = APP_VERSION;
       runCurrentMode();
     </script>
+<!-- Weather Scene Engine v8.5
+     將本段完整貼在原檔最後一個 </body> 之前。
+     不改 API、地圖與預報，只接管動態天氣背景。 -->
+<style>
+  :root {
+    --sun-x: 50%;
+    --sun-y: 12%;
+    --sun-opacity: 0;
+    --sun-warmth: 0;
+    --scene-light-x: 50%;
+    --scene-flash: 0;
+  }
+
+  /* 關閉舊的單層效果，由新版 Canvas 場景接管。 */
+  body.scene-engine-ready > .sky-layer,
+  body.scene-engine-ready > .rain-layer,
+  body.scene-engine-ready > .fog-layer,
+  body.scene-engine-ready > .stars-layer,
+  body.scene-engine-ready > .cloud-layer,
+  body.scene-engine-ready > .precip-layer {
+    display: none !important;
+  }
+
+  .weather-scene-engine,
+  .weather-scene-background-canvas,
+  .weather-scene-canvas,
+  .weather-celestial-layer,
+  .weather-atmosphere-wash,
+  .weather-lightning-glow {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .weather-scene-engine {
+    z-index: 0;
+    overflow: hidden;
+    contain: strict;
+  }
+  .weather-scene-canvas {
+    z-index: 4;
+  }
+  .weather-scene-background-canvas {
+    z-index: 2;
+  }
+  .weather-celestial-layer {
+    z-index: 1;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 1.2s ease;
+  }
+  .weather-sun {
+    position: absolute;
+    left: var(--sun-x);
+    top: var(--sun-y);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: var(--sun-opacity);
+    background: #fffdf0;
+    box-shadow:
+      0 0 12px 5px rgba(255, 253, 225, .92),
+      0 0 44px 18px rgba(255, 244, 179, .55),
+      0 0 110px 48px rgba(202, 232, 255, .34),
+      0 0 220px 95px rgba(255, 221, 153, calc(.10 + var(--sun-warmth) * .16));
+    filter: blur(.15px);
+    transition: opacity 1.2s ease, box-shadow 1.2s ease;
+  }
+  .weather-sun::before {
+    content: "";
+    position: absolute;
+    inset: -180px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(255,255,255,.20) 0,
+      rgba(255,242,196,.11) 20%,
+      transparent 63%);
+    animation: sceneSunBreathe 8s ease-in-out infinite;
+  }
+  .weather-lens-flare {
+    position: absolute;
+    left: var(--sun-x);
+    top: var(--sun-y);
+    width: 100%;
+    height: 100%;
+    opacity: calc(var(--sun-opacity) * .55);
+    transform-origin: 0 0;
+    transition: opacity 1.2s ease;
+  }
+  .weather-lens-flare i {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(205,235,255,.12);
+    background: radial-gradient(circle, rgba(255,255,255,.12), rgba(118,195,255,.035) 48%, transparent 72%);
+    filter: blur(1px);
+  }
+  .weather-lens-flare i:nth-child(1) { width: 27px; height: 27px; left: 12vw; top: 14vh; }
+  .weather-lens-flare i:nth-child(2) { width: 52px; height: 52px; left: 29vw; top: 31vh; opacity: .64; }
+  .weather-lens-flare i:nth-child(3) { width: 18px; height: 18px; left: 47vw; top: 49vh; opacity: .72; }
+  .weather-lens-flare i:nth-child(4) { width: 92px; height: 92px; left: 60vw; top: 61vh; opacity: .27; }
+
+  .weather-atmosphere-wash {
+    z-index: 3;
+    opacity: .55;
+    background:
+      linear-gradient(to top, rgba(232,244,250,.17), transparent 38%),
+      radial-gradient(circle at var(--scene-light-x) 5%, rgba(255,255,255,.12), transparent 38%);
+    mix-blend-mode: screen;
+    transition: opacity 1s ease, background 1s ease;
+  }
+  body[data-weather-effect="fog"] .weather-atmosphere-wash,
+  body[data-weather-fog="true"] .weather-atmosphere-wash {
+    opacity: .92;
+    background:
+      linear-gradient(to top, rgba(232,239,241,.45), rgba(221,231,235,.13) 66%, transparent),
+      radial-gradient(ellipse at 40% 58%, rgba(255,255,255,.22), transparent 52%);
+  }
+  body[data-weather-effect="rain"] .weather-atmosphere-wash,
+  body[data-weather-effect="storm"] .weather-atmosphere-wash {
+    opacity: .85;
+    background:
+      linear-gradient(to top, rgba(206,221,228,.25), transparent 48%),
+      linear-gradient(105deg, rgba(174,200,216,.10), transparent 62%);
+  }
+  body[data-weather-effect="storm"] .weather-atmosphere-wash {
+    opacity: calc(.78 + var(--scene-flash) * .2);
+    filter: saturate(.72) brightness(calc(1 + var(--scene-flash) * .22));
+  }
+
+  .weather-lightning-glow {
+    z-index: 5;
+    opacity: 0;
+    background:
+      radial-gradient(ellipse at var(--bolt-x, 67%) var(--bolt-y, 17%),
+        rgba(238,247,255,.96) 0,
+        rgba(190,218,255,.58) 12%,
+        rgba(145,178,230,.20) 31%,
+        transparent 61%);
+    mix-blend-mode: screen;
+    will-change: opacity;
+  }
+  .weather-lightning-glow.is-flashing { opacity: var(--flash-alpha, .9); }
+
+  body.scene-engine-ready .card {
+    background: color-mix(in srgb, var(--panel) 82%, transparent);
+    backdrop-filter: blur(22px) saturate(1.12);
+    -webkit-backdrop-filter: blur(22px) saturate(1.12);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.10),
+      inset calc((var(--scene-light-x-num, 50) - 50) * -.08px) -1px 24px rgba(255,255,255,.035),
+      0 16px 36px rgba(0,0,0,.17);
+  }
+  body[data-weather-effect="rain"].scene-engine-ready .card,
+  body[data-weather-effect="storm"].scene-engine-ready .card {
+    backdrop-filter: blur(10px) saturate(1.06);
+    -webkit-backdrop-filter: blur(10px) saturate(1.06);
+  }
+  body.scene-engine-ready .current-card {
+    position: relative;
+    isolation: isolate;
+  }
+  .weather-wet-glass-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .45s ease;
+  }
+  body[data-weather-effect="rain"] .weather-wet-glass-canvas,
+  body[data-weather-effect="storm"] .weather-wet-glass-canvas {
+    opacity: .82;
+  }
+  body.scene-flash .card {
+    border-color: rgba(225,239,255,.34);
+    box-shadow:
+      inset 0 0 34px rgba(226,240,255,.13),
+      0 16px 38px rgba(0,0,0,.15);
+  }
+
+  @keyframes sceneSunBreathe {
+    0%, 100% { transform: scale(.96); opacity: .82; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .weather-sun::before { animation: none; }
+  }
+</style>
+
+<script>
+(() => {
+  "use strict";
+
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const root = document.documentElement;
+  const body = document.body;
+  const oldRenderAtmosphere = window.renderAtmosphereEffects;
+  const oldGetScene = window.getScene;
+
+  const host = document.createElement("div");
+  host.className = "weather-scene-engine";
+  host.setAttribute("aria-hidden", "true");
+  host.innerHTML = `
+    <div class="weather-celestial-layer">
+      <div class="weather-sun"></div>
+      <div class="weather-lens-flare"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <canvas class="weather-scene-background-canvas"></canvas>
+    <canvas class="weather-scene-canvas"></canvas>
+    <div class="weather-atmosphere-wash"></div>
+    <div class="weather-lightning-glow"></div>`;
+  body.insertBefore(host, body.firstChild);
+  body.classList.add("scene-engine-ready");
+  // 保留基底前端的版本標示。
+
+  const canvas = host.querySelector("canvas.weather-scene-canvas");
+  const backgroundCanvas = host.querySelector("canvas.weather-scene-background-canvas");
+  const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+  const backgroundCtx = backgroundCanvas.getContext("2d", { alpha: true, desynchronized: true });
+  const glow = host.querySelector(".weather-lightning-glow");
+  const currentCard = document.querySelector(".current-card");
+  const wetCanvas = document.createElement("canvas");
+  wetCanvas.className = "weather-wet-glass-canvas";
+  wetCanvas.setAttribute("aria-hidden", "true");
+  currentCard?.appendChild(wetCanvas);
+  const wetCtx = wetCanvas.getContext("2d", { alpha: true, desynchronized: true });
+
+  const wet = {
+    width: 1,
+    height: 1,
+    dpr: 1,
+    rect: null,
+    impacts: [],
+    drops: [],
+    lastImpact: 0,
+    lastDraw: 0,
+  };
+
+  const state = {
+    width: 1,
+    height: 1,
+    dpr: 1,
+    effect: "clear",
+    isNight: false,
+    cloud: 15,
+    rain: 0,
+    rain10: NaN,
+    rain1h: NaN,
+    rainLevel: "none",
+    conditionAgeMinutes: NaN,
+    conditionStationDistanceKm: NaN,
+    visibility: NaN,
+    foggy: false,
+    wind: .22,
+    clouds: [],
+    precip: [],
+    fog: [],
+    stars: [],
+    last: performance.now(),
+    lastDraw: 0,
+    lastBackgroundDraw: 0,
+    lastBackgroundTime: performance.now(),
+    lightningAt: Infinity,
+    boltUntil: 0,
+    bolt: [],
+    visible: !document.hidden,
+  };
+
+  const random = (a, b) => a + Math.random() * (b - a);
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+
+  function resizeWetSurface() {
+    if (!currentCard || !wetCtx) return;
+    const rect = currentCard.getBoundingClientRect();
+    wet.rect = rect;
+    wet.width = Math.max(1, rect.width);
+    wet.height = Math.max(1, rect.height);
+    wet.dpr = Math.min(devicePixelRatio || 1, 1.5);
+    wetCanvas.width = Math.round(wet.width * wet.dpr);
+    wetCanvas.height = Math.round(wet.height * wet.dpr);
+    wetCanvas.style.width = wet.width + "px";
+    wetCanvas.style.height = wet.height + "px";
+    wetCtx.setTransform(wet.dpr, 0, 0, wet.dpr, 0, 0);
+  }
+
+  function resize() {
+    state.width = Math.max(1, innerWidth, document.documentElement.clientWidth);
+    state.height = Math.max(1, innerHeight, document.documentElement.clientHeight);
+    state.dpr = Math.min(devicePixelRatio || 1, 1.65);
+    for (const layerCanvas of [backgroundCanvas, canvas]) {
+      layerCanvas.width = Math.round(state.width * state.dpr);
+      layerCanvas.height = Math.round(state.height * state.dpr);
+      layerCanvas.style.width = state.width + "px";
+      layerCanvas.style.height = state.height + "px";
+    }
+    ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    backgroundCtx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    state.lastBackgroundDraw = 0;
+    state.lastBackgroundTime = performance.now();
+    resizeWetSurface();
+    rebuildScene();
+  }
+
+  function classify(weatherText, scene, rain) {
+    const s = String(weatherText || "");
+    const sc = String(scene || "");
+    if (/雷|thunder/i.test(s + sc)) return "storm";
+    if (/雪|霰|snow/i.test(s + sc)) return "snow";
+    if (/霧|靄|haze|fog/i.test(s + sc)) return "fog";
+    if (/雨|rain|shower/i.test(s + sc) || rain > .2) return "rain";
+    if (/陰|overcast/i.test(s + sc)) return "overcast";
+    if (/多雲|cloud|partly/i.test(s + sc)) return "partly";
+    return "clear";
+  }
+
+  function finiteNumber(value) {
+    if (value === null || value === undefined || value === "") return NaN;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : NaN;
+  }
+
+  function classifyRainLevel(rain10, rain1h) {
+    const tenMinutes = finiteNumber(rain10);
+    const oneHour = finiteNumber(rain1h);
+    if (Number.isFinite(tenMinutes)) {
+      if (tenMinutes >= 9) return "heavy";
+      // 5.5～未滿 9 mm 沿用中雨，視覺強度會繼續向大雨增加。
+      if (tenMinutes >= 2.5) return "moderate";
+      if (tenMinutes >= .5) return "light";
+      return "none";
+    }
+    if (Number.isFinite(oneHour)) {
+      if (oneHour >= 55) return "heavy";
+      if (oneHour >= 15) return "moderate";
+      if (oneHour >= .5) return "light";
+    }
+    return "none";
+  }
+
+  function drySkyEffect(weatherText) {
+    const text = String(weatherText || "");
+    if (/霧|靄|haze|fog/i.test(text)) return "fog";
+    if (/陰|overcast/i.test(text)) return "overcast";
+    if (/多雲|cloud|partly/i.test(text)) return "partly";
+    return "clear";
+  }
+
+  function rebuildScene() {
+    const w = state.width, h = state.height;
+    const storm = state.effect === "storm";
+    const cloudy = ["partly", "overcast", "rain", "storm", "snow", "fog"].includes(state.effect);
+    const cloudFactor = storm ? 1 : Math.max(state.cloud / 100, state.effect === "rain" ? .76 : 0);
+    const cloudCount = cloudy ? Math.round(5 + cloudFactor * 12) : state.cloud > 18 ? 3 : 1;
+
+    state.clouds = Array.from({ length: cloudCount }, (_, i) => {
+      const depth = i % 3;
+      const scale = [1.7, 1.25, .9][depth];
+      return {
+        x: random(-w * .35, w * 1.2),
+        y: random(-h * .08, h * (storm ? .44 : .52)),
+        rx: random(w * .24, w * .58) * scale,
+        ry: random(h * .07, h * .16) * scale,
+        speed: random(1.5, 5.5) * (depth + 1),
+        depth,
+        phase: random(0, Math.PI * 2),
+        alpha: random(.12, .25) + cloudFactor * random(.13, .28),
+      };
+    });
+
+    const measuredStrength = Number.isFinite(state.rain10)
+      ? clamp01((state.rain10 - .5) / 8.5)
+      : Number.isFinite(state.rain1h)
+        ? clamp01((state.rain1h - .5) / 54.5)
+        : 0;
+    const levelBase = { light: .30, moderate: .62, heavy: 1 }[state.rainLevel] || 0;
+    const rainStrength = storm ? Math.max(.88, levelBase) : Math.max(levelBase, measuredStrength);
+    const rainCount = state.effect === "storm"
+      ? Math.round(215 + rainStrength * 45)
+      : state.effect === "rain"
+        ? Math.round(55 + rainStrength * 170)
+        : 0;
+    const snowCount = state.effect === "snow" ? 110 : 0;
+    state.precip = [];
+    for (let i = 0; i < rainCount; i++) {
+      const depth = Math.random() < .18 ? 2 : Math.random() < .54 ? 1 : 0;
+      state.precip.push({
+        type: "rain", depth,
+        x: random(-w * .08, w * 1.08), y: random(-h, h),
+        len: random(13 + rainStrength * 5, 27 + rainStrength * 14) * (1 + depth * .75),
+        speed: random(390 + rainStrength * 90, 600 + rainStrength * 170) * (1 + depth * .42),
+        alpha: random(.08 + rainStrength * .04, .22 + rainStrength * .18) + depth * .10,
+        width: random(.45, 1.05) + depth * .42,
+        hitsGlass: Math.random() < (.15 + rainStrength * .10),
+        glassHitRatio: random(.04, .96),
+      });
+    }
+    for (let i = 0; i < snowCount; i++) {
+      const r = Math.random();
+      const depth = r < .05 ? 3 : r < .18 ? 2 : r < .51 ? 1 : 0;
+      const size = depth === 3
+        ? random(4.0, 5.8)
+        : depth === 2
+          ? random(2.7, 4.0)
+          : depth === 1
+            ? random(1.45, 2.45)
+            : random(.55, 1.25);
+      state.precip.push({
+        type: "snow", depth,
+        kind: depth === 0 || (depth === 1 && Math.random() < .34) ? "dot" : "crystal",
+        x: random(-w * .06, w * 1.06), y: random(-h, h),
+        size,
+        speed: random(13, 24) * (1 + depth * .42),
+        sway: random(5, 15) * (1 + depth * .25),
+        drift: random(-3.5, 5.5),
+        phase: random(0, Math.PI * 2),
+        gustPhase: random(0, Math.PI * 2),
+        wobbleSpeed: random(.00055, .00125),
+        angle: random(0, Math.PI * 2),
+        spin: random(-.58, .58),
+        alpha: random(.30, .62) + depth * .075,
+      });
+    }
+
+    const fogCount = state.foggy ? 9 : (state.effect === "storm" || state.effect === "rain") ? 5 : 0;
+    state.fog = Array.from({ length: fogCount }, (_, i) => ({
+      x: random(-w * .35, w), y: random(h * .30, h * .92),
+      rx: random(w * .28, w * .62), ry: random(h * .09, h * .24),
+      speed: random(2, 7) * (i % 2 ? 1 : -1),
+      alpha: state.foggy ? random(.07, .15) : random(.025, .075),
+      phase: random(0, Math.PI * 2),
+    }));
+
+    state.stars = state.isNight && !storm ? Array.from({ length: state.effect === "clear" ? 70 : 22 }, () => ({
+      x: random(0, w), y: random(0, h * .68), r: random(.35, 1.25),
+      alpha: random(.18, .82), phase: random(0, Math.PI * 2), speed: random(.5, 1.5),
+    })) : [];
+  }
+
+  function drawEllipseGradient(context, x, y, rx, ry, inner, outer, alpha) {
+    context.save();
+    context.translate(x, y);
+    context.scale(1, ry / rx);
+    const g = context.createRadialGradient(0, 0, rx * .08, 0, 0, rx);
+    g.addColorStop(0, inner);
+    g.addColorStop(.58, outer);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    context.globalAlpha = alpha;
+    context.fillStyle = g;
+    context.beginPath();
+    context.arc(0, 0, rx, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  function drawClouds(context, dt, time) {
+    const dark = ["overcast", "rain", "storm"].includes(state.effect);
+    for (const c of state.clouds) {
+      c.x += c.speed * dt;
+      if (c.x - c.rx > state.width) c.x = -c.rx;
+      const roll = Math.sin(time * .00013 + c.phase) * c.ry * .10;
+      const night = state.isNight;
+      const inner = dark
+        ? (night ? "rgba(38,49,66,.96)" : "rgba(83,103,120,.94)")
+        : (night ? "rgba(76,92,121,.70)" : "rgba(255,255,255,.90)");
+      const outer = dark
+        ? (night ? "rgba(18,27,42,.63)" : "rgba(69,86,103,.57)")
+        : (night ? "rgba(47,63,92,.32)" : "rgba(230,242,250,.55)");
+      drawEllipseGradient(context, c.x, c.y + roll, c.rx, c.ry, inner, outer, c.alpha);
+      drawEllipseGradient(context, c.x - c.rx * .32, c.y - c.ry * .20 + roll, c.rx * .56, c.ry * .82, inner, outer, c.alpha * .8);
+      drawEllipseGradient(context, c.x + c.rx * .28, c.y - c.ry * .13 + roll, c.rx * .49, c.ry * .72, inner, outer, c.alpha * .76);
+    }
+  }
+
+  function drawFog(context, dt, time) {
+    for (const f of state.fog) {
+      f.x += f.speed * dt;
+      if (f.speed > 0 && f.x - f.rx > state.width) f.x = -f.rx;
+      if (f.speed < 0 && f.x + f.rx < 0) f.x = state.width + f.rx;
+      const y = f.y + Math.sin(time * .00018 + f.phase) * 16;
+      drawEllipseGradient(context, f.x, y, f.rx, f.ry, "rgba(244,250,252,.9)", "rgba(214,228,234,.38)", f.alpha);
+    }
+  }
+
+  function resetRainDrop(p) {
+    p.y = random(-state.height * .35, -p.len);
+    p.x = random(0, state.width * 1.15);
+    const strength = { light: .25, moderate: .6, heavy: 1 }[state.rainLevel] || .25;
+    p.hitsGlass = Math.random() < (.15 + strength * .10);
+    p.glassHitRatio = random(.04, .96);
+  }
+
+  function spawnWetImpact(viewportX, viewportY, time, depth = 0) {
+    if (!wet.rect || !wetCtx) return;
+    const x = viewportX - wet.rect.left;
+    const y = viewportY - wet.rect.top;
+    if (x < 5 || x > wet.width - 5 || y < 5 || y > wet.height - 5) return;
+    const strength = { light: .38, moderate: .7, heavy: 1 }[state.rainLevel] || .38;
+    // 大多數附著雨滴只有 1～3 CSS px；極少數聚合滴才稍大。
+    let radius = .75 + Math.pow(Math.random(), 2.25) * 2.15;
+    if (Math.random() < .055) radius *= random(1.25, 1.6);
+    radius *= 1 + depth * .055;
+    const satelliteCount = Math.floor(random(2, 5));
+    wet.impacts.push({
+      x, y, radius, born: time,
+      satellites: Array.from({ length: satelliteCount }, () => ({
+        angle: random(0, Math.PI * 2),
+        distance: random(2.2, 6.2) * (.8 + strength * .25),
+        size: random(.28, .72),
+      })),
+    });
+    if (wet.impacts.length > 10) wet.impacts.splice(0, wet.impacts.length - 10);
+
+    // 少量雨滴附著成薄水珠，其餘只留下瞬間的微小飛濺。
+    if (Math.random() < .22) {
+      wet.drops.push({
+        x: x + random(-1.4, 1.4),
+        y: y + random(-1, 1.4),
+        radius: radius * random(.72, 1.05),
+        born: time,
+        hold: random(1700, 5200),
+        life: random(5600, 10500),
+        slide: random(2.5, 8) * (.74 + strength * .34),
+        wobble: random(0, Math.PI * 2),
+      });
+      if (wet.drops.length > 18) wet.drops.splice(0, wet.drops.length - 18);
+    }
+  }
+
+  function drawWetGlass(time, dt) {
+    if (!wetCtx || !wet.rect) return;
+    if (time - wet.lastDraw < 1000 / (reducedMotion.matches ? 10 : 30)) return;
+    wet.lastDraw = time;
+    wet.rect = currentCard.getBoundingClientRect();
+    wetCtx.setTransform(wet.dpr, 0, 0, wet.dpr, 0, 0);
+    wetCtx.clearRect(0, 0, wet.width, wet.height);
+
+    wet.impacts = wet.impacts.filter(impact => time - impact.born < 210);
+    for (const impact of wet.impacts) {
+      const age = (time - impact.born) / 210;
+      const ease = 1 - Math.pow(1 - age, 2);
+      const alpha = (1 - age) * .48;
+      wetCtx.save();
+      wetCtx.globalAlpha = alpha;
+      wetCtx.fillStyle = "rgba(242,250,255,.82)";
+      wetCtx.beginPath();
+      wetCtx.ellipse(impact.x, impact.y, impact.radius * (1 - age * .42), impact.radius * .42, -.18, 0, Math.PI * 2);
+      wetCtx.fill();
+      for (const dot of impact.satellites) {
+        const distance = dot.distance * (.28 + ease);
+        wetCtx.beginPath();
+        wetCtx.arc(
+          impact.x + Math.cos(dot.angle) * distance,
+          impact.y + Math.sin(dot.angle) * distance,
+          dot.size * (1 - age * .55),
+          0,
+          Math.PI * 2,
+        );
+        wetCtx.fill();
+      }
+      wetCtx.restore();
+    }
+
+    wet.drops = wet.drops.filter(drop => {
+      const ageMs = time - drop.born;
+      if (ageMs > drop.life || drop.y > wet.height + 12) return false;
+      if (ageMs > drop.hold) {
+        const slideFactor = Math.min(2.1, 1 + (ageMs - drop.hold) / 4200);
+        drop.y += drop.slide * slideFactor * dt;
+        drop.x += Math.sin(time * .0011 + drop.wobble) * .13;
+      }
+      const fade = ageMs > drop.life - 1100 ? clamp01((drop.life - ageMs) / 1100) : 1;
+      const stretching = ageMs > drop.hold ? Math.min(1.72, 1 + (ageMs - drop.hold) / 5200) : 1;
+      const r = drop.radius;
+      wetCtx.save();
+      wetCtx.globalAlpha = .48 * fade;
+      if (ageMs > drop.hold + 180) {
+        const trail = Math.min(12, (ageMs - drop.hold) * .0026);
+        wetCtx.strokeStyle = "rgba(234,248,255,.14)";
+        wetCtx.lineWidth = Math.max(.35, r * .42);
+        wetCtx.lineCap = "round";
+        wetCtx.beginPath();
+        wetCtx.moveTo(drop.x, drop.y - trail);
+        wetCtx.lineTo(drop.x, drop.y - r * .55);
+        wetCtx.stroke();
+      }
+      const gradient = wetCtx.createRadialGradient(
+        drop.x - r * .34, drop.y - r * .42, r * .04,
+        drop.x, drop.y, r * 1.12,
+      );
+      gradient.addColorStop(0, "rgba(255,255,255,.88)");
+      gradient.addColorStop(.2, "rgba(244,251,255,.34)");
+      gradient.addColorStop(.62, "rgba(221,240,249,.055)");
+      gradient.addColorStop(.84, "rgba(246,252,255,.12)");
+      gradient.addColorStop(1, "rgba(226,243,252,.32)");
+      wetCtx.fillStyle = gradient;
+      wetCtx.beginPath();
+      wetCtx.ellipse(drop.x, drop.y, r, r * stretching, 0, 0, Math.PI * 2);
+      wetCtx.fill();
+      wetCtx.strokeStyle = "rgba(247,253,255,.26)";
+      wetCtx.lineWidth = .45;
+      wetCtx.stroke();
+      wetCtx.globalAlpha = .44 * fade;
+      wetCtx.strokeStyle = "rgba(255,255,255,.9)";
+      wetCtx.lineWidth = Math.max(.35, r * .2);
+      wetCtx.beginPath();
+      wetCtx.arc(drop.x - r * .18, drop.y - r * .25, r * .42, Math.PI * 1.02, Math.PI * 1.54);
+      wetCtx.stroke();
+      wetCtx.restore();
+      return true;
+    });
+  }
+
+  function resetSnowflake(p) {
+    const margin = Math.max(8, p.size * 3);
+    p.y = random(-state.height * .22, -margin);
+    p.x = random(-state.width * .04, state.width * 1.04);
+    p.phase = random(0, Math.PI * 2);
+    p.gustPhase = random(0, Math.PI * 2);
+    p.angle = random(0, Math.PI * 2);
+  }
+
+  function drawSnowflake(p) {
+    const r = p.size;
+    if (p.kind === "dot") {
+      ctx.globalAlpha = Math.min(.82, p.alpha);
+      ctx.fillStyle = "rgba(250,253,255,.96)";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    ctx.globalAlpha = Math.min(.9, p.alpha);
+    ctx.strokeStyle = "rgba(248,252,255,.94)";
+    ctx.fillStyle = "rgba(255,255,255,.96)";
+    ctx.lineWidth = p.depth >= 3 ? .72 : p.depth === 2 ? .58 : .46;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (p.depth >= 2) {
+      ctx.shadowColor = "rgba(225,241,255,.34)";
+      ctx.shadowBlur = p.depth === 3 ? 2.2 : 1.2;
+    }
+
+    // 三條交叉晶枝形成六角雪花；近景再加短分枝，但不使用文字符號。
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const angle = i * Math.PI / 3;
+      const dx = Math.cos(angle) * r;
+      const dy = Math.sin(angle) * r;
+      ctx.moveTo(-dx, -dy);
+      ctx.lineTo(dx, dy);
+    }
+    ctx.stroke();
+
+    if (p.depth >= 2) {
+      const branchAt = r * .56;
+      const branchLength = r * .27;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = i * Math.PI / 3;
+        const bx = Math.cos(angle) * branchAt;
+        const by = Math.sin(angle) * branchAt;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(
+          bx + Math.cos(angle - .72) * branchLength,
+          by + Math.sin(angle - .72) * branchLength,
+        );
+        ctx.moveTo(bx, by);
+        ctx.lineTo(
+          bx + Math.cos(angle + .72) * branchLength,
+          by + Math.sin(angle + .72) * branchLength,
+        );
+      }
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(.42, r * .13), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPrecip(dt, time) {
+    const storm = state.effect === "storm";
+    for (const p of state.precip) {
+      if (p.type === "rain") {
+        const oldX = p.x;
+        const oldY = p.y;
+        p.y += p.speed * dt;
+        p.x -= (storm ? 120 : 72) * dt * (1 + p.depth * .18);
+        const cardRect = wet.rect;
+        if (p.hitsGlass && cardRect && p.y > oldY) {
+          const hitY = cardRect.top + cardRect.height * p.glassHitRatio;
+          if (oldY <= hitY && p.y > hitY) {
+            const fraction = (hitY - oldY) / Math.max(.001, p.y - oldY);
+            const hitX = oldX + (p.x - oldX) * fraction;
+            const minGap = state.rainLevel === "heavy" ? 38 : state.rainLevel === "moderate" ? 62 : 96;
+            if (hitX >= cardRect.left && hitX <= cardRect.right && time - wet.lastImpact >= minGap) {
+              wet.lastImpact = time;
+              spawnWetImpact(hitX, hitY, time, p.depth);
+              resetRainDrop(p);
+              continue;
+            }
+          }
+        }
+        if (p.y > state.height + p.len || p.x < -p.len) {
+          resetRainDrop(p);
+        }
+        ctx.globalAlpha = p.alpha;
+        ctx.lineWidth = p.width;
+        const lowerScene = p.y > state.height * .43;
+        ctx.strokeStyle = lowerScene
+          ? (p.depth === 2 ? "rgba(95,143,181,.94)" : "rgba(116,158,190,.80)")
+          : (p.depth === 2 ? "rgba(225,241,255,.9)" : "rgba(210,232,249,.76)");
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.len * .18, p.y + p.len);
+        ctx.stroke();
+      } else {
+        const fallPulse = .88 + Math.sin(time * .00072 + p.phase) * .12;
+        const slowGust = Math.sin(time * .00019 + p.gustPhase) * (2.2 + p.depth * 1.35);
+        const sideToSide = Math.sin(time * p.wobbleSpeed + p.phase) * p.sway;
+        p.y += p.speed * fallPulse * dt;
+        p.x += (p.drift + slowGust + sideToSide) * dt;
+        p.angle += p.spin * dt;
+
+        const margin = Math.max(10, p.size * 3);
+        if (p.x < -margin) p.x = state.width + margin;
+        else if (p.x > state.width + margin) p.x = -margin;
+        if (p.y > state.height + margin) resetSnowflake(p);
+        drawSnowflake(p);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function makeBolt() {
+    const x = random(state.width * .24, state.width * .82);
+    let y = random(state.height * .06, state.height * .18);
+    const pts = [{ x, y }];
+    let px = x;
+    while (y < state.height * random(.46, .72)) {
+      px += random(-22, 22);
+      y += random(28, 52);
+      pts.push({ x: px, y });
+    }
+    state.bolt = pts;
+    state.boltUntil = performance.now() + 105;
+  }
+
+  function drawBolt(now) {
+    if (now > state.boltUntil || state.bolt.length < 2) return;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(192,220,255,.96)";
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = "rgba(244,249,255,.98)";
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    state.bolt.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function flash(alpha, duration) {
+    glow.style.setProperty("--flash-alpha", alpha);
+    glow.classList.add("is-flashing");
+    root.style.setProperty("--scene-flash", alpha);
+    body.classList.add("scene-flash");
+    setTimeout(() => {
+      glow.classList.remove("is-flashing");
+      root.style.setProperty("--scene-flash", 0);
+      body.classList.remove("scene-flash");
+    }, duration);
+  }
+
+  function lightningEvent() {
+    if (state.effect !== "storm" || document.hidden || reducedMotion.matches) return;
+    const x = random(24, 82), y = random(7, 26);
+    glow.style.setProperty("--bolt-x", x + "%");
+    glow.style.setProperty("--bolt-y", y + "%");
+    flash(.48, 55);
+    setTimeout(() => flash(1, 88), 95);
+    setTimeout(() => {
+      if (Math.random() < .34) makeBolt();
+      flash(.34, 62);
+    }, 255);
+    state.lightningAt = performance.now() + random(11000, 38000);
+  }
+
+  function updateSun() {
+    let hour = new Date().getHours() + new Date().getMinutes() / 60;
+    let sunrise = 6, sunset = 18;
+    try {
+      if (typeof getTargetHour === "function") hour = getTargetHour(Date.now());
+      if (typeof getSunHoursForTs === "function") {
+        const solar = getSunHoursForTs(Date.now());
+        if (Number.isFinite(solar?.sunriseHour)) sunrise = solar.sunriseHour;
+        if (Number.isFinite(solar?.sunsetHour)) sunset = solar.sunsetHour;
+      }
+    } catch {}
+    const daylight = hour >= sunrise && hour < sunset;
+    const p = daylight ? clamp01((hour - sunrise) / Math.max(.1, sunset - sunrise)) : 0;
+    const x = 7 + p * 86;
+    const y = 82 - Math.sin(p * Math.PI) * 72;
+    const warmth = daylight ? clamp01(1 - Math.sin(p * Math.PI) * 1.12) : 0;
+    const blocked = ["overcast", "rain", "storm", "fog", "snow"].includes(state.effect);
+    const opacity = daylight && !blocked ? (state.effect === "partly" ? .62 : .98) : 0;
+    root.style.setProperty("--sun-x", x.toFixed(2) + "%");
+    root.style.setProperty("--sun-y", y.toFixed(2) + "%");
+    root.style.setProperty("--sun-opacity", opacity.toFixed(2));
+    root.style.setProperty("--sun-warmth", warmth.toFixed(2));
+    root.style.setProperty("--scene-light-x", x.toFixed(2) + "%");
+    root.style.setProperty("--scene-light-x-num", x.toFixed(2));
+  }
+
+  function applySceneConfig(args = {}) {
+    const scene = String(args.scene || body.dataset.scene || "clear-day");
+    const text = String(args.weatherText || document.getElementById("cardCondition")?.textContent || "");
+    const rain = Number(args.rain) || 0;
+    const night = typeof args.isNight === "boolean" ? args.isNight : /night/.test(scene);
+    const rain10 = finiteNumber(args.rain10);
+    const rain1h = finiteNumber(args.rain1h);
+    const visibility = finiteNumber(args.visibility);
+    const conditionAgeMinutes = finiteNumber(args.conditionAgeMinutes);
+    const conditionStationDistanceKm = finiteNumber(args.conditionStationDistanceKm);
+    const conditionIsStale = Number.isFinite(conditionAgeMinutes) && conditionAgeMinutes > 20;
+    const nearbyConditionStation = Number.isFinite(conditionStationDistanceKm) &&
+      conditionStationDistanceKm >= 0 && conditionStationDistanceKm <= 5;
+    const conditionCanVetoRain = nearbyConditionStation && !conditionIsStale;
+    const reportsSnow = /雪|霰|snow/i.test(text);
+    const reportsThunder = /雷|thunder/i.test(text);
+    const reportsRain = /雨|有降水|rain|shower/i.test(text);
+    let rainLevel = classifyRainLevel(rain10, rain1h);
+
+    // 只有 5 km 內且未超過 20 分鐘的天氣狀況測站，才有權否決雨量動畫。
+    // 測站較遠、距離不明或狀況資料過舊時，雨量判斷優先。
+    if (!reportsRain && !reportsSnow && !reportsThunder && conditionCanVetoRain) rainLevel = "none";
+    if ((reportsRain || reportsThunder) && rainLevel === "none") rainLevel = reportsThunder ? "heavy" : "light";
+
+    if (reportsSnow) state.effect = "snow";
+    else if (reportsThunder) state.effect = "storm";
+    else if (reportsRain || (!conditionCanVetoRain && rainLevel !== "none")) state.effect = "rain";
+    else state.effect = drySkyEffect(text);
+    state.isNight = night;
+    state.cloud = Number.isFinite(Number(args.cloud)) ? Number(args.cloud) : (/陰/.test(text) ? 92 : /多雲/.test(text) ? 62 : 14);
+    state.rain10 = rain10;
+    state.rain1h = rain1h;
+    state.rainLevel = rainLevel;
+    state.conditionAgeMinutes = conditionAgeMinutes;
+    state.conditionStationDistanceKm = conditionStationDistanceKm;
+    state.visibility = visibility;
+    state.foggy = (Number.isFinite(visibility) && visibility < 1.5) || state.effect === "fog";
+    state.rain = state.effect === "storm" ? Math.max(18, rain) : rain;
+    body.dataset.weatherEffect = state.effect;
+    body.dataset.weatherFog = String(state.foggy);
+    body.dataset.rainIntensity = rainLevel;
+    if (state.effect === "storm") state.lightningAt = performance.now() + random(2200, 6500);
+    else state.lightningAt = Infinity;
+    updateSun();
+    rebuildScene();
+  }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!state.visible) return;
+    const targetFps = reducedMotion.matches ? 12 : 60,
+      targetFrame = 1000 / targetFps,
+      elapsedSinceDraw = now - state.lastDraw;
+    if (elapsedSinceDraw + .45 < targetFrame) return;
+    const dt = Math.min(.05, Math.max(.001, (now - state.last) / 1000));
+    state.last = now;
+    state.lastDraw = now - (elapsedSinceDraw % targetFrame);
+    ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+    ctx.clearRect(0, 0, state.width, state.height);
+
+    const backgroundFrame = 1000 / (reducedMotion.matches ? 8 : 15);
+    if (now - state.lastBackgroundDraw >= backgroundFrame) {
+      const backgroundDt = Math.min(
+        .12,
+        Math.max(.001, (now - state.lastBackgroundTime) / 1000),
+      );
+      state.lastBackgroundTime = now;
+      state.lastBackgroundDraw = now;
+      backgroundCtx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      backgroundCtx.clearRect(0, 0, state.width, state.height);
+      if (state.isNight) {
+        for (const s of state.stars) {
+          backgroundCtx.globalAlpha = s.alpha * (.56 + Math.sin(now * .001 * s.speed + s.phase) * .34);
+          backgroundCtx.fillStyle = "#fff";
+          backgroundCtx.beginPath();
+          backgroundCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          backgroundCtx.fill();
+        }
+      }
+      backgroundCtx.globalAlpha = 1;
+      drawClouds(backgroundCtx, backgroundDt, now);
+      drawFog(backgroundCtx, backgroundDt, now);
+    }
+    ctx.globalAlpha = 1;
+    drawPrecip(dt, now);
+    drawWetGlass(now, dt);
+    drawBolt(now);
+    if (now >= state.lightningAt) lightningEvent();
+  }
+
+  let latestSceneArgs = {};
+
+  /* 接管原函式；其餘資料與 UI 邏輯維持原樣。 */
+  window.renderAtmosphereEffects = function(args = {}) {
+    latestSceneArgs = { ...latestSceneArgs, ...args };
+    try { applySceneConfig(latestSceneArgs); }
+    catch (error) {
+      console.warn("[Weather Scene Engine]", error);
+      if (typeof oldRenderAtmosphere === "function") oldRenderAtmosphere(args);
+    }
+  };
+
+  window.getScene = function(args = {}) {
+    const text = String(args.weatherText || "");
+    const night = typeof isNightAt === "function" ? isNightAt(args.ts || Date.now()) : false;
+    if (/雷/.test(text)) return night ? "storm-night" : "storm-day";
+    return typeof oldGetScene === "function" ? oldGetScene(args) : (night ? "clear-night" : "clear-day");
+  };
+
+  const condition = document.getElementById("cardCondition");
+  if (condition) {
+    new MutationObserver(() => {
+      const text = condition.textContent || "";
+      if (text && text !== "--") applySceneConfig({
+        ...latestSceneArgs,
+        scene: body.dataset.scene,
+        weatherText: text,
+        isNight: /night/.test(body.dataset.scene || ""),
+      });
+    }).observe(condition, { childList: true, characterData: true, subtree: true });
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    state.visible = !document.hidden;
+    state.last = performance.now();
+  });
+  addEventListener("resize", resize, { passive: true });
+  window.visualViewport?.addEventListener("resize", resize, { passive: true });
+  if (currentCard && typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(resizeWetSurface).observe(currentCard);
+  }
+  setInterval(updateSun, 60000);
+  resize();
+  applySceneConfig({ scene: body.dataset.scene, weatherText: condition?.textContent || "" });
+  requestAnimationFrame(frame);
+})();
+</script>
   </body>
 </html>
