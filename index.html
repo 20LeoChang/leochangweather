@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站 v8.6</title>
+    <title>天氣網站 v8.6.1</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3584,7 +3584,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.6</div>
+              <div class="version-badge" id="versionLabel">v8.6.1</div>
             </div>
           </section>
 
@@ -3766,7 +3766,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.6</div>
+              <div class="version-badge">v8.6.1</div>
             </div>
           </section>
 
@@ -3978,7 +3978,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.6</div>
+              <div class="version-badge">v8.6.1</div>
             </div>
           </section>
         </div>
@@ -4189,7 +4189,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.6";
+      const APP_VERSION = "v8.6.1";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -8502,7 +8502,7 @@ function obsMapPickVisibleStations() {
       if ($("versionLabel")) $("versionLabel").textContent = APP_VERSION;
       runCurrentMode();
     </script>
-<!-- Weather Scene Engine v8.5
+<!-- Weather Scene Engine v8.6.1
      將本段完整貼在原檔最後一個 </body> 之前。
      不改 API、地圖與預報，只接管動態天氣背景。 -->
 <style>
@@ -8570,7 +8570,11 @@ function obsMapPickVisibleStations() {
       0 0 110px 48px rgba(202, 232, 255, .34),
       0 0 220px 95px rgba(255, 221, 153, calc(.10 + var(--sun-warmth) * .16));
     filter: blur(.15px);
-    transition: opacity 1.2s ease, box-shadow 1.2s ease;
+    transition:
+      left 2.8s linear,
+      top 2.8s linear,
+      opacity 1.2s ease,
+      box-shadow 1.2s ease;
   }
   .weather-sun::before {
     content: "";
@@ -8604,6 +8608,11 @@ function obsMapPickVisibleStations() {
   .weather-lens-flare i:nth-child(2) { width: 52px; height: 52px; left: 29vw; top: 31vh; opacity: .64; }
   .weather-lens-flare i:nth-child(3) { width: 18px; height: 18px; left: 47vw; top: 49vh; opacity: .72; }
   .weather-lens-flare i:nth-child(4) { width: 92px; height: 92px; left: 60vw; top: 61vh; opacity: .27; }
+
+  /* v8.6.1：停用 lens flare，避免 iOS Safari 出現深色合成殘影。 */
+  .weather-lens-flare {
+    display: none !important;
+  }
 
   .weather-atmosphere-wash {
     z-index: 3;
@@ -9301,30 +9310,189 @@ function obsMapPickVisibleStations() {
     state.lightningAt = performance.now() + random(11000, 38000);
   }
 
-  function updateSun() {
-    let hour = new Date().getHours() + new Date().getMinutes() / 60;
-    let sunrise = 6, sunset = 18;
-    try {
-      if (typeof getTargetHour === "function") hour = getTargetHour(Date.now());
-      if (typeof getSunHoursForTs === "function") {
-        const solar = getSunHoursForTs(Date.now());
-        if (Number.isFinite(solar?.sunriseHour)) sunrise = solar.sunriseHour;
-        if (Number.isFinite(solar?.sunsetHour)) sunset = solar.sunsetHour;
+  /*
+   * v8.6.1：依日期、時間與查詢地點經緯度計算太陽實際位置。
+   *
+   * azimuth：0° 北、90° 東、180° 南、270° 西
+   * elevation：0° 地平線、90° 天頂
+   *
+   * 計算採 NOAA Solar Calculator 使用的太陽幾何近似式；
+   * 真太陽時直接由 UTC 時刻 + 經度求得，因此不依賴裝置時區。
+   */
+  function calculateSolarPosition(ts = Date.now(), lat = solarTargetLat, lon = solarTargetLon) {
+    lat = Number(lat);
+    lon = Number(lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      return null;
+    }
+
+    const rad = deg => deg * Math.PI / 180;
+    const deg = value => value * 180 / Math.PI;
+    const normalize360 = value => ((value % 360) + 360) % 360;
+
+    const jd = ts / 86400000 + 2440587.5;
+    const jc = (jd - 2451545.0) / 36525;
+
+    const geomMeanLongSun = normalize360(
+      280.46646 + jc * (36000.76983 + jc * 0.0003032)
+    );
+    const geomMeanAnomalySun =
+      357.52911 + jc * (35999.05029 - 0.0001537 * jc);
+    const eccentricityEarthOrbit =
+      0.016708634 - jc * (0.000042037 + 0.0000001267 * jc);
+
+    const sunEquationOfCenter =
+      Math.sin(rad(geomMeanAnomalySun)) *
+        (1.914602 - jc * (0.004817 + 0.000014 * jc)) +
+      Math.sin(rad(2 * geomMeanAnomalySun)) *
+        (0.019993 - 0.000101 * jc) +
+      Math.sin(rad(3 * geomMeanAnomalySun)) * 0.000289;
+
+    const sunTrueLongitude = geomMeanLongSun + sunEquationOfCenter;
+    const omega = 125.04 - 1934.136 * jc;
+    const sunApparentLongitude =
+      sunTrueLongitude - 0.00569 - 0.00478 * Math.sin(rad(omega));
+
+    const meanObliquity =
+      23 +
+      (26 +
+        (21.448 -
+          jc * (46.815 + jc * (0.00059 - jc * 0.001813))) /
+          60) /
+        60;
+    const obliquityCorrection =
+      meanObliquity + 0.00256 * Math.cos(rad(omega));
+
+    const declination = deg(
+      Math.asin(
+        Math.sin(rad(obliquityCorrection)) *
+        Math.sin(rad(sunApparentLongitude))
+      )
+    );
+
+    const y = Math.tan(rad(obliquityCorrection / 2)) ** 2;
+    const equationOfTime = 4 * deg(
+      y * Math.sin(2 * rad(geomMeanLongSun)) -
+      2 * eccentricityEarthOrbit * Math.sin(rad(geomMeanAnomalySun)) +
+      4 * eccentricityEarthOrbit * y *
+        Math.sin(rad(geomMeanAnomalySun)) *
+        Math.cos(2 * rad(geomMeanLongSun)) -
+      0.5 * y ** 2 * Math.sin(4 * rad(geomMeanLongSun)) -
+      1.25 * eccentricityEarthOrbit ** 2 *
+        Math.sin(2 * rad(geomMeanAnomalySun))
+    );
+
+    const utc = new Date(ts);
+    const utcMinutes =
+      utc.getUTCHours() * 60 +
+      utc.getUTCMinutes() +
+      utc.getUTCSeconds() / 60 +
+      utc.getUTCMilliseconds() / 60000;
+
+    let trueSolarTime = (utcMinutes + equationOfTime + 4 * lon) % 1440;
+    if (trueSolarTime < 0) trueSolarTime += 1440;
+
+    let hourAngle = trueSolarTime / 4 - 180;
+    if (hourAngle < -180) hourAngle += 360;
+
+    const latRad = rad(lat);
+    const declinationRad = rad(declination);
+    const hourAngleRad = rad(hourAngle);
+    const cosZenith =
+      Math.sin(latRad) * Math.sin(declinationRad) +
+      Math.cos(latRad) * Math.cos(declinationRad) * Math.cos(hourAngleRad);
+    const zenith = deg(Math.acos(Math.max(-1, Math.min(1, cosZenith))));
+    const geometricElevation = 90 - zenith;
+
+    /* NOAA 近地平線大氣折射修正。 */
+    let refraction = 0;
+    if (geometricElevation > 85) {
+      refraction = 0;
+    } else if (geometricElevation > 5) {
+      const tangent = Math.tan(rad(geometricElevation));
+      refraction =
+        (58.1 / tangent - 0.07 / tangent ** 3 + 0.000086 / tangent ** 5) /
+        3600;
+    } else if (geometricElevation > -0.575) {
+      const e = geometricElevation;
+      refraction =
+        (1735 + e * (-518.2 + e * (103.4 + e * (-12.79 + e * 0.711)))) /
+        3600;
+    } else {
+      const tangent = Math.tan(rad(geometricElevation));
+      if (Math.abs(tangent) > 1e-8) {
+        refraction = (-20.772 / tangent) / 3600;
       }
-    } catch {}
-    const daylight = hour >= sunrise && hour < sunset;
-    const p = daylight ? clamp01((hour - sunrise) / Math.max(.1, sunset - sunrise)) : 0;
-    const x = 7 + p * 86;
-    const y = 82 - Math.sin(p * Math.PI) * 72;
-    const warmth = daylight ? clamp01(1 - Math.sin(p * Math.PI) * 1.12) : 0;
+    }
+
+    const elevation = geometricElevation + refraction;
+    const azimuth = normalize360(
+      deg(
+        Math.atan2(
+          Math.sin(hourAngleRad),
+          Math.cos(hourAngleRad) * Math.sin(latRad) -
+            Math.tan(declinationRad) * Math.cos(latRad)
+        )
+      ) + 180
+    );
+
+    return {
+      azimuth,
+      elevation,
+      geometricElevation,
+      declination,
+      hourAngle,
+      equationOfTime,
+    };
+  }
+
+  function updateSun() {
+    const solar = calculateSolarPosition(Date.now(), solarTargetLat, solarTargetLon);
+    if (!solar) {
+      root.style.setProperty("--sun-opacity", "0");
+      return;
+    }
+
+    const { azimuth, elevation, geometricElevation } = solar;
+    const azimuthRad = azimuth * Math.PI / 180;
+    const visibleElevation = Math.max(0, elevation);
+    const elevationRad = visibleElevation * Math.PI / 180;
+
+    /*
+     * 將真實天空球正投影到畫面：
+     * 東向分量為正，所以東方日出在畫面右側；西方日落在左側。
+     * 高度越接近天頂，水平位移自然越接近中央。
+     */
+    const eastWest = Math.sin(azimuthRad) * Math.cos(elevationRad);
+    const x = 50 + eastWest * 42;
+
+    /* 地平線約在畫面 82%，天頂約在 12%。 */
+    const altitudeProjection = Math.sin(
+      Math.max(0, Math.min(Math.PI / 2, elevationRad))
+    );
+    const y = 82 - altitudeProjection * 70;
+
+    /* 太陽圓心幾何高度約 -0.833° 時視為日出／日落附近。 */
+    const aboveHorizon = geometricElevation > -0.833;
+    const horizonFade = clamp01((geometricElevation + 0.833) / 1.5);
+    const warmth = aboveHorizon
+      ? 1 - clamp01(Math.max(0, elevation) / 18)
+      : 0;
+
     const blocked = ["overcast", "rain", "storm", "fog", "snow"].includes(state.effect);
-    const opacity = daylight && !blocked ? (state.effect === "partly" ? .62 : .98) : 0;
+    const baseOpacity = state.effect === "partly" ? .62 : .98;
+    const opacity = aboveHorizon && !blocked ? baseOpacity * horizonFade : 0;
+
     root.style.setProperty("--sun-x", x.toFixed(2) + "%");
     root.style.setProperty("--sun-y", y.toFixed(2) + "%");
-    root.style.setProperty("--sun-opacity", opacity.toFixed(2));
-    root.style.setProperty("--sun-warmth", warmth.toFixed(2));
+    root.style.setProperty("--sun-opacity", opacity.toFixed(3));
+    root.style.setProperty("--sun-warmth", warmth.toFixed(3));
     root.style.setProperty("--scene-light-x", x.toFixed(2) + "%");
     root.style.setProperty("--scene-light-x-num", x.toFixed(2));
+
+    /* 保留給 debug / 開發者工具查看，不顯示在正式 UI。 */
+    body.dataset.sunAzimuth = azimuth.toFixed(1);
+    body.dataset.sunElevation = elevation.toFixed(1);
   }
 
   function applySceneConfig(args = {}) {
@@ -9458,7 +9626,7 @@ function obsMapPickVisibleStations() {
   if (currentCard && typeof ResizeObserver !== "undefined") {
     new ResizeObserver(resizeWetSurface).observe(currentCard);
   }
-  setInterval(updateSun, 60000);
+  setInterval(updateSun, 10000);
   resize();
   applySceneConfig({ scene: body.dataset.scene, weatherText: condition?.textContent || "" });
   requestAnimationFrame(frame);
