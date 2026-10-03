@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站 v8.6.1</title>
+    <title>天氣網站 v8.6.2</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3584,7 +3584,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.6.1</div>
+              <div class="version-badge" id="versionLabel">v8.6.2</div>
             </div>
           </section>
 
@@ -3766,7 +3766,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.1</div>
+              <div class="version-badge">v8.6.2</div>
             </div>
           </section>
 
@@ -3978,7 +3978,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.1</div>
+              <div class="version-badge">v8.6.2</div>
             </div>
           </section>
         </div>
@@ -4189,7 +4189,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.6.1";
+      const APP_VERSION = "v8.6.2";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -5445,7 +5445,17 @@ function obsMapPickVisibleStations() {
           qpfLocationMarker.bringToFront();
         } catch {}
       }
-      async function loadQpfImage() {
+      // All refresh entry points share one in-flight image update.
+      let qpfImageLoadPromise = null;
+      function loadQpfImage() {
+        if (!qpfMap) return Promise.resolve(false);
+        if (qpfImageLoadPromise) return qpfImageLoadPromise;
+        qpfImageLoadPromise = loadQpfImageOnce().finally(() => {
+          qpfImageLoadPromise = null;
+        });
+        return qpfImageLoadPromise;
+      }
+      async function loadQpfImageOnce() {
   if(!qpfMap) return false;
   const seq=++qpfImageLoadSeq;let candidate=null;
   try {
@@ -8703,6 +8713,16 @@ function obsMapPickVisibleStations() {
   @media (prefers-reduced-motion: reduce) {
     .weather-sun::before { animation: none; }
   }
+/* Reduce compositing cost on the long map pages. */
+body.scene-engine-ready .forecast-card,
+body.scene-engine-ready .observation-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.forecast-item {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 </style>
 
 <script>
@@ -9045,6 +9065,7 @@ function obsMapPickVisibleStations() {
   }
 
   function drawWetGlass(time, dt) {
+    if (body.dataset.page !== "current") return;
     if (!wetCtx || !wet.rect) return;
     if (time - wet.lastDraw < 1000 / (reducedMotion.matches ? 10 : 30)) return;
     wet.lastDraw = time;
