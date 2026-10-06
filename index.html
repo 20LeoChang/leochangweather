@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站 v8.6.4</title>
+    <title>天氣網站 v8.6.5</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3584,7 +3584,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.6.4</div>
+              <div class="version-badge" id="versionLabel">v8.6.5</div>
             </div>
           </section>
 
@@ -3766,7 +3766,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.4</div>
+              <div class="version-badge">v8.6.5</div>
             </div>
           </section>
 
@@ -3978,7 +3978,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.4</div>
+              <div class="version-badge">v8.6.5</div>
             </div>
           </section>
         </div>
@@ -4189,7 +4189,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.6.4";
+      const APP_VERSION = "v8.6.5";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -7708,6 +7708,7 @@ function obsMapPickVisibleStations() {
           d = Number.isFinite(ts) ? new Date(ts) : null;
         return {
           dateKey,
+          wxSource: String(i?.wxSource || ""),
           dow: String(
             i?.dow ??
               i?.weekday ??
@@ -7900,7 +7901,7 @@ function obsMapPickVisibleStations() {
                 : mapWeatherToIcon(d.wx, false)),
             row = document.createElement("div");
           row.className = "daily-row";
-          row.innerHTML = `<div class="dr-left">${escapeHtml(d.dow)}</div><div class="dr-mid"><span class="dr-icon">${escapeHtml(icon)}</span><span class="dr-wx">${escapeHtml(d.wx || "--")}</span></div><div class="dr-right"><div class="dr-temp"><span class="dr-min">${Number.isFinite(min) ? Math.round(min) + "°" : "--"}</span><span class="dr-max">${Number.isFinite(max) ? Math.round(max) + "°" : "--"}</span></div><div class="dr-pop"><span class="dr-pop-pill">${Number.isFinite(d.pop) ? Math.round(d.pop) + "%" : "--"}</span></div></div>`;
+          row.innerHTML = `<div class="dr-left">${escapeHtml(d.dow)}</div><div class="dr-mid"><span class="dr-icon">${escapeHtml(icon)}</span><span class="dr-wx">${escapeHtml(d.wx ? d.wx + (d.wxSource === "current" ? "（目前天氣）" : "") : "暫無資料")}</span></div><div class="dr-right"><div class="dr-temp"><span class="dr-min">${Number.isFinite(min) ? Math.round(min) + "°" : "--"}</span><span class="dr-max">${Number.isFinite(max) ? Math.round(max) + "°" : "--"}</span></div><div class="dr-pop"><span class="dr-pop-pill">${Number.isFinite(d.pop) ? Math.round(d.pop) + "%" : "--"}</span></div></div>`;
           box.appendChild(row);
         });
       }
@@ -7909,6 +7910,17 @@ function obsMapPickVisibleStations() {
   const arr=v=>Array.isArray(v)?v:[], now=Date.now();
   const h10=cleanForecastHours(arr(fc.hourly10m||fc.hourly_10m||fc.hourly_10min).map(normalizeBackendForecastHourlyItem));
   const h1=cleanForecastHours(arr(fc.hourly1h||fc.hourly_1h||fc.hourly).map(normalizeBackendForecastHourlyItem));
+  const currentWx=String(data?.realtime?.condition||"").trim();
+  const carryWeather=items=>{
+    let lastWx=currentWx;
+    for(const p of items){
+      if(p.wx) lastWx=p.wx;
+      else if(lastWx && p.ts>=now-60000){
+        p.wx=lastWx; p._icon=""; p._code=null;
+      }
+    }
+  };
+  carryWeather(h10); carryWeather(h1);
   const days=arr(fc.daily7||fc.daily_7||fc.daily).map(normalizeBackendForecastDailyItem).filter(d=>Number.isFinite(parseBackendForecastTs(d.dateKey,true))&&d.dateKey>=weatherDateKey(now,solarTargetTimeZone));
   hourly10m=h10.length?h10.filter(x=>x.ts>=now-60000).slice(0,144):interpolateForecastHours(h1,now);
   hourly1h=(h1.length?h1:h10.filter(x=>getTargetDateTimeParts(x.ts).minute===0)).filter(x=>x.ts>=now-60000).slice(0,24);
@@ -8842,21 +8854,38 @@ body.scene-engine-ready .observation-card {
   }
 
   function resize() {
-    state.width = Math.max(1, innerWidth, document.documentElement.clientWidth);
-    state.height = Math.max(1, innerHeight, document.documentElement.clientHeight);
-    state.dpr = Math.min(devicePixelRatio || 1, 1.65);
-    for (const layerCanvas of [backgroundCanvas, canvas]) {
-      layerCanvas.width = Math.round(state.width * state.dpr);
-      layerCanvas.height = Math.round(state.height * state.dpr);
-      layerCanvas.style.width = state.width + "px";
-      layerCanvas.style.height = state.height + "px";
+    const oldW = state.width, oldH = state.height;
+    const width = Math.max(1, innerWidth, document.documentElement.clientWidth);
+    const height = Math.max(1, innerHeight, document.documentElement.clientHeight);
+    const dpr = Math.min(devicePixelRatio || 1, 1.65);
+    const initialized = canvas.width === Math.round(width*dpr) && canvas.height === Math.round(height*dpr);
+    if (initialized && width===oldW && height===oldH && dpr===state.dpr) {
+      resizeWetSurface();
+      return;
     }
-    ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-    backgroundCtx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-    state.lastBackgroundDraw = 0;
-    state.lastBackgroundTime = performance.now();
+    state.width=width; state.height=height; state.dpr=dpr;
+    for (const layerCanvas of [backgroundCanvas, canvas]) {
+      layerCanvas.width = Math.round(width*dpr);
+      layerCanvas.height = Math.round(height*dpr);
+      layerCanvas.style.width = width+"px";
+      layerCanvas.style.height = height+"px";
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    backgroundCtx.setTransform(dpr,0,0,dpr,0,0);
+    state.lastBackgroundDraw=0;
+    state.lastBackgroundTime=performance.now();
     resizeWetSurface();
-    rebuildScene();
+    // Height-only changes preserve positions; orientation changes scale existing objects.
+    if (oldW>0 && oldH>0 && width!==oldW) {
+      const sx=width/oldW, sy=height/oldH;
+      for (const name of ["clouds","precip","fog","stars"]) {
+        for (const p of state[name]||[]) {
+          p.x*=sx; p.y*=sy;
+          if (Number.isFinite(p.rx)) p.rx*=sx;
+          if (Number.isFinite(p.ry)) p.ry*=sy;
+        }
+      }
+    }
   }
 
   function classify(weatherText, scene, rain) {
