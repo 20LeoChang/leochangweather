@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站 v8.6.5</title>
+    <title>天氣網站v8.6.6</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -29,22 +29,50 @@
         --item-border: rgba(255, 255, 255, 0.1);
         --btn-pill-bg: rgba(255, 255, 255, 0.1);
       }
+      /* v8.6.6: iOS Safari 的浮動工具列會讀取 body 的純色底色。
+         不要只使用 background-image 漸層（background-color 會變透明），
+         否則 Safari 工具列下方容易出現一條與頁面不一致的實色區塊。 */
       body {
         margin: 0;
         min-height: 100vh;
-        background:
-          linear-gradient(var(--temp-tint), var(--temp-tint)),
-          radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.14), transparent 34%),
-          linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+        background-color: var(--bg2);
         display: flex;
         align-items: center;
         justify-content: center;
         color: var(--text-main);
         transition:
-          background 0.8s ease,
+          background-color 0.8s ease,
           color 0.5s ease;
         overflow-x: hidden;
         position: relative;
+      }
+      /* 原本的溫度色調、天空光暈、天氣漸層全部保留，
+         只將漸層固定在視窗，避免長頁高度與 Safari 工具列視窗高度不一致。 */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(var(--temp-tint), var(--temp-tint)),
+          radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.14), transparent 34%),
+          linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
+        background-repeat: no-repeat;
+      }
+      /* iOS WebKit 底部色彩採樣輔助：2px，不影響頁面功能或操作。 */
+      @supports (-webkit-touch-callout: none) {
+        body::after {
+          content: "";
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 2px;
+          pointer-events: none;
+          z-index: 1;
+          background-color: var(--bg2);
+        }
       }
       .app {
         padding: 24px;
@@ -3584,7 +3612,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.6.5</div>
+              <div class="version-badge" id="versionLabel">v8.6.6</div>
             </div>
           </section>
 
@@ -3766,7 +3794,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.5</div>
+              <div class="version-badge">v8.6.6</div>
             </div>
           </section>
 
@@ -3978,7 +4006,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.5</div>
+              <div class="version-badge">v8.6.6</div>
             </div>
           </section>
         </div>
@@ -4189,7 +4217,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.6.5";
+      const APP_VERSION = "v8.6.6";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -7439,7 +7467,8 @@ function obsMapPickVisibleStations() {
         return "";
       }
       function sourceNameFromBackendCode(code) {
-        const s = String(code || "").toLowerCase();
+        const s = String(code || "").trim().toLowerCase();
+        if (s === "cwa_o_a0002") return "CWA 自動雨量站";
         if (s === "open-meteo-cams-model") return "Open-Meteo CAMS 模型";
         if (s === "open-meteo-15min-model") return "Open-Meteo 15分鐘模型";
         if (s === "open-meteo-hourly-model") return "Open-Meteo 小時模型";
@@ -7449,15 +7478,15 @@ function obsMapPickVisibleStations() {
       function primaryFieldSourceName(data, field) {
         const provider = data?.provider;
         if (provider === "cwa-backend") {
-          if (field === "rain10" || field === "rain1h") return "CWA 雨量站 O-A0002";
+          if (field === "rain10" || field === "rain1h") return "CWA 自動雨量站";
           if (field === "air") return "環境部空品測站";
-          if (field === "uv") return "CWA UV 測站";
+          if (field === "uv") return "CWA 紫外線測站";
           if (field === "feels") return "CWA 測站資料推算";
-          return "CWA 自動氣象站 / IDW";
+          return "CWA 自動氣象站";
         }
         if (provider === "cma-backend") {
           if (field === "feels") return "CMA 測站資料推算";
-          return "CMA 測站 / IDW";
+          return "CMA 自動氣象站";
         }
         if (provider === "open-meteo-backend") return "Open-Meteo 模型";
         return backendProviderName(data);
@@ -7493,12 +7522,12 @@ function obsMapPickVisibleStations() {
         }
 
         const preferred = [
-          "CWA 自動氣象站 / IDW",
+          "CWA 自動氣象站",
           "CWA 測站資料推算",
-          "CWA 雨量站 O-A0002",
-          "CWA UV 測站",
+          "CWA 自動雨量站",
+          "CWA 紫外線測站",
           "環境部空品測站",
-          "CMA 測站 / IDW",
+          "CMA 自動氣象站",
           "CMA 測站資料推算",
           "Open-Meteo 模型",
           "Open-Meteo 小時模型",
