@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#5aaeff" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v8.6.7</title>
+    <title>天氣網站v9.0</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -30,7 +30,7 @@
         --item-border: rgba(255, 255, 255, 0.1);
         --btn-pill-bg: rgba(255, 255, 255, 0.1);
       }
-      /* v8.6.7: iOS Safari 的浮動工具列會讀取 body 的純色底色。
+      /* v9.0: iOS Safari 的浮動工具列會讀取 body 的純色底色。
          不要只使用 background-image 漸層（background-color 會變透明），
          否則 Safari 工具列下方容易出現一條與頁面不一致的實色區塊。 */
       body {
@@ -61,7 +61,7 @@
           linear-gradient(180deg, var(--bg1) 0%, var(--bg2) 100%);
         background-repeat: no-repeat;
       }
-      /* v8.6.7: 移除底部 2px 固定色帶，避免 Safari 產生水平接縫。 */
+      /* v9.0: 移除底部 2px 固定色帶，避免 Safari 產生水平接縫。 */
       .app {
         padding: 24px;
         width: 100%;
@@ -656,7 +656,7 @@
         line-height: 1.2;
         font-variant-numeric: tabular-nums;
       }
-      /* v8.6.7: 前端內插溫度保留來源註記，不會冒充原始官方數值。 */
+      /* v9.0: 前端內插溫度保留來源註記，不會冒充原始官方數值。 */
       .fi-interpolated {
         margin-top: 3px;
         font-size: 9px;
@@ -1753,7 +1753,7 @@
       }
 
       html {
-        /* v8.6.7: Safari 的頂端系統區域需要自己的主題底色，不能繼承 body 的漸層終點色。 */
+        /* v9.0: Safari 的頂端系統區域需要自己的主題底色，不能繼承 body 的漸層終點色。 */
         background-color: var(--browser-top-color, #5aaeff);
         width: 100%;
         min-width: 0;
@@ -3609,7 +3609,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v8.6.7</div>
+              <div class="version-badge" id="versionLabel">v9.0</div>
             </div>
           </section>
 
@@ -3791,7 +3791,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.7</div>
+              <div class="version-badge">v9.0</div>
             </div>
           </section>
 
@@ -3851,7 +3851,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
 
                   <div class="obs-live-map-wrap">
-                    <div id="obsLiveMap" aria-label="台灣與中國大陸即時測站互動地圖"></div>
+                    <div id="obsLiveMap" aria-label="台灣、中國大陸與日本即時測站互動地圖"></div>
 
                     <div class="obs-live-map-loading" id="obsMapLoading">
                       正在載入測站資料…
@@ -4003,7 +4003,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v8.6.7</div>
+              <div class="version-badge">v9.0</div>
             </div>
           </section>
         </div>
@@ -4214,7 +4214,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v8.6.7";
+      const APP_VERSION = "v9.0";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4303,8 +4303,10 @@ function waitForOverlay(candidate,map,timeout=15000) {
          互動式觀測測站地圖
          - 台灣：CWA O-A0003 / O-A0001
          - 中國大陸：優先讀取 Worker 的全測站端點
+         - 日本：讀取 v9 Worker /obs/map/jma 全國觀測快照
          =========================== */
       const CMA_MAP_ENDPOINT_CANDIDATES = WORKER_ORIGIN ? [WORKER_ORIGIN + "/cma/map/all"] : [];
+      const JMA_MAP_ENDPOINT = WORKER_ORIGIN ? WORKER_ORIGIN + "/obs/map/jma" : "";
 
       const OBS_MAP_METRICS = {
         temperature: { label: "溫度", unit: "°C" },
@@ -4671,6 +4673,28 @@ function waitForOverlay(candidate,map,timeout=15000) {
         throw lastErr || new Error("CMA 尚無可用測站資料");
       }
 
+      // JMA is already normalized by the v9 backend: do not convert its coordinates a second time.
+      function obsMapParseJmaSnapshot(data) {
+        if (!data?.ok || !Array.isArray(data.stations)) throw new Error("JMA 回應沒有有效測站資料");
+        return data.stations.map(s => ({
+          id: "jp-" + String(s.id ?? `${s.lat},${s.lon}`), rawId: String(s.id ?? ""),
+          name: String(s.name ?? s.id ?? "JMA 測站"), source: "JMA", timezone: "Asia/Tokyo",
+          lat: obsMapNum(s.lat), lon: obsMapNum(s.lon), alt: obsMapNum(s.alt),
+          temperature: obsMapQcTemperature(s.temperature), humidity: obsMapQcHumidity(s.humidity),
+          windSpeed: obsMapQcWind(s.windSpeed), windDirection: obsMapQcWindDir(s.windDirection),
+          pressure: obsMapQcPressure(s.pressure), rain1h: obsMapQcRain(s.rain1h),
+          feels: obsMapQcTemperature(s.feels), obsTime: s.obsTime || null,
+          fieldTimes: {...(s.fieldTimes || {})}
+        })).filter(s => Number.isFinite(s.lat) && Number.isFinite(s.lon) &&
+          [s.temperature,s.humidity,s.windSpeed,s.pressure,s.rain1h].some(Number.isFinite));
+      }
+
+      async function obsMapLoadJma({force=false}={}) {
+        if (!JMA_MAP_ENDPOINT) throw new Error("JMA 後端網址尚未設定");
+        const data = await fetchJson(JMA_MAP_ENDPOINT + (force ? "?refresh=1&t=" + Date.now() : ""),20000);
+        return obsMapParseJmaSnapshot(data);
+      }
+
       function obsMapValue(station, metric = obsLiveMapMetric) {
         const key=metric==="wind"?"windSpeed":metric,ts=weatherTimestamp(station?.fieldTimes?.[key]||station?.obsTime);
         if(!Number.isFinite(ts)||Date.now()-ts>90*60000||ts-Date.now()>120000)return NaN;
@@ -4847,12 +4871,12 @@ function waitForOverlay(candidate,map,timeout=15000) {
         return `${Number.isFinite(dir) ? Math.round(dir) + "° " : ""}${speed.toFixed(1)} m/s`;
       }
 
-      function obsMapFormatTime(v) {
+      function obsMapFormatTime(v, timeZone = "Asia/Taipei") {
         if (!v) return "--";
         const d = new Date(weatherTimestamp(v));
         if (Number.isNaN(d.getTime())) return String(v);
         return new Intl.DateTimeFormat("zh-TW", {
-          timeZone: "Asia/Taipei",
+          timeZone,
           month: "2-digit",
           day: "2-digit",
           hour: "2-digit",
@@ -4887,7 +4911,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
             ? `${obsMapNum(station.rain1h).toFixed(1)} mm`
             : "--";
         $("obsMapDetailTime").textContent =
-          `觀測時間：${obsMapFormatTime(station?.fieldTimes?.[obsLiveMapMetric==="wind"?"windSpeed":obsLiveMapMetric]||station?.obsTime)}`;
+          `觀測時間：${obsMapFormatTime(station?.fieldTimes?.[obsLiveMapMetric==="wind"?"windSpeed":obsLiveMapMetric]||station?.obsTime,station?.source==="JMA"?"Asia/Tokyo":"Asia/Taipei")}${station?.source==="JMA"?"（日本時間）":""}`;
 
         box.classList.add("is-open");
         box.setAttribute("aria-hidden", "false");
@@ -5179,12 +5203,12 @@ function obsMapPickVisibleStations() {
   if(obsLiveMapMetric==="radar") return refreshObservationRadar({force});
   if(obsLiveMapLoading) return;
   if(!force&&obsLiveMapDataLoaded&&Date.now()-obsLiveMapLastLoadAt<60000) {obsMapRenderStations();syncObservationLoading();return;}
-  obsLiveMapLoading=true;obsStationStatus="正在取得 CWA / CMA 測站資料…";syncObservationLoading();
+  obsLiveMapLoading=true;obsStationStatus="正在取得 CWA / CMA / JMA 測站資料…";syncObservationLoading();
   try {
-    const results=await Promise.allSettled([obsMapLoadCwa(),obsMapLoadCma()]),parts=[],next=[];
-    for(let i=0;i<results.length;i++) {const r=results[i],source=i===0?"CWA":"CMA";if(r.status==="fulfilled") {next.push(...r.value);parts.push(source+" "+r.value.length+" 站"+(r.value.partialFailure?"（部分來源失敗）":""));} else {parts.push(source+" 取得失敗");next.push(...obsLiveMapStations.filter(s=>s.source===source));}}
+    const results=await Promise.allSettled([obsMapLoadCwa(),obsMapLoadCma(),obsMapLoadJma({force})]),parts=[],next=[];
+    for(let i=0;i<results.length;i++) {const r=results[i],source=["CWA","CMA","JMA"][i];if(r.status==="fulfilled") {next.push(...r.value);parts.push(source+" "+r.value.length+" 站"+(r.value.partialFailure?"（部分來源失敗）":""));} else {parts.push(source+" 取得失敗");next.push(...obsLiveMapStations.filter(s=>s.source===source));}}
     const now=Date.now();obsLiveMapStations=next.filter(s=> {const ts=weatherTimestamp(s.obsTime);return Number.isFinite(ts)&&now-ts<=90*60000&&ts-now<=120000;});
-    if(results.every(r=>r.status==="rejected")) throw new Error("CWA / CMA 都無法更新；只保留未過期的上次資料");
+    if(results.every(r=>r.status==="rejected")) throw new Error("CWA / CMA / JMA 都無法更新；只保留未過期的上次資料");
     obsLiveMapLastLoadAt=now;obsLiveMapDataLoaded=true;obsStationStatus=parts.filter(part=>part.includes("失敗")).join("｜");
     if(obsLiveMapSelected) {const updated=obsLiveMapStations.find(s=>s.id===obsLiveMapSelected.id);updated?obsMapOpenDetail(updated):obsMapCloseDetail();}
   } catch(e) {obsStationStatus="測站載入失敗："+(e.message||e);}
@@ -5198,8 +5222,8 @@ function obsMapPickVisibleStations() {
           obsLiveMap.fitBounds(bounds, { padding: [8, 8], animate: true });
           return;
         }
-        // Taiwan + mainland China, but not so wide that the map becomes unusable.
-        obsLiveMap.fitBounds([[18.0, 73.0], [54.5, 135.5]], {
+        // Taiwan, mainland China and Japan, including Japan's eastern island stations.
+        obsLiveMap.fitBounds([[18.0, 73.0], [54.5, 155.0]], {
           padding: [8, 8],
           animate: true,
         });
@@ -5224,7 +5248,7 @@ function obsMapPickVisibleStations() {
         }
 
         obsLiveMap = L.map("obsLiveMap", {
-          center: [31.5, 113.5],
+          center: [31.5, 122.0],
           zoom: 4,
           minZoom: 3,
           maxZoom: 13,
@@ -5239,7 +5263,7 @@ function obsMapPickVisibleStations() {
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           maxZoom: 19,
           detectRetina: false,
-          attribution: "&copy; OpenStreetMap",
+          attribution: "&copy; OpenStreetMap | JMA：気象庁（加工）",
         }).addTo(obsLiveMap);
 
         // Hit-test only visible stations, in screen pixels, for mouse and touch.
@@ -7421,6 +7445,7 @@ function obsMapPickVisibleStations() {
       function backendProviderName(data) {
         if (data?.provider === "cwa-backend") return "CWA 中央氣象署";
         if (data?.provider === "cma-backend") return "CMA 中國氣象局";
+        if (data?.provider === "jma-backend") return "JMA 日本氣象廳";
         if (data?.provider === "open-meteo-backend") return "Open-Meteo";
         return data?.provider || "整合後端";
       }
@@ -7435,7 +7460,7 @@ function obsMapPickVisibleStations() {
           if (Array.isArray(arr)) return arr;
         return [];
       }
-      // v8.6.7: The backend provider is a routing label, not proof that a station
+      // v9.0: The backend provider is a routing label, not proof that a station
       // actually contributed a value. Use per-field provenance for the visible UI.
       function hasRealtimeStationEvidence(data) {
         const r = data?.realtime || {};
@@ -7445,14 +7470,14 @@ function obsMapPickVisibleStations() {
         return getStationArray(data).length > 0;
       }
       function isObservedStationSourceName(name) {
-        return /^(?:CWA|CMA) (?:自動氣象站|自動雨量站|測站資料推算)$/.test(name) ||
-          /^(?:CWA|CMA) (?:紫外線測站|UV 測站)$/.test(name);
+        return /^(?:CWA|CMA|JMA) (?:自動氣象站|自動雨量站|測站資料推算)$/.test(name) ||
+          /^(?:CWA|CMA|JMA) (?:紫外線測站|UV 測站)$/.test(name);
       }
       function buildStationSourceHtml(data) {
         const groups = getRealtimeSourceGroups(data);
         const names = Array.from(groups.keys()).filter((name) => name !== "無資料");
         const observed = names.filter(isObservedStationSourceName);
-        // v8.6.7: Keep the headline concise. The field-level panel below
+        // v9.0: Keep the headline concise. The field-level panel below
         // continues to show CWA / CMA / environmental measurement provenance.
         const hasModel = names.some((name) => name.startsWith("Open-Meteo"));
         const stations = getStationArray(data);
@@ -7509,10 +7534,12 @@ function obsMapPickVisibleStations() {
       }
       function sourceNameFromBackendCode(code) {
         const s = String(code || "").trim().toLowerCase();
-        // v8.6.7 source-group patch: IDW is a CMA station-derived estimate,
+        // v9.0 source-group patch: IDW is a CMA station-derived estimate,
         // not a distinct weather data provider. Keep true model sources separate.
         if (s === "cma_station_idw" || s === "cma-station-idw") return "CMA 自動氣象站";
         if (s === "cwa_station_idw" || s === "cwa-station-idw") return "CWA 自動氣象站";
+        if (s === "jma-station-idw" || s === "jma-nearest-station") return "JMA 自動氣象站";
+        if (s === "jma-derived-apparent-temperature") return "JMA 測站資料推算";
         // UV sensors can belong to their own physical stations; grouping here
         // is for source-panel presentation, not a claim they share one site.
         if (s === "cwa 紫外線測站" || s === "cwa uv 測站" ||
@@ -7538,6 +7565,10 @@ function obsMapPickVisibleStations() {
         if (provider === "cma-backend") {
           if (field === "feels") return "CMA 測站資料推算";
           return "CMA 自動氣象站";
+        }
+        if (provider === "jma-backend") {
+          if (field === "feels") return "JMA 測站資料推算";
+          return "JMA 自動氣象站";
         }
         if (provider === "open-meteo-backend") return "Open-Meteo 模型";
         return backendProviderName(data);
@@ -7592,6 +7623,8 @@ function obsMapPickVisibleStations() {
           "環境部空品測站",
           "CMA 自動氣象站",
           "CMA 測站資料推算",
+          "JMA 自動氣象站",
+          "JMA 測站資料推算",
           "Open-Meteo 模型",
           "Open-Meteo 小時模型",
           "Open-Meteo 15分鐘模型",
@@ -8014,7 +8047,7 @@ function obsMapPickVisibleStations() {
           box.appendChild(row);
         });
       }
-      /* v8.6.7: 補齊有 10 分鐘時段、卻缺少個別數值的後端資料。
+      /* v9.0: 補齊有 10 分鐘時段、卻缺少個別數值的後端資料。
          使用 CWA 同時段/相鄰逐時資料；觀測錨點限 90 分鐘內。只在前後兩端
          都有有效資料，且間距 <= 3 小時時內插。所有其他缺值維持缺值。 */
       function repairPartialTenMinuteForecast(tenMinute, hourly, realtime, now = Date.now()) {
@@ -8483,7 +8516,7 @@ function obsMapPickVisibleStations() {
         if(saved.h10.length) hourly10m=saved.h10; if(saved.h1.length) hourly1h=saved.h1; if(saved.days.length) daily7=saved.days;
         renderHourlyForecast(); renderDailyForecast();
         $("hintBar").textContent=(saved.h10.length||saved.h1.length||saved.days.length)
-          ? (data?.provider === "cma-backend" ? "中國氣象局／Open-Meteo 備援" : "中央氣象署／Open-Meteo 備援")
+          ? (data?.provider === "jma-backend" ? "Open-Meteo 模型" : data?.provider === "cma-backend" ? "中國氣象局／Open-Meteo 備援" : "中央氣象署／Open-Meteo 備援")
           : "Open-Meteo 模型";
       } catch(e) {assertWeatherRun(seq); $("hintBar").textContent="預報暫時無法取得";}
     }
@@ -9895,5 +9928,6 @@ body.scene-engine-ready .observation-card {
   requestAnimationFrame(frame);
 })();
 </script>
-  </body>
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"f347ca51cd48489e862f03616411b112","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
 </html>
