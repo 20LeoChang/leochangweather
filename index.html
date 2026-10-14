@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#5aaeff" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v9.0</title>
+    <title>天氣網站v9.1</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -3609,7 +3609,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v9.0</div>
+              <div class="version-badge" id="versionLabel">v9.1</div>
             </div>
           </section>
 
@@ -3791,7 +3791,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
               </section>
-              <div class="version-badge">v9.0</div>
+              <div class="version-badge">v9.1</div>
             </div>
           </section>
 
@@ -4003,7 +4003,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v9.0</div>
+              <div class="version-badge">v9.1</div>
             </div>
           </section>
         </div>
@@ -4214,7 +4214,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v9.0";
+      const APP_VERSION = "v9.1";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -4706,25 +4706,48 @@ function waitForOverlay(candidate,map,timeout=15000) {
         return NaN;
       }
 
+      // 觀測地圖溫度色階：沿用參考圖片的節點與色系，提高亮度與鮮明度。
+      // 測站與圖例共用節點，相鄰節點依實際溫差做 RGB 線性插值。
+      const OBS_MAP_TEMPERATURE_STOPS = [
+        { value: -70, color: "#aa72a3", rgb: [170, 114, 163] },
+        { value: -55, color: "#e3c9df", rgb: [227, 201, 223] },
+        { value: -40, color: "#d766ca", rgb: [215, 102, 202] },
+        { value: -25, color: "#b57be3", rgb: [181, 123, 227] },
+        { value: -15, color: "#bceeed", rgb: [188, 238, 237] },
+        { value: -8, color: "#91e2d7", rgb: [145, 226, 215] },
+        { value: -4, color: "#85c5e6", rgb: [133, 197, 230] },
+        { value: 0, color: "#81adf5", rgb: [129, 173, 245] },
+        { value: 1, color: "#57bf82", rgb: [87, 191, 130] },
+        { value: 10, color: "#bfd33e", rgb: [191, 211, 62] },
+        { value: 21, color: "#ffda4c", rgb: [255, 218, 76] },
+        { value: 30, color: "#ff8c45", rgb: [255, 140, 69] },
+        { value: 45, color: "#e85b3a", rgb: [232, 91, 58] },
+      ];
+
+      function obsMapTemperatureColor(value) {
+        const stops = OBS_MAP_TEMPERATURE_STOPS;
+        if (value <= stops[0].value) return stops[0].color;
+        if (value >= stops[stops.length - 1].value) return stops[stops.length - 1].color;
+        for (let i = 1; i < stops.length; i++) {
+          const upper = stops[i], lower = stops[i - 1];
+          if (value <= upper.value) {
+            if (value === upper.value) return upper.color;
+            const ratio = (value - lower.value) / (upper.value - lower.value);
+            return "#" + lower.rgb.map((channel, j) =>
+              Math.round(channel + (upper.rgb[j] - channel) * ratio)
+                .toString(16).padStart(2, "0")
+            ).join("");
+          }
+        }
+        return stops[stops.length - 1].color;
+      }
+
       function obsMapColor(metric, value) {
         const v = Number(value);
         if (!Number.isFinite(v)) return "transparent";
 
         if (metric === "temperature") {
-          if (v < -40) return "#4b1f6f";
-          if (v < -30) return "#6d35a8";
-          if (v < -20) return "#6556c8";
-          if (v < -10) return "#3559b7";
-          if (v < 0) return "#2f7fd3";
-          if (v < 10) return "#41a9d8";
-          if (v < 18) return "#43b7aa";
-          if (v < 24) return "#43b978";
-          if (v < 28) return "#9bc94b";
-          if (v < 32) return "#e4cf43";
-          if (v < 36) return "#f2a13a";
-          if (v < 40) return "#e75643";
-          if (v < 45) return "#d83b72";
-          return "#9f245e";
+          return obsMapTemperatureColor(v);
         }
 
         if (metric === "humidity") {
@@ -4793,12 +4816,9 @@ function waitForOverlay(candidate,map,timeout=15000) {
         }
         if (metric === "temperature") {
           return {
-            labels: ["<-40","-40","-30","-20","-10","0","10","18","24","28","32","36","40","45","≥45"],
-            colors: [
-              "#4b1f6f","#6d35a8","#6556c8","#3559b7","#2f7fd3",
-              "#41a9d8","#43b7aa","#43b978","#9bc94b","#e4cf43",
-              "#f2a13a","#e75643","#d83b72","#9f245e"
-            ]
+            labels: OBS_MAP_TEMPERATURE_STOPS.map(stop => String(stop.value)),
+            colors: OBS_MAP_TEMPERATURE_STOPS.map(stop => stop.color),
+            continuous: true,
           };
         }
         if (metric === "humidity") {
@@ -4837,6 +4857,22 @@ function waitForOverlay(candidate,map,timeout=15000) {
         const labels = Array.isArray(cfg.labels) ? cfg.labels : [];
         const colors = Array.isArray(cfg.colors) ? cfg.colors : [];
         const count = Math.max(1, colors.length);
+
+        if (cfg.continuous) {
+          // 節點等距排版以保持手機標籤可讀；每個標籤對準自己的顏色。
+          const gradient = colors.map((color, i) =>
+            `${color} ${((i + 0.5) / count * 100).toFixed(6)}%`
+          ).join(",");
+          box.innerHTML =
+            `<div class="obs-live-map-legend-title">${title}（°C）</div>` +
+            `<div class="obs-live-map-legend-scale">` +
+              `<div class="obs-live-map-legend-bar" style="background:linear-gradient(to right,${gradient})"></div>` +
+              `<div class="obs-live-map-legend-values" style="grid-template-columns:repeat(${count},minmax(0,1fr))">` +
+                labels.map(label => `<span class="obs-live-map-legend-value">${label}</span>`).join("") +
+              `</div>` +
+            `</div>`;
+          return;
+        }
 
         box.innerHTML =
           `<div class="obs-live-map-legend-title">${title}</div>` +
@@ -9929,5 +9965,137 @@ body.scene-engine-ready .observation-card {
 })();
 </script>
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"f347ca51cd48489e862f03616411b112","r":1,"spa":2}' crossorigin="anonymous"></script>
+<!-- 即時雷達參考圖片配色：貼在原本最後的 </body> 前。 -->
+<script>
+(() => {
+  "use strict";
+  // 從提供的色條中央取樣，每 1 dBZ 一階；15 dBZ 保留藍／綠分界。
+  // 截圖壓縮及地圖透明度會使實際顯色略有差異。
+  const palette = [
+    "#6ceafc",
+    "#68e4fc",
+    "#5dcafa",
+    "#58c3fa",
+    "#4ba7f9",
+    "#48a0f8",
+    "#3b87f8",
+    "#377df7",
+    "#2c68f7",
+    "#2559f6",
+    "#1a43f6",
+    "#0e2bf6",
+    "#0922f5",
+    "#010bf5",
+    "#0000f6",
+    "#74fb4b",
+    "#6ff248",
+    "#6ae545",
+    "#65dc40",
+    "#5fd13d",
+    "#5ac53a",
+    "#55bb35",
+    "#50b133",
+    "#4ca830",
+    "#479e2c",
+    "#429429",
+    "#59a930",
+    "#7cbe38",
+    "#a6d441",
+    "#d2e94b",
+    "#ffff54",
+    "#fdf550",
+    "#fceb4e",
+    "#fadf4b",
+    "#f8d547",
+    "#f6ca45",
+    "#f4bb3f",
+    "#f2ac3c",
+    "#f19d37",
+    "#f08e34",
+    "#ee8031",
+    "#ed6b2c",
+    "#ed5729",
+    "#eb4626",
+    "#ea3a23",
+    "#ea3323",
+    "#e03021",
+    "#d62d1e",
+    "#cc2a1d",
+    "#c1281b",
+    "#b72519",
+    "#ae2317",
+    "#a52114",
+    "#9b1e14",
+    "#921c12",
+    "#891a10",
+    "#9d1f37",
+    "#b02365",
+    "#c42995",
+    "#d72ec6",
+    "#e832ef",
+    "#d72ef8",
+    "#c82af7",
+    "#af24f6",
+    "#a521f7",
+    "#8a1af6"
+];
+  const ticks = Array.from({ length: 14 }, (_, i) => i * 5);
+  const rgb = palette.map(hex => [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
+  ]);
+  const oldLegendConfig = obsMapLegendConfig;
+  const oldUpdateLegend = obsMapUpdateLegend;
+
+  obsRadarColor = function(dbz) {
+    if (!Number.isFinite(dbz) || dbz < 0) return [0, 0, 0, 0];
+    const index = Math.min(65, Math.floor(dbz));
+    return [...rgb[index], 255];
+  };
+
+  obsMapLegendConfig = function(metric) {
+    if (metric !== "radar") return oldLegendConfig(metric);
+    return {
+      labels: ticks.map(value => value === 65 ? "≥65" : String(value)),
+      colors: ticks.map(value => palette[value]),
+      continuous: true,
+    };
+  };
+
+  obsMapUpdateLegend = function() {
+    if (obsLiveMapMetric !== "radar") return oldUpdateLegend();
+    const box = document.getElementById("obsMapLegend");
+    if (!box) return;
+    // 使用實際 dBZ 等距排列，圖例與格點共用同一個 palette。
+    const stops = [];
+    for (let value = 0; value < 65; value++) {
+      stops.push(`${palette[value]} ${value / 65 * 100}%`);
+      stops.push(`${palette[value]} ${(value + 1) / 65 * 100}%`);
+    }
+    // 65 dBZ 以上沿用最高階；最右端保留最高階顏色。
+    stops.push(`${palette[65]} 100%`);
+    const labels = ticks.map(value => {
+      const edge = value === 0 ? "none" : value === 65 ? "translateX(-100%)" : "translateX(-50%)";
+      return `<span style="position:absolute;left:${value / 65 * 100}%;transform:${edge};white-space:nowrap">${value === 65 ? "≥65" : value}</span>`;
+    }).join("");
+    box.innerHTML =
+      `<div class="obs-live-map-legend-title">即時雷達（dBZ）</div>` +
+      `<div class="obs-live-map-legend-scale" style="min-width:300px">` +
+        `<div class="obs-live-map-legend-bar" style="width:100%;background:linear-gradient(to right,${stops.join(",")})"></div>` +
+        `<div style="position:relative;height:13px;margin-top:5px;font-size:8px;font-weight:850;color:rgba(255,255,255,.78);font-variant-numeric:tabular-nums">${labels}</div>` +
+      `</div>`;
+  };
+
+  // 正常首次載入時，雷達會在使用者切換至該圖層後使用新配色。
+  // 若是在已經開啟的頁面執行本段，重建既有雷達避免只更新圖例。
+  if (typeof obsLiveMap !== "undefined" && obsLiveMap) {
+    obsMapUpdateLegend();
+    if (obsLiveMapMetric === "radar" && !obsRadarLoading) {
+      refreshObservationRadar({ force: true });
+    }
+  }
+})();
+</script>
 </body>
 </html>
