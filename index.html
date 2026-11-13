@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#5aaeff" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>天氣網站v9.2</title>
+    <title>天氣網站v9.3</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'" />
     <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -439,6 +439,117 @@
         font-weight: 850;
         letter-spacing: 0.8px;
         color: rgba(255, 255, 255, 0.58);
+      }
+
+      /* v9.3: 健康區塊下方的天文資訊，依太陽、月亮、觀星條件分組。 */
+      .astro-subsection {
+        margin-top: 9px;
+        padding: 10px 8px 8px;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.045);
+      }
+      .astro-subsection:first-of-type { margin-top: 2px; }
+      .astro-subsection-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 1px 3px 9px;
+        font-size: 12px;
+        font-weight: 850;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .astro-subsection-hint {
+        font-size: 10px;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+        white-space: nowrap;
+      }
+      .astro-subsection .environment-row { min-height: 40px; }
+
+      /* v9.3 — 獨立天文預報置於七天預報後；與目前觀測分開 */
+      .astro-forecast-panel { margin-top: 18px; padding: 13px 12px; border: 1px solid var(--section-border); border-radius: 18px; background: var(--section-bg); }
+      .astro-forecast-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+      .astro-forecast-heading { font-weight: 850; font-size: 15px; }
+      .astro-forecast-meta { font-size: 10px; opacity: .68; text-align: right; }
+      .astro-modes { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; margin-bottom: 12px; }
+      .astro-mode { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); color: inherit; border-radius: 12px; padding: 9px 6px; font-size: 11.5px; text-align: center; cursor: pointer; }
+      .astro-mode.active { background: rgba(65,153,255,.24); border-color: rgba(150,204,255,.7); font-weight: 800; }
+      .astro-panel-highlight { background: rgba(255,255,255,.075); padding: 12px; border-radius: 13px; }
+      .astro-highlight-main { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+      .astro-score-value { font-size: 28px; font-weight: 850; font-variant-numeric: tabular-nums; }
+      .astro-score-tag { font-size: 11px; opacity: .76; }
+      /* 天文逐時列表：與 24 小時預報共用原生橫向捲動，不觸發主頁面左右切換。 */
+      .astro-timeline {
+        display: flex;
+        gap: 10px;
+        max-width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        margin: 10px 0 8px;
+        padding: 2px 2px 8px;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        touch-action: auto;
+        scrollbar-width: none;
+      }
+      .astro-timeline::-webkit-scrollbar { display: none; }
+      .astro-timeline .astro-hour {
+        flex: 0 0 72px;
+        width: 72px;
+        min-width: 72px;
+        min-height: 128px;
+        border-radius: 20px;
+        padding: 8px 6px 9px;
+        border: 1px solid var(--item-border);
+        background: var(--item-bg);
+        color: inherit;
+        font: inherit;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 6px 16px rgba(0,0,0,.1);
+        backdrop-filter: blur(8px);
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .astro-timeline .astro-hour.is-selected {
+        border-color: rgba(255,255,255,.35);
+        background: linear-gradient(180deg,rgba(30,132,255,.5),rgba(14,83,181,.26));
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.13),0 9px 20px rgba(0,66,156,.2);
+      }
+      .astro-timeline .astro-hour:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+      .astro-timeline .astro-hour:active { transform: scale(.97); }
+      .astro-hour-time { font-size: 11px; font-weight: 650; opacity: .8; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+      .astro-hour-icon { font-size: 23px; line-height: 1; margin-bottom: 8px; }
+      .astro-hour-score { font-size: 17px; line-height: 1.1; font-weight: 850; font-variant-numeric: tabular-nums; }
+      .astro-hour-detail { font-size: 10px; opacity: .75; margin-top: 4px; }
+      .astro-hour-cloud { display: inline-block; margin-top: 6px; padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 9.5px; }
+      .astro-forecast-hint { font-size: 10.5px; opacity: .67; margin: 7px 2px 0; line-height: 1.4; }
+      .astro-hour-selected { padding: 10px 11px; border-radius: 12px; background: rgba(255,255,255,.075); font-size: 11px; line-height: 1.7; }
+      .astro-hour-selected-title { font-weight: 850; font-size: 12px; margin-bottom: 3px; }
+      .astro-hour-selected-metrics { display: flex; gap: 7px 12px; flex-wrap: wrap; opacity: .85; }
+      .astro-forecast-explain { font-size: 11px; opacity: .85; line-height: 1.65; margin-top: 10px; }
+      .astro-observe-modes { margin-top: 7px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 6px; }
+      .astro-observe-modes .environment-row {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        font-size: 11px;
+        min-height: 88px;
+        aspect-ratio: 1 / 1;
+        gap: 8px;
+      }
+      .astro-observe-modes .environment-row b { display: block; text-align: left; margin-top: auto; font-size: 14px; }
+
+      .astro-footnote {
+        padding: 8px 4px 1px;
+        font-size: 10px;
+        line-height: 1.55;
+        color: rgba(255, 255, 255, 0.66);
       }
       .environment-row {
         --metric-accent: rgba(110, 181, 255, 0.95);
@@ -3609,7 +3720,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
               </div>
               <div class="page-hint">單指左右滑動，或在左／右側連點兩下切換；雙指可縮放</div>
               <pre id="debugBox"></pre>
-              <div class="version-badge" id="versionLabel">v9.2</div>
+              <div class="version-badge" id="versionLabel">v9.3</div>
             </div>
           </section>
 
@@ -3790,8 +3901,33 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                 <div class="daily-forecast" id="dailyForecast">
                   <div class="forecast-empty">尚無預報資料</div>
                 </div>
+
+                <section class="astro-forecast-panel" id="astroForecastPanel" aria-label="天文預報（未來12小時）">
+                  <div class="astro-forecast-header">
+                    <div class="astro-forecast-heading">🌌 天文預報</div>
+                    <div class="astro-forecast-meta" id="astroForecastRange">未來 12 小時・整點預估</div>
+                  </div>
+                  <div class="astro-modes" id="astroForecastModes" role="group" aria-label="觀測類型">
+                    <button class="astro-mode active" type="button" data-astro-mode="A">⭐ A 一般星空</button>
+                    <button class="astro-mode" type="button" data-astro-mode="B">🌌 B 銀河深空</button>
+                    <button class="astro-mode" type="button" data-astro-mode="C">🪐 C 行星月面</button>
+                    <button class="astro-mode" type="button" data-astro-mode="D">📷 D 星空攝影</button>
+                  </div>
+                  <div class="astro-panel-highlight">
+                    <div class="astro-highlight-main">
+                      <div><div class="astro-score-tag">最佳觀測條件</div><div id="astroForecastBestScore" class="astro-score-value">--</div></div>
+                      <div style="text-align:right"><div class="astro-score-tag">最佳連續兩小時</div><strong id="astroForecastBestTime">待取得資料</strong></div>
+                    </div>
+                    <div id="astroForecastModeInfo" class="astro-forecast-explain">依雲量、月光、透明度、降雨風險與地面風速推估。</div>
+                  </div>
+                  <div class="astro-forecast-hint">左右滑動查看 12 個整點時段；白天時段會顯示「非夜間」，點選卡片可查看詳細條件</div>
+                  <div id="astroForecastTimeline" class="hourly-forecast astro-timeline" aria-label="未來12小時天文逐時預報" aria-live="polite"><div class="forecast-empty">正在取得未來 12 小時天文資料…</div></div>
+                  <div id="astroForecastSelected" class="astro-hour-selected" aria-live="polite">點選時段查看詳細條件</div>
+                  <div id="astroForecastNote" class="astro-forecast-explain">預報分數非實測；不含視寧度、光害與地形遮蔽。</div>
+                </section>
+
               </section>
-              <div class="version-badge">v9.2</div>
+              <div class="version-badge">v9.3</div>
             </div>
           </section>
 
@@ -3965,12 +4101,43 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                             </div>
                             <div class="environment-row" id="mSun">日照 <b>--</b></div>
                             <div class="environment-row" id="mVis">能見度 <b>--</b></div>
+                            <div class="environment-row" id="mCloud">雲量 <b>--</b></div>
                           </section>
 
                           <section class="environment-section" aria-label="健康資料">
                             <div class="environment-section-title">健康</div>
                             <div class="environment-row" id="mAir">空氣品質 <b>--</b></div>
                             <div class="environment-row" id="mUv">紫外線指數 <b>--</b></div>
+                          </section>
+
+                          <section class="environment-section" aria-label="天文資訊">
+                            <div class="environment-section-title">天文</div>
+                            <div class="astro-subsection" aria-label="太陽資訊">
+                              <div class="astro-subsection-head"><span>☀️ 太陽</span><span class="astro-subsection-hint">依當地時間計算</span></div>
+                              <div class="environment-row" id="mSunrise">🌅 今日日出 <b>--</b></div>
+                              <div class="environment-row" id="mSunset">🌇 今日日落 <b>--</b></div>
+                              <div class="environment-row" id="mDaylight">🌤️ 白晝長度 <b>--</b></div>
+                              <div class="environment-row" id="mSolarAltitude">📐 太陽仰角 <b>--</b></div>
+                            </div>
+                            <div class="astro-subsection" aria-label="月亮資訊">
+                              <div class="astro-subsection-head"><span>🌙 月亮</span><span class="astro-subsection-hint">天文公式估算</span></div>
+                              <div class="environment-row" id="mMoonrise">🌙 今日月出 <b>--</b></div>
+                              <div class="environment-row" id="mMoonset">🌘 今日月落 <b>--</b></div>
+                              <div class="environment-row" id="mMoonPhase">🌗 目前月相 <b>--</b></div>
+                              <div class="environment-row" id="mMoonIllum">🌕 月面照明率 <b>--</b></div>
+                              <div class="environment-row" id="mLunarAltitude">📐 月球仰角 <b>--</b></div>
+                            </div>
+                            <div class="astro-subsection" aria-label="觀星條件">
+                              <div class="astro-subsection-head"><span>✨ 目前觀星條件</span><span class="astro-subsection-hint">觀測優先／模型補值</span></div>
+                              <div class="astro-observe-modes">
+                                <div class="environment-row" id="mStargazing">⭐ A 一般星空 <b>--</b></div>
+                                <div class="environment-row" id="mStarB">🌌 B 銀河深空 <b>--</b></div>
+                                <div class="environment-row" id="mStarC">🪐 C 行星月面 <b>--</b></div>
+                                <div class="environment-row" id="mStarD">📷 D 星空攝影 <b>--</b></div>
+                              </div>
+                              <div class="environment-row" id="mMoonGlare">🌕 目前月光干擾 <b>--</b></div>
+                              <div class="astro-footnote" id="astroStargazingNote">目前條件依有效觀測及模型補值估算；白天不評分。</div>
+                            </div>
                           </section>
                         </div>
                       </div>
@@ -4003,7 +4170,7 @@ body[data-page="current"] .current-card::-webkit-scrollbar { display: none; widt
                   </div>
                 </div>
               </section>
-              <div class="version-badge">v9.2</div>
+              <div class="version-badge">v9.3</div>
             </div>
           </section>
         </div>
@@ -4214,7 +4381,7 @@ function waitForOverlay(candidate,map,timeout=15000) {
    設定
    =========================== */
       const PROXY_BASE = "https://weatherapp.leochang101817.workers.dev/fc";
-      const APP_VERSION = "v9.2";
+      const APP_VERSION = "v9.3";
       const CWA_OBS_10M_S3 =
         "https://cwaopendata.s3.ap-northeast-1.amazonaws.com/Observation/O-A0003-001.json";
       const CWA_OBS_1H_S3 =
@@ -6487,7 +6654,7 @@ function obsMapPickVisibleStations() {
           el &&
           el.closest &&
           el.closest(
-            "button,input,textarea,select,label,a,[role=\"button\"],.hourly-forecast,.daily-forecast,.obs-asset-img,.image-lightbox,.qpf-map-wrap,.qpf-map-toolbar,.leaflet-container",
+            "button,input,textarea,select,label,a,[role=\"button\"],.hourly-forecast,.astro-timeline,.daily-forecast,.obs-asset-img,.image-lightbox,.qpf-map-wrap,.qpf-map-toolbar,.leaflet-container",
           )
         );
       }
@@ -7054,6 +7221,466 @@ function obsMapPickVisibleStations() {
           );
         return solarTimeCache.get(key);
       }
+      // 低成本月球位置近似（Meeus/SunCalc 類型）：赤經、赤緯、當地恆星時與高度角。
+      // 幾何月球高度達 +0.133° 作為月出月落判準（含平均折射/視差/半徑修正）。
+      // 不使用 API，也不考慮地形遮蔽；分鐘結果為估算值。
+      const moonTimesCache = new Map();
+      function lunarAltitudeDifference(ts, lat, lon) {
+        const rad = Math.PI / 180;
+        const d = (ts - Date.UTC(2000, 0, 1, 12)) / 86400000;
+        const L = rad * (218.316 + 13.176396 * d);
+        const M = rad * (134.963 + 13.064993 * d);
+        const F = rad * (93.272 + 13.229350 * d);
+        const e = rad * 23.4397;
+        const l = L + rad * 6.289 * Math.sin(M);
+        const b = rad * 5.128 * Math.sin(F);
+        const ra = Math.atan2(Math.sin(l) * Math.cos(e) - Math.tan(b) * Math.sin(e), Math.cos(l));
+        const dec = Math.asin(Math.sin(b) * Math.cos(e) + Math.cos(b) * Math.sin(e) * Math.sin(l));
+        const hourAngle = rad * (280.16 + 360.9856235 * d + lon) - ra;
+        const phi = lat * rad;
+        const altitude = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(hourAngle));
+        return altitude - 0.133 * rad;
+      }
+      function getMoonTimesForTs(ts = Date.now()) {
+        const p = getTargetDateTimeParts(ts);
+        const key = `${p.year}-${p.month}-${p.day}|${solarTargetLat.toFixed(4)}|${solarTargetLon.toFixed(4)}|${solarTargetTimeZone}`;
+        if (moonTimesCache.has(key)) return moonTimesCache.get(key);
+        // 由當地民用午夜求 UTC 時刻；再次修正，兼容跨日的 UTC offset 變化。
+        const localMidnight = Date.UTC(p.year, p.month - 1, p.day);
+        let start = localMidnight - getTargetUtcOffsetMinutes(localMidnight) * 60000;
+        for (let i = 0; i < 3; i++) start = localMidnight - getTargetUtcOffsetMinutes(start) * 60000;
+        const nextMidnight = Date.UTC(p.year, p.month - 1, p.day + 1);
+        let end = nextMidnight - getTargetUtcOffsetMinutes(nextMidnight) * 60000;
+        for (let i = 0; i < 3; i++) end = nextMidnight - getTargetUtcOffsetMinutes(end) * 60000;
+        const step = 5 * 60000;
+        let moonrise = null, moonset = null;
+        let prevTs = start, prev = lunarAltitudeDifference(start, solarTargetLat, solarTargetLon);
+        for (let nextTs = Math.min(start + step, end); nextTs <= end; nextTs = Math.min(nextTs + step, end)) {
+          const next = lunarAltitudeDifference(nextTs, solarTargetLat, solarTargetLon);
+          if (prev * next < 0 || prev === 0) {
+            let lo = prevTs, hi = nextTs, a = prev;
+            for (let i = 0; i < 18; i++) {
+              const mid = (lo + hi) / 2, value = lunarAltitudeDifference(mid, solarTargetLat, solarTargetLon);
+              if ((a <= 0) === (value <= 0)) { lo = mid; a = value; } else hi = mid;
+            }
+            const eventTs = (lo + hi) / 2;
+            if (prev <= 0 && next > 0 && moonrise === null) moonrise = eventTs;
+            if (prev >= 0 && next < 0 && moonset === null) moonset = eventTs;
+          }
+          if (nextTs === end) break;
+          prevTs = nextTs; prev = next;
+        }
+        const result = {moonrise, moonset};
+        if (moonTimesCache.size >= 32) moonTimesCache.clear();
+        moonTimesCache.set(key, result);
+        return result;
+      }
+      function renderLunarObservation(ts = Date.now()) {
+        const moon = getMoonTimesForTs(ts);
+        const format = (event) => {
+          if (!Number.isFinite(event)) return null;
+          const p = getTargetDateTimeParts(event);
+          return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
+        };
+        const rise = $("mMoonrise"), set = $("mMoonset");
+        if (rise) rise.querySelector("b").textContent = format(moon.moonrise) ?? "今日無月出";
+        if (set) set.querySelector("b").textContent = format(moon.moonset) ?? "今日無月落";
+      }
+
+      // 獨立太陽幾何仰角：原畫面太陽動畫使用第二段私有 script，這裡不可跨作用域呼叫。
+      // 以 J2000 太陽黃經、赤經／赤緯與恆星時估算，供觀星暮光判斷使用。
+      function astroSolarGeometricAltitude(ts, lat = solarTargetLat, lon = solarTargetLon) {
+        const rad = Math.PI / 180, d = (ts - Date.UTC(2000,0,1,12)) / 86400000;
+        const meanAnomaly = (357.52911 + 0.98560028 * d) * rad;
+        const lambda = (280.46646 + 0.98564736 * d + 1.9146 * Math.sin(meanAnomaly)
+          + 0.0200 * Math.sin(2 * meanAnomaly)) * rad;
+        const obliquity = (23.4393 - 0.00000036 * d) * rad;
+        const ra = Math.atan2(Math.cos(obliquity) * Math.sin(lambda), Math.cos(lambda));
+        const dec = Math.asin(Math.sin(obliquity) * Math.sin(lambda));
+        const hourAngle = (280.46061837 + 360.98564736629 * d + lon) * rad - ra;
+        const phi = lat * rad;
+        return Math.asin(Math.max(-1, Math.min(1,
+          Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(hourAngle)))) / rad;
+      }
+      // v9.3: 月相近似（太陽/月球黃經差），不依賴網路。
+      function calculateMoonPhase(ts = Date.now()) {
+        const rad = Math.PI / 180, d = (ts - Date.UTC(2000, 0, 1, 12)) / 86400000;
+        const lunarMeanLon = 218.316 + 13.176396 * d;
+        const lunarMeanAnomaly = (134.963 + 13.064993 * d) * rad;
+        const lunarArgumentLat = (93.272 + 13.229350 * d) * rad;
+        const moonLon = lunarMeanLon + 6.289 * Math.sin(lunarMeanAnomaly);
+        const moonLat = 5.128 * Math.sin(lunarArgumentLat);
+        const sunMeanAnomaly = (357.52911 + 0.98560028 * d) * rad;
+        const sunLon = 280.46646 + 0.98564736 * d + 1.9146 * Math.sin(sunMeanAnomaly)
+          + 0.0200 * Math.sin(2 * sunMeanAnomaly);
+        const elongation = ((moonLon - sunLon) % 360 + 360) % 360;
+        const separation = Math.acos(Math.max(-1, Math.min(1,
+          Math.cos(moonLat * rad) * Math.cos(elongation * rad))));
+        const illuminated = (1 - Math.cos(separation)) / 2;
+        const names = ["新月", "盈眉月", "上弦月", "盈凸月", "滿月", "虧凸月", "下弦月", "殘月"];
+        const phaseIdx = Math.floor(((elongation + 22.5) % 360) / 45);
+        return { illuminated, name: names[phaseIdx] };
+      }
+      let stargazingForecastContext = null;
+      // 已有 Open-Meteo 逐時資料時直接沿用；只有後端未傳雲量時才補抓。
+      // 相同座標的逐時預報快取 15 分鐘，避免自動更新每 2 分鐘重複請求。
+      const stargazingOmCache = new Map(), stargazingOmInFlight = new Map();
+      function loadStargazingForecast(lat, lon, seq) {
+        const key = `${Number(lat).toFixed(2)},${Number(lon).toFixed(2)}`;
+        const hit = stargazingOmCache.get(key);
+        if (hit && Date.now() - hit.timestamp < 15 * 60000) {
+          if (seq === weatherRunSeq) {stargazingForecastContext = {...stargazingForecastContext,om:hit.data}; renderStargazingObservation();}
+          return;
+        }
+        if (!stargazingOmInFlight.has(key)) {
+          const task = fetchOpenMeteoAll(lat, lon)
+            .then(data => {
+              if (stargazingOmCache.size >= 8) stargazingOmCache.clear();
+              stargazingOmCache.set(key, {data, timestamp:Date.now()});
+              return data;
+            })
+            .finally(() => stargazingOmInFlight.delete(key));
+          stargazingOmInFlight.set(key, task);
+        }
+        stargazingOmInFlight.get(key).then(data => {
+          if (seq !== weatherRunSeq) return;
+          stargazingForecastContext = {...stargazingForecastContext,om:data};
+          renderStargazingObservation();
+          queueEnvironmentSummaryRender();
+        }).catch(() => {
+          if (seq === weatherRunSeq && $("astroStargazingNote"))
+            $("astroStargazingNote").textContent = "觀星預報暫時無法取得；不會使用即時雲量假裝成今晚預報。";
+        });
+      }
+      function renderAstroExtras(ts = Date.now()) {
+        const sun = getSunHoursForTs(ts), phase = calculateMoonPhase(ts);
+        const daylight = $("mDaylight"), solarAngle = $("mSolarAltitude"),
+          phaseEl = $("mMoonPhase"), illumEl = $("mMoonIllum"), lunarAngle = $("mLunarAltitude");
+        if (daylight) {
+          let value = "--";
+          if (sun.polarDay && !Number.isFinite(sun.sunriseHour) && !Number.isFinite(sun.sunsetHour)) value = "24 小時（極晝）";
+          else if (sun.polarNight && !Number.isFinite(sun.sunriseHour) && !Number.isFinite(sun.sunsetHour)) value = "0 小時（極夜）";
+          else if (Number.isFinite(sun.sunriseHour) && Number.isFinite(sun.sunsetHour)) {
+            const minutes = Math.round(((sun.sunsetHour - sun.sunriseHour + 24) % 24) * 60);
+            value = `${Math.floor(minutes / 60)} 小時 ${String(minutes % 60).padStart(2, "0")} 分`;
+          }
+          daylight.querySelector("b").textContent = value;
+        }
+        const solarAltitude = astroSolarGeometricAltitude(ts);
+        if (solarAngle) solarAngle.querySelector("b").textContent = Number.isFinite(solarAltitude) ? `${solarAltitude.toFixed(1)}°` : "--";
+        if (phaseEl) phaseEl.querySelector("b").textContent = phase.name;
+        if (illumEl) illumEl.querySelector("b").textContent = `${Math.round(phase.illuminated * 100)}%`;
+        if (lunarAngle) {
+          const altitude = lunarAltitudeDifference(ts, solarTargetLat, solarTargetLon) * 180 / Math.PI + 0.133;
+          lunarAngle.querySelector("b").textContent = Number.isFinite(altitude) ? `${altitude.toFixed(1)}°` : "--";
+        }
+      }
+      // v9.3 天文觀測／預報共用評分：觀測優先、缺值重權重，不假造視寧度及光害。
+      // A 一般星空 / B 銀河與深空 / C 行星月面 / D 星空攝影。
+      const ASTRO_WEIGHTS = {
+        A: [50,15,15,15,5], B: [40,25,25,5,5],
+        C: [55,15,0,15,15], D: [45,20,10,15,10]
+      };
+      const ASTRO_MODE_DESCRIPTIONS = {
+        A: "適合肉眼星座、亮星、雙筒望遠鏡；雲量是主要限制。",
+        B: "適合銀河、星雲、星系與暗弱星團；重視暗夜、月光與透明度。銀河核心是否升起另需看季節及位置。",
+        C: "適合月面及亮行星；不把月光當作負面因素。未計入視寧度，不能代表高倍率成像品質。",
+        D: "適合廣角星空、星軌與長曝光；風速及結露風險特別重要，月光影響依題材而異。"
+      };
+      let astroForecastMode = "A", astroSelectedHourTs = null, astroLastStartHour = null,
+        astroRadarCache = null, astroAirCache = null;
+      let astroRadarInFlight = null, astroAirInFlight = null;
+      const astroClamp = (v,lo=0,hi=100) => Math.min(hi,Math.max(lo,v));
+      const astroValid = v => Number.isFinite(v);
+      const astroNum = v => backendNumber(v);
+      const astroRating = score => score >= 80 ? "極佳" : score >= 65 ? "良好" : score >= 45 ? "普通" : score >= 25 ? "不佳" : "差";
+      function astroWeatherRow(ts, current = false) {
+        const ctx=stargazingForecastContext || {}, om=ctx.om || {}, h=om.hourly || {};
+        let bestOm=-1, minOm=Infinity;
+        if (Array.isArray(h.time)) h.time.forEach((t,i) => {
+          const tms=weatherTimestamp(t,astroNum(om.utc_offset_seconds)/60||0,om.timezone);
+          const dist=Math.abs(tms-ts);
+          if (Number.isFinite(dist) && dist<minOm) {minOm=dist;bestOm=i;}
+        });
+        if (minOm>45*60000) bestOm=-1;
+        const hx = (field) => bestOm>=0 ? astroNum(h[field]?.[bestOm]) : NaN;
+        const p = [...hourly1h].filter(x=>Number.isFinite(x.ts)).sort((a,b)=>Math.abs(a.ts-ts)-Math.abs(b.ts-ts))[0];
+        const pp = p && Math.abs(p.ts-ts)<75*60000 ? p : null;
+        // Rainfall amounts represent the preceding hour: for slot [ts,ts+1h], look at the hour END.
+        const endTs=ts+3600000;
+        const rainForecast = [...hourly1h].filter(x=>Number.isFinite(x.ts)).sort((a,b)=>Math.abs(a.ts-endTs)-Math.abs(b.ts-endTs))[0];
+        const rainPP=rainForecast && Math.abs(rainForecast.ts-endTs)<75*60000?rainForecast:null;
+        let bestRainIndex=-1, rainDistance=Infinity;
+        if(Array.isArray(h.time))h.time.forEach((t,i)=>{
+          const tms=weatherTimestamp(t,astroNum(om.utc_offset_seconds)/60||0,om.timezone);
+          if(Number.isFinite(tms)&&Math.abs(tms-endTs)<rainDistance){bestRainIndex=i;rainDistance=Math.abs(tms-endTs);}
+        });
+        const hxRain = field => bestRainIndex>=0&&rainDistance<=45*60000?astroNum(h[field]?.[bestRainIndex]):NaN;
+        const r = ctx.data?.realtime || {};
+        const rt = ctx.realtime || {};
+        const validFrom = (...numbers) => numbers.find(Number.isFinite) ?? NaN;
+        const cloud = current ? validFrom(astroNum(r.cloudCover),astroNum(om.current?.cloud_cover),hx("cloud_cover"))
+          : validFrom(astroNum(pp?.cloudCover),hx("cloud_cover"));
+        const humidity = current ? validFrom(astroNum(r.humidity),hx("relative_humidity_2m"))
+          : validFrom(astroNum(pp?.humidity),hx("relative_humidity_2m"));
+        const wind = current ? validFrom(astroNum(r.windSpeed),hx("wind_speed_10m"))
+          : validFrom(astroNum(pp?.windSpeed),hx("wind_speed_10m"));
+        const visibilityM = current ? validFrom(astroNum(rt.visibility)*1000,astroNum(pp?.visibilityM),hx("visibility"))
+          : validFrom(astroNum(pp?.visibilityM),hx("visibility"));
+        const pop = current ? NaN : validFrom(astroNum(rainPP?.pop),hxRain("precipitation_probability"));
+        const modelRainMm = current ? NaN : validFrom(astroNum(rainPP?.rainMm),hxRain("precipitation"));
+        let rainMm=modelRainMm, rainSource=Number.isFinite(modelRainMm)?"模式逐時雨量":"未取得";
+        // Radar endpoint returns the cumulative amount for [now,now+60min] only.
+        // Our forecast slots are [now+i*1h, now+(i+1)*1h]; only the first slot may use it.
+        const lead=(ts-Date.now())/60000,radar=astroRadarCache;
+        if (!current && radar && Number.isFinite(radar.mm) &&
+            Date.now()-radar.baseTime<=15*60000 && Date.now()-radar.fetched<=15*60000 &&
+            lead>=0 && lead<2) {
+          rainMm=radar.mm;
+          rainSource="自有雷達外推（未來60分鐘）";
+        }
+        if (current) {
+          rainMm=validFrom(astroNum(rt.rain10),astroNum(rt.rain1h));
+          rainSource=Number.isFinite(rainMm)?"近期雨量（觀測／後端備援）":"無近期雨量資料";
+        }
+        const aodH=astroAirCache?.data?.hourly;
+        let aod=NaN,pm25=NaN;
+        if (aodH?.time?.length) {
+          let idx=-1,distance=Infinity;
+          aodH.time.forEach((t,i)=>{
+            const at=weatherTimestamp(t,astroNum(astroAirCache.data.utc_offset_seconds)/60||0,astroAirCache.data.timezone);
+            if (Math.abs(at-ts)<distance){distance=Math.abs(at-ts);idx=i;}
+          });
+          if (idx>=0 && distance<=45*60000) {aod=astroNum(aodH.aerosol_optical_depth?.[idx]);pm25=astroNum(aodH.pm2_5?.[idx]);}
+        }
+        if (current) pm25=validFrom(astroNum(r.air?.pm25),pm25);
+        return {ts,cloud,humidity,wind,visibilityM,pop,rainMm,rainSource,aod,pm25,
+          cloudLow:validFrom(astroNum(pp?.cloudLow),hx("cloud_cover_low")),
+          cloudMid:validFrom(astroNum(pp?.cloudMid),hx("cloud_cover_mid")),
+          cloudHigh:validFrom(astroNum(pp?.cloudHigh),hx("cloud_cover_high"))};
+      }
+      function astroScore(weather, mode) {
+        const ts=weather.ts, sun=astroSolarGeometricAltitude(ts), threshold=mode==="B"?-18:mode==="C"?-6:-12;
+        if (sun>threshold) return {score:null,reason:"非對應夜間時段",sun};
+        const c=weather.cloud;
+        if (!Number.isFinite(c) || c<0 || c>100) return {score:null,reason:"缺少有效雲量",sun};
+        const moonAlt=lunarAltitudeDifference(ts,solarTargetLat,solarTargetLon)*180/Math.PI+.133;
+        const illum=calculateMoonPhase(ts).illuminated;
+        const glare=moonAlt>0 ? illum * astroClamp(.30 + moonAlt/35,0,1) : 0;
+        const cloudScore=100*Math.pow(1-c/100,1.5);
+        let clarity=NaN;
+        const vis=weather.visibilityM;
+        if (Number.isFinite(vis) && vis>=0) clarity=astroClamp(vis/20000*100);
+        const aod=weather.aod;
+        if (Number.isFinite(aod) && aod>=0) {
+          const aerosol=100*Math.exp(-3.4*aod);
+          clarity=Number.isFinite(clarity)?clarity*.7+aerosol*.3:aerosol;
+        } else if (Number.isFinite(weather.pm25) && weather.pm25>=0) {
+          const pmScore=astroClamp(100-(weather.pm25-5)*1.7);
+          clarity=Number.isFinite(clarity)?clarity*.85+pmScore*.15:pmScore;
+        }
+        const humidity=weather.humidity;
+        const humidityScore=Number.isFinite(humidity)?astroClamp(100-Math.max(0,humidity-75)*3.6):NaN;
+        const pop=weather.pop;
+        const rain=weather.rainMm;
+        const risks=[];
+        if (Number.isFinite(pop)&&pop>=0&&pop<=100) risks.push({s:100-pop,w:45});
+        if (Number.isFinite(rain)&&rain>=0) risks.push({s:100/(1+2.4*rain),w:35});
+        if (Number.isFinite(humidityScore)) risks.push({s:humidityScore,w:20});
+        const rw=risks.reduce((s,x)=>s+x.w,0);
+        const rainScore=rw?risks.reduce((s,x)=>s+x.s*x.w,0)/rw:NaN;
+        const wind=weather.wind, windScore=Number.isFinite(wind)&&wind>=0 ? astroClamp(100 - Math.max(0,wind-3)*13) : NaN;
+        const parts=[cloudScore,clarity,100-100*glare,rainScore,windScore],weights=ASTRO_WEIGHTS[mode];
+        let numerator=0,totalWeight=0;
+        parts.forEach((v,i)=>{if(Number.isFinite(v)&&weights[i]>0){numerator+=v*weights[i];totalWeight+=weights[i];}});
+        if(totalWeight<65) return {score:null,reason:"可用評分因子不足",sun};
+        let value=numerator/totalWeight;
+        // 陰天／降雨／霧不得被其他高分抵消。雨量推估不等於必然下雨，限制採保守門檻。
+        value=Math.min(value,100-.90*c);
+        if (Number.isFinite(rain) && rain>=2) value=Math.min(value,15);
+        else if(Number.isFinite(rain) && rain>=.3) value=Math.min(value,35);
+        if (Number.isFinite(vis) && vis<1000) value=Math.min(value,15);
+        if (Number.isFinite(pop) && pop>=85) value=Math.min(value,30);
+        const score=Math.round(astroClamp(value));
+        const restrictions=[];
+        if(c>=60) restrictions.push("雲量偏高");
+        if(mode!=="C"&&glare>.5) restrictions.push("月光較強");
+        if(Number.isFinite(vis)&&vis<5000) restrictions.push("能見度偏低");
+        if(Number.isFinite(rain)&&rain>=.3) restrictions.push("有降雨風險");
+        if(Number.isFinite(humidity)&&humidity>=90) restrictions.push("濕度高");
+        if(Number.isFinite(wind)&&wind>=8) restrictions.push("風速較強");
+        return {score,rating:astroRating(score),glare,cloud:c,coverage:totalWeight,restrictions,sun};
+      }
+      // 預報以「選定地點當地時間」的下一個整點開始；剛好整點則包含該整點。
+      // 不使用 UTC 小時取整，避免印度等半小時時區出現 :30 的時段。
+      function astroForecastStartHour(now=Date.now()) {
+        const parts=getTargetDateTimeParts(now);
+        if(!Number.isFinite(parts.minute)) return Math.ceil(now/3600000)*3600000;
+        const previousHour=Math.floor(now/60000)*60000-parts.minute*60000;
+        return previousHour<now ? previousHour+3600000 : previousHour;
+      }
+      function astroForecastItems(now=Date.now()) {
+        const start=astroForecastStartHour(now);
+        return Array.from({length:12},(_,i)=>{
+          const ts=start+i*3600000;
+          const row=astroWeatherRow(ts,false);
+          const scores=Object.fromEntries(Object.keys(ASTRO_WEIGHTS).map(k=>[k,astroScore(row,k)]));
+          return {ts,row,scores};
+        });
+      }
+      function renderAstroForecast() {
+        const timeline=$("astroForecastTimeline"), bestLabel=$("astroForecastBestScore"),
+          timeLabel=$("astroForecastBestTime"), note=$("astroForecastNote"),
+          info=$("astroForecastModeInfo"), range=$("astroForecastRange"),
+          details=$("astroForecastSelected");
+        if(!timeline)return;
+        const items=astroForecastItems();
+        const mode=astroForecastMode;
+        const scored=items.map(p=>({...p,result:p.scores[mode]}));
+        const available=scored.filter(p=>Number.isFinite(p.result.score));
+        info.textContent=ASTRO_MODE_DESCRIPTIONS[mode];
+        const firstHour=items[0].ts, endHour=items.at(-1).ts+3600000;
+        const startParts=getTargetDateTimeParts(firstHour),endParts=getTargetDateTimeParts(endHour);
+        const isNextDay=startParts.year!==endParts.year||startParts.month!==endParts.month||startParts.day!==endParts.day;
+        if(range)range.textContent=`${fmtHHMM(firstHour)}～${isNextDay?"次日 ":""}${fmtHHMM(endHour)}・12小時`;
+        let bestPair=null;
+        for(let i=0;i<scored.length-1;i++){
+          const a=scored[i],b=scored[i+1];
+          if(Number.isFinite(a.result.score)&&Number.isFinite(b.result.score)) {
+            const average=(a.result.score+b.result.score)/2;
+            if(!bestPair||average>bestPair.average)bestPair={average,start:a.ts,end:b.ts+3600000,first:a,second:b};
+          }
+        }
+        const best=bestPair?Math.round(bestPair.average):null;
+        bestLabel.textContent=best!==null?`${best}/100`:(available.length?"沒有連續2小時":"--");
+        timeLabel.textContent=bestPair?`${fmtHHMM(bestPair.start)}～${fmtHHMM(bestPair.end)}`:"無合適連續時段";
+
+        // 資料刷新／模式切換時保留使用者滑到的位置；進入下一個整點才回到最左邊。
+        const previousScroll=astroLastStartHour===firstHour?timeline.scrollLeft:0;
+        astroLastStartHour=firstHour;
+        if(!scored.some(p=>p.ts===astroSelectedHourTs))astroSelectedHourTs=(scored.find(p=>Number.isFinite(p.result.score))?.ts)??firstHour;
+        timeline.replaceChildren();
+        for(const p of scored){
+          const card=document.createElement("button");
+          card.type="button";
+          card.className=`forecast-item astro-hour${p.ts===astroSelectedHourTs?" is-selected":""}`;
+          const valid=Number.isFinite(p.result.score);
+          const nonNight=p.result.reason==="非對應夜間時段";
+          const icon=nonNight?"☀️":!valid?"🌫️":p.result.score>=80?"✨":p.result.score>=65?"🌟":p.result.score>=45?"⭐":p.result.score>=25?"☁️":"🌧️";
+          const cloud=Number.isFinite(p.row.cloud)?`☁ ${Math.round(p.row.cloud)}%`:"☁ --";
+          const title=valid?`${p.result.score}/100・${p.result.rating}`:nonNight?"非夜間":"缺資料";
+          card.setAttribute("aria-label",`${fmtHHMM(p.ts)}至${fmtHHMM(p.ts+3600000)}，${title}，點擊查看詳細條件`);
+          card.title=valid?`雲量 ${cloud}；${p.result.restrictions.join("、")||"無明顯限制"}`:p.result.reason;
+          card.innerHTML=`<div class="astro-hour-time">${fmtHHMM(p.ts)}</div><div class="astro-hour-icon">${icon}</div><div class="astro-hour-score">${valid?p.result.score+"分":"--"}</div><div class="astro-hour-detail">${valid?p.result.rating:nonNight?"非夜間":"缺資料"}</div><div class="astro-hour-cloud">${cloud}</div>`;
+          card.addEventListener("click",()=>{astroSelectedHourTs=p.ts;renderAstroForecast();});
+          timeline.appendChild(card);
+        }
+        timeline.scrollLeft=previousScroll;
+        if(details){
+          const p=scored.find(x=>x.ts===astroSelectedHourTs)??scored[0];
+          const r=p.result,w=p.row;
+          const fmtPct=v=>Number.isFinite(v)?`${Math.round(v)}%`:"--";
+          const fmtRain=v=>Number.isFinite(v)?`${v.toFixed(1)} mm`:"--";
+          const fmtWind=v=>Number.isFinite(v)?`${v.toFixed(1)} m/s`:"--";
+          const summary=Number.isFinite(r.score)?`${r.score}/100・${r.rating}${r.restrictions.length?"｜"+r.restrictions.join("、"):""}`:r.reason;
+          const top=document.createElement("div");top.className="astro-hour-selected-title";
+          top.textContent=`${fmtHHMM(p.ts)}～${fmtHHMM(p.ts+3600000)}｜${summary}`;
+          const metrics=document.createElement("div");metrics.className="astro-hour-selected-metrics";
+          for(const item of [`☁ 雲量 ${fmtPct(w.cloud)}`,`🌧 降雨機率 ${fmtPct(w.pop)}`,`💧 預報雨量 ${fmtRain(w.rainMm)}`,`💨 風速 ${fmtWind(w.wind)}`,`濕度 ${fmtPct(w.humidity)}`]){
+            const span=document.createElement("span");span.textContent=item;metrics.appendChild(span);
+          }
+          details.replaceChildren(top,metrics);
+        }
+        const noData=!stargazingForecastContext?.om && !hourly1h.length;
+        const radarUsed=scored.some(x=>x.row.rainSource?.startsWith("自有雷達"));
+        const airFresh=astroAirCache?.data?.hourly?.aerosol_optical_depth?.length;
+        const lowCloud=available.some(x=>Number.isFinite(x.row.cloudLow));
+        note.textContent=(noData?"氣象預報尚未取得。":"")+
+          `預報從下一個整點起算 12 小時；白天時段會顯示「非夜間」；缺資料時不補成晴天。濕度、風速、降雨機率優先取既有逐時預報；${radarUsed?"整點對齊時使用雷達外推雨量":"整點雨量使用模式預報（雷達60分鐘視窗未與整點時段完整對齊時不強行套用）"}；${lowCloud?"分層雲量可供參考（主分數採總雲量）":"分層雲量暫缺"}；${airFresh?"AOD採Open-Meteo／Copernicus CAMS模式":"AOD暫未取得"}。不含光害、視寧度與地形遮蔽。`;
+      }
+      function renderStargazingObservation() {
+        const ctx=stargazingForecastContext || {},now=Date.now();
+        const w=astroWeatherRow(now,true), sun=astroSolarGeometricAltitude(now);
+        const out=Object.fromEntries(Object.keys(ASTRO_WEIGHTS).map(k=>[k,astroScore(w,k)]));
+        for(const [id,k] of [["mStargazing","A"],["mStarB","B"],["mStarC","C"],["mStarD","D"]]){
+          const el=$(id),r=out[k];if(!el)continue;
+          const value=Number.isFinite(r.score)?`${r.score}/100｜${r.rating}`:sun>(k==="B"?-18:k==="C"?-6:-12)?"非觀測時段":"資料不足";
+          el.querySelector("b").textContent=value;
+          setMetricHighlight(el,Number.isFinite(r.score)&&r.score<45,Number.isFinite(r.score)&&r.score<25?"#ff8091":"#ffbe68");
+        }
+        const cloud=$("mCloud"),glare=$("mMoonGlare"),note=$("astroStargazingNote");
+        if(cloud) cloud.querySelector("b").textContent=Number.isFinite(w.cloud)?`${Math.round(w.cloud)}%`:"--";
+        if(glare){const moonAlt=lunarAltitudeDifference(now,solarTargetLat,solarTargetLon)*180/Math.PI+.133;
+          const glareValue=moonAlt>0?calculateMoonPhase(now).illuminated*astroClamp(.3+moonAlt/35,0,1):0;
+          glare.querySelector("b").textContent=glareValue<.15?"低":glareValue<.48?"中":"高";
+        }
+        if(note)note.textContent=sun>-6?"目前尚非適合夜間觀星的時段；分數不以0替代。":
+          `目前條件依已有觀測、模型雲量及缺值備援估算；${Number.isFinite(ctx.data?.realtime?.cloudCover)?"雲量取後端資料":"雲量可能來自模型"}；白天顯示「非觀測時段」屬正常；不含視寧度、光害與地形遮蔽。`;
+        renderAstroForecast();
+      }
+      async function loadAstroRadar(lat,lon,seq) {
+        const key=`${lat.toFixed(3)},${lon.toFixed(3)}`;
+        if(astroRadarCache?.key===key && Date.now()-astroRadarCache.fetched<3*60000)return;
+        if(astroRadarInFlight)return;
+        astroRadarInFlight=fetchJson(`https://api.leochangrainapi.com/api/rain?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&minutes=60&mode=mean&debug=0`,11000)
+          .then(data=>{
+            if(data?.ok===false)throw new Error(data.error||"雷達預報不可用");
+            const t=weatherTimestamp(data.base_time||data.built_time);
+            if(!Number.isFinite(t)||Math.abs(Date.now()-t)>15*60000)throw new Error("雷達預報已過期");
+            let mm=astroNum(data.accum_mm);
+            if(!Number.isFinite(mm)&&Array.isArray(data.series)&&data.series.length>=60){
+              const arr=validatedRainSeries(data,60);mm=arr.reduce((a,b)=>a+b,0);
+            }
+            if(!Number.isFinite(mm)||mm<0)throw new Error("雷達雨量無效");
+            if(seq===weatherRunSeq&&lastTarget&&lastTarget.lat===lat&&lastTarget.lon===lon){
+              astroRadarCache={key,mm,fetched:Date.now(),baseTime:t};renderAstroForecast();
+            }
+          }).catch(()=>{if(seq===weatherRunSeq){astroRadarCache=null;renderAstroForecast();}})
+          .finally(()=>{astroRadarInFlight=null;});
+        await astroRadarInFlight;
+      }
+      async function loadAstroAir(lat,lon,seq) {
+        if(!WORKER_ORIGIN)return;
+        const key=`${lat.toFixed(2)},${lon.toFixed(2)}`;
+        if(astroAirCache?.key===key&&Date.now()-astroAirCache.fetched<15*60000)return;
+        if(astroAirInFlight)return;
+        astroAirInFlight=fetchJson(`${WORKER_ORIGIN}/om/air?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`,9000)
+          .then(data=>{
+            if(seq!==weatherRunSeq||!data?.hourly)return;
+            astroAirCache={key,data,fetched:Date.now()};renderStargazingObservation();queueEnvironmentSummaryRender();
+          }).catch(()=>{}).finally(()=>{astroAirInFlight=null;});
+        await astroAirInFlight;
+      }
+      function installAstroForecast() {
+        document.querySelectorAll("[data-astro-mode]").forEach(btn=>btn.addEventListener("click",()=>{
+          astroForecastMode=btn.dataset.astroMode;
+          document.querySelectorAll("[data-astro-mode]").forEach(el=>{
+            const selected=el===btn;el.classList.toggle("active",selected);el.setAttribute("aria-pressed",String(selected));
+          });
+          renderAstroForecast();
+        }));
+        renderAstroForecast();
+      }
+
+      // 依選定地點的民用日期、時區及經緯度顯示天文日出日落，不需 API。
+      // 使用與畫面天空日夜判斷相同的 NOAA 近似演算法；不含山脈遮蔽。
+      function renderSolarObservation(ts = Date.now()) {
+        const sun = getSunHoursForTs(ts);
+        const format = hour => {
+          if (!Number.isFinite(hour)) return "--";
+          const minutes = Math.round(((hour % 24) + 24) % 24 * 60) % 1440;
+          return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+        };
+        const rise = $("mSunrise"), set = $("mSunset");
+        const noRise = sun.polarNight ? "極夜" : sun.polarDay ? "極晝" : "--";
+        const noSet = sun.polarDay ? "極晝" : sun.polarNight ? "極夜" : "--";
+        if (rise) rise.querySelector("b").textContent = Number.isFinite(sun.sunriseHour) ? format(sun.sunriseHour) : noRise;
+        if (set) set.querySelector("b").textContent = Number.isFinite(sun.sunsetHour) ? format(sun.sunsetHour) : noSet;
+        renderLunarObservation(ts);
+        renderAstroExtras(ts);
+        renderStargazingObservation();
+        queueEnvironmentSummaryRender();
+      }
       function getTargetHour(ts = Date.now()) {
         const p = getTargetDateTimeParts(ts);
         return p.hour + p.minute / 60;
@@ -7172,6 +7799,14 @@ function obsMapPickVisibleStations() {
         { id: "mVis", label: "能見度", icon: "👁️", base: 16 },
         { id: "mPres", label: "氣壓", icon: "◉", base: 14 },
         { id: "mSun", label: "日照", icon: "🌤️", base: 12 },
+        { id: "mSunrise", label: "日出", icon: "🌅", base: 11 },
+        { id: "mSunset", label: "日落", icon: "🌇", base: 10 },
+        { id: "mMoonrise", label: "月出", icon: "🌙", base: 9 },
+        { id: "mMoonset", label: "月落", icon: "🌘", base: 8 },
+        { id: "mStargazing", label: "觀星指數（估算）", icon: "⭐", base: 7 },
+        { id: "mMoonPhase", label: "月相", icon: "🌗", base: 6 },
+        { id: "mMoonIllum", label: "月面照明率", icon: "🌕", base: 5 },
+        { id: "mDaylight", label: "白晝長度", icon: "🌤️", base: 4 },
       ];
       const ENVIRONMENT_SUMMARY_STORAGE_KEY = "weather_environment_summary_v1";
       const environmentSummaryState = { mode: "auto", customIds: [] };
@@ -7871,6 +8506,12 @@ function obsMapPickVisibleStations() {
           ).trim(),
           primaryPoint: String(i?.primaryPoint ?? i?.primary_point ?? i?.forecastPoint ?? "").trim(),
           pop: backendNumber(i?.pop ?? i?.precipitation_probability),
+          rainMm: backendNumber(i?.rainMm ?? i?.precipitation),
+          cloudCover: backendNumber(i?.cloudCover ?? i?.cloud_cover),
+          cloudLow: backendNumber(i?.cloudLow ?? i?.cloud_cover_low),
+          cloudMid: backendNumber(i?.cloudMid ?? i?.cloud_cover_mid),
+          cloudHigh: backendNumber(i?.cloudHigh ?? i?.cloud_cover_high),
+          visibilityM: backendNumber(i?.visibilityM ?? i?.visibility),
           wx: String(i?.wx ?? i?.condition ?? i?.weather ?? "").trim(),
           _icon: String(i?.icon ?? i?._icon ?? "").trim(),
           _code: Number.isFinite(backendNumber(i?.code ?? i?.weather_code))
@@ -8195,7 +8836,7 @@ function obsMapPickVisibleStations() {
           daily:
             "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_mean",
           hourly:
-            "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover,visibility",
+            "temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility",
           current:
             "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m",
           timezone: "auto",
@@ -8253,6 +8894,12 @@ function obsMapPickVisibleStations() {
             weatherDescription: "",
             primaryPoint: "Open-Meteo",
             pop: backendNumber(h.precipitation_probability?.[i]),
+            rainMm: backendNumber(h.precipitation?.[i]),
+            cloudCover: backendNumber(h.cloud_cover?.[i]),
+            cloudLow: backendNumber(h.cloud_cover_low?.[i]),
+            cloudMid: backendNumber(h.cloud_cover_mid?.[i]),
+            cloudHigh: backendNumber(h.cloud_cover_high?.[i]),
+            visibilityM: backendNumber(h.visibility?.[i]),
             wx: wx.text,
             _icon: wx.icon,
             _code: backendNumber(h.weather_code?.[i]),
@@ -8320,11 +8967,13 @@ function obsMapPickVisibleStations() {
           }
         });
         setPressureValues(NaN, NaN, NaN);
+        renderSolarObservation();
         hourly1h = [];
         hourly10m = [];
         daily7 = [];
         renderHourlyForecast();
         renderDailyForecast();
+        renderAstroForecast();
       }
       function setSolarTarget(lat, lon, om = null) {
         if (Number.isFinite(Number(lat))) solarTargetLat = clamp(Number(lat), -89.8, 89.8);
@@ -8335,7 +8984,25 @@ function obsMapPickVisibleStations() {
         solarTargetTimeZone =
           reportedTimeZone && canUseTimeZone(reportedTimeZone) ? reportedTimeZone : "Asia/Taipei";
         solarTimeCache.clear();
+        moonTimesCache.clear();
+        renderSolarObservation();
       }
+      setInterval(() => {
+        const today = getTargetDateTimeParts();
+        const dayKey = `${today.year}-${today.month}-${today.day}`;
+        if (dayKey !== lastSolarObservationDateKey) {
+          lastSolarObservationDateKey = dayKey;
+          renderSolarObservation();
+        }
+      }, 60000);
+      let lastSolarObservationDateKey = "";
+      setInterval(() => {
+        if (!document.hidden) {
+          renderAstroExtras();
+          renderStargazingObservation();
+          queueEnvironmentSummaryRender();
+        }
+      }, 10 * 60000);
       function visibilityToKm(v) {
         const s = String(v ?? "");
         const nums = s.match(/\d+(?:\.\d+)?/g);
@@ -8518,7 +9185,9 @@ function obsMapPickVisibleStations() {
       }
 
       async function runAllForTarget(lat,lon,alt,labelHint,adminOverride=null,seq=weatherRunSeq) {
-  assertWeatherRun(seq); closeHourlyDetail({restoreFocus:false}); setSolarTarget(lat,lon); resetWeatherUi(lat,lon,labelHint);
+  assertWeatherRun(seq); closeHourlyDetail({restoreFocus:false}); stargazingForecastContext = null;
+  if (!lastTarget || Math.abs(lastTarget.lat-lat)>.001 || Math.abs(lastTarget.lon-lon)>.001) { astroRadarCache=null; astroAirCache=null; }
+  setSolarTarget(lat,lon); resetWeatherUi(lat,lon,labelHint);
   const rg=await reverseGeocodePlace(lat,lon); assertWeatherRun(seq);
   let label=labelHint||rg.label||"目前位置";
   if(isInsideTaiwan(lat,lon)&&adminOverride) label=adminOverride.startsWith(rg.county)?adminOverride:buildTaiwanLabel(rg.county,adminOverride,adminOverride);
@@ -8566,6 +9235,12 @@ function obsMapPickVisibleStations() {
   assertWeatherRun(seq);
   $("altitudeLabel").textContent=Number.isFinite(targetAlt)?Math.round(targetAlt)+" m":"高度無資料";
   lastTarget={lat,lon,alt,label,adminOverride};
+  stargazingForecastContext = { om, data, realtime };
+  renderStargazingObservation();
+  loadAstroRadar(lat,lon,seq);
+  loadAstroAir(lat,lon,seq);
+  if (!om) loadStargazingForecast(lat, lon, seq);
+  queueEnvironmentSummaryRender();
   const now=Date.now(),night=isNightAt(now),cloud=backendNumber(data?.realtime?.cloudCover??om?.current?.cloud_cover??om?.hourly?.cloud_cover?.[omHourIndex(om)]),rain=Math.max(Number.isFinite(realtime?.rain10)?realtime.rain10*6:0,Number.isFinite(realtime?.rain1h)?realtime.rain1h:0);
   const conditionAgeMinutes = observationAgeMinutes(realtime?.conditionObsTime);
   const conditionStationDistanceKm = backendNumber(realtime?.conditionStationDistanceKm);
@@ -8794,6 +9469,7 @@ function obsMapPickVisibleStations() {
         if (e.key === "Enter" && !$("rainBtn").disabled) $("rainBtn").click();
       });
 
+      installAstroForecast();
       installWeatherPageGestures();
       installHourlyDetail();
       installObservationMap();
